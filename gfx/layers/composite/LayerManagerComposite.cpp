@@ -1121,7 +1121,8 @@ bool LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion,
   {
     AUTO_PROFILER_LABEL("LayerManagerComposite::Render:Prerender", GRAPHICS);
 
-    if (!mCompositor->GetWidget()->PreRender(&widgetContext)) {
+    if (mCompositor->GetWidget() &&
+        !mCompositor->GetWidget()->PreRender(&widgetContext)) {
       return false;
     }
   }
@@ -1310,7 +1311,9 @@ bool LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion,
     }
   }
 
-  mCompositor->GetWidget()->PostRender(&widgetContext);
+  if (mCompositor->GetWidget()) {
+    mCompositor->GetWidget()->PostRender(&widgetContext);
+  }
 
   mProfilerScreenshotGrabber.MaybeProcessQueue();
 
