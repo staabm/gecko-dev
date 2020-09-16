@@ -45,6 +45,8 @@ static void EnsureInitialized() {
                                                        LayersId(), TimeDuration());
 }
 
+static void DumpDrawTarget();
+
 void SendUpdate(const TransactionInfo& aInfo) {
   EnsureInitialized();
 
@@ -54,6 +56,8 @@ void SendUpdate(const TransactionInfo& aInfo) {
   MOZ_RELEASE_ASSERT(rv == ipc::IPCResult::Ok());
 
   gCompositorBridge->CompositeToTarget(VsyncId(), nullptr, nullptr);
+
+  DumpDrawTarget();
 }
 
 void SendNewCompositable(const layers::CompositableHandle& aHandle,
@@ -101,6 +105,18 @@ already_AddRefed<gfx::DrawTarget> DrawTargetForRemoteDrawing(const gfx::IntRect&
   MOZ_RELEASE_ASSERT(drawTarget);
 
   return drawTarget.forget();
+}
+
+static void DumpDrawTarget() {
+  MOZ_RELEASE_ASSERT(gDrawTargetBufferSize == gPaintWidth * gPaintHeight * 4);
+  int numFilled = 0;
+  for (int i = 0; i < gDrawTargetBufferSize; i++) {
+    if (((char*)gDrawTargetBuffer)[i]) {
+      numFilled++;
+    }
+  }
+  PrintLog("DrawTargetContents Width %lu Height %lu Filled %d",
+           gPaintWidth, gPaintHeight, numFilled);
 }
 
 } // namespace mozilla::recordreplay
