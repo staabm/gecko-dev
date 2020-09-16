@@ -8,6 +8,7 @@
 // recording/replaying.
 
 #include "mozilla/layers/BasicCompositor.h"
+#include "mozilla/layers/BufferTexture.h"
 #include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/ImageDataSerializer.h"
 #include "mozilla/layers/LayerManagerComposite.h"
@@ -117,6 +118,52 @@ static void DumpDrawTarget() {
   }
   PrintLog("DrawTargetContents Width %lu Height %lu Filled %d",
            gPaintWidth, gPaintHeight, numFilled);
+}
+
+struct TextureInfo {
+  uint8_t* mBuffer;
+  BufferDescriptor mDesc;
+  TextureFlags mFlags;
+};
+
+static std::unordered_map<PTextureChild*, TextureInfo> gTextureInfo;
+
+void RegisterTextureChild(PTextureChild* aChild, TextureData* aData,
+                          const SurfaceDescriptor& aDesc,
+                          TextureFlags aFlags) {
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+
+  if (aDesc.type() != SurfaceDescriptor::TSurfaceDescriptorBuffer) {
+    return;
+  }
+
+  const SurfaceDescriptorBuffer& buf = aDesc.get_SurfaceDescriptorBuffer();
+  MOZ_RELEASE_ASSERT(buf.data().type() == MemoryOrShmem::TShmem);
+  uint8_t* buffer = static_cast<BufferTextureData*>(aData)->GetBuffer();
+
+  TextureInfo info = {
+    buffer,
+    buf.desc(),
+    aFlags
+  };
+
+  gTextureInfo[aChild] = info;
+}
+
+TextureHost* CreateTextureHost(PTextureChild* aChild) {
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+
+  auto iter = gTextureInfo.find(aChild);
+  MOZ_RELEASE_ASSERT(iter != gTextureInfo.end());
+  const TextureInfo& info = iter->second;
+  MemoryTextureHost* rv = new MemoryTextureHost(info.mBuffer, info.mDesc, info.mFlags);
+
+  // Leak the result so it doesn't get deleted later. We aren't respecting
+  // ownership rules by giving this MemoryTextureHost an internal pointer to
+  // a shmem.
+  new RefPtr(rv);
+
+  return rv;
 }
 
 } // namespace mozilla::recordreplay
