@@ -908,7 +908,7 @@ void CompositorBridgeParent::ScheduleComposition(
 
   if (mWrBridge) {
     mWrBridge->ScheduleGenerateFrame(aRenderRoots);
-  } else {
+  } else if (mCompositorScheduler) {
     mCompositorScheduler->ScheduleComposition();
   }
 }
@@ -1270,7 +1270,9 @@ void CompositorBridgeParent::ShadowLayersUpdated(
     mLayerManager->GetCompositor()->SetScreenRotation(targetConfig.rotation());
   }
 
-  mCompositionManager->Updated(aInfo.isFirstPaint(), targetConfig);
+  if (mCompositionManager) {
+    mCompositionManager->Updated(aInfo.isFirstPaint(), targetConfig);
+  }
   Layer* root = aLayerTree->GetRoot();
   mLayerManager->SetRoot(root);
 
@@ -1492,6 +1494,10 @@ void CompositorBridgeParent::InitializeLayerManager(
 
   MonitorAutoLock lock(*sIndirectLayerTreesLock);
   sIndirectLayerTrees[mRootLayerTreeID].mLayerManager = mLayerManager;
+}
+
+void CompositorBridgeParent::SetLayerManager(HostLayerManager* aLayerManager) {
+  mLayerManager = aLayerManager;
 }
 
 bool CompositorBridgeParent::InitializeAdvancedLayers(

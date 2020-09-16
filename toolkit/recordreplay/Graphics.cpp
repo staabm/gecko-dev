@@ -8,6 +8,7 @@
 // recording/replaying.
 
 #include "mozilla/layers/BasicCompositor.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/LayerManagerComposite.h"
 #include "mozilla/layers/LayerTransactionParent.h"
 #include "mozilla/layers/LayersMessages.h"
@@ -17,6 +18,7 @@ using namespace mozilla::layers;
 namespace mozilla::recordreplay {
 
 static LayerManagerComposite* gLayerManager;
+static CompositorBridgeParent* gCompositorBridge;
 static LayerTransactionParent* gLayerTransactionParent;
 
 static void EnsureInitialized() {
@@ -28,7 +30,17 @@ static void EnsureInitialized() {
 
   Compositor* compositor = new BasicCompositor(nullptr, nullptr);
   gLayerManager = new LayerManagerComposite(compositor);
-  gLayerTransactionParent = new LayerTransactionParent(gLayerManager, nullptr, nullptr,
+
+  gCompositorBridge = new CompositorBridgeParent(nullptr,
+                                                 CSSToLayoutDeviceScale(1),
+                                                 TimeDuration(),
+                                                 CompositorOptions(),
+                                                 false,
+                                                 gfx::IntSize());
+  gCompositorBridge->SetLayerManager(gLayerManager);
+
+  gLayerTransactionParent = new LayerTransactionParent(gLayerManager,
+                                                       gCompositorBridge, nullptr,
                                                        LayersId(), TimeDuration());
 }
 
@@ -40,9 +52,7 @@ void SendUpdate(const TransactionInfo& aInfo) {
   ipc::IPCResult rv = gLayerTransactionParent->RecvUpdate(aInfo);
   MOZ_RELEASE_ASSERT(rv == ipc::IPCResult::Ok());
 
-  nsCString none;
-  gLayerManager->BeginTransaction(none);
-  gLayerManager->EndTransaction(TimeStamp::Now());
+  gCompositorBridge->CompositeToTarget(VsyncId(), nullptr, nullptr);
 }
 
 void SendNewCompositable(const layers::CompositableHandle& aHandle,
