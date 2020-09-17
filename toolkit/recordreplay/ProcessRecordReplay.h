@@ -21,6 +21,8 @@ static inline bool TestEnv(const char* env) {
   return value && value[0];
 }
 
+void OnPaint(const char* aMimeType, const char* aOptions, const char* aData);
+
 }  // namespace mozilla::recordreplay
 
 #endif  // mozilla_recordreplay_ProcessRecordReplay_h

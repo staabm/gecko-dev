@@ -86,6 +86,7 @@ static bool (*gRecordReplayIsReplaying)();
 static int (*gCreateOrderedLock)(const char* aName);
 static void (*gOrderedLock)(int aLock);
 static void (*gOrderedUnlock)(int aLock);
+static void (*gOnPaint)(const char* aMimeType, const char* aOptions, const char* aData);
 
 template <typename T>
 static void LoadSymbol(void* handle, const char* name, T& function) {
@@ -154,6 +155,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol(handle, "RecordReplayCreateOrderedLock", gCreateOrderedLock);
   LoadSymbol(handle, "RecordReplayOrderedLock", gOrderedLock);
   LoadSymbol(handle, "RecordReplayOrderedUnlock", gOrderedUnlock);
+  LoadSymbol(handle, "RecordReplayOnPaint", gOnPaint);
 
   char buildId[128];
   snprintf(buildId, sizeof(buildId), "macOS-gecko-%s", PlatformBuildID());
@@ -394,6 +396,10 @@ void FinishRecording() {
   // fully uploaded. The ContentParent will not kill this process after
   // finishing the recording, so we have to it ourselves.
   exit(0);
+}
+
+void OnPaint(const char* aMimeType, const char* aOptions, const char* aData) {
+  gOnPaint(aMimeType, aOptions, aData);
 }
 
 }  // namespace recordreplay

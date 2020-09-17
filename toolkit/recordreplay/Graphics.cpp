@@ -7,6 +7,8 @@
 // Interfaces for drawing graphics to an in process buffer when
 // recording/replaying.
 
+#include "ProcessRecordReplay.h"
+#include "mozilla/Base64.h"
 #include "mozilla/layers/BasicCompositor.h"
 #include "mozilla/layers/BufferTexture.h"
 #include "mozilla/layers/CompositorBridgeParent.h"
@@ -14,6 +16,7 @@
 #include "mozilla/layers/LayerManagerComposite.h"
 #include "mozilla/layers/LayerTransactionParent.h"
 #include "mozilla/layers/LayersMessages.h"
+#include "imgIEncoder.h"
 
 using namespace mozilla::layers;
 
@@ -46,7 +49,7 @@ static void EnsureInitialized() {
                                                        LayersId(), TimeDuration());
 }
 
-static void DumpDrawTarget();
+static void ReportPaint();
 
 void SendUpdate(const TransactionInfo& aInfo) {
   EnsureInitialized();
@@ -58,7 +61,9 @@ void SendUpdate(const TransactionInfo& aInfo) {
 
   gCompositorBridge->CompositeToTarget(VsyncId(), nullptr, nullptr);
 
-  DumpDrawTarget();
+  if (IsReplaying()) {
+    ReportPaint();
+  }
 }
 
 void SendNewCompositable(const layers::CompositableHandle& aHandle,
@@ -108,18 +113,6 @@ already_AddRefed<gfx::DrawTarget> DrawTargetForRemoteDrawing(const gfx::IntRect&
   return drawTarget.forget();
 }
 
-static void DumpDrawTarget() {
-  MOZ_RELEASE_ASSERT(gDrawTargetBufferSize == gPaintWidth * gPaintHeight * 4);
-  int numFilled = 0;
-  for (int i = 0; i < gDrawTargetBufferSize; i++) {
-    if (((char*)gDrawTargetBuffer)[i]) {
-      numFilled++;
-    }
-  }
-  PrintLog("DrawTargetContents Width %lu Height %lu Filled %d",
-           gPaintWidth, gPaintHeight, numFilled);
-}
-
 struct TextureInfo {
   uint8_t* mBuffer;
   BufferDescriptor mDesc;
@@ -164,6 +157,49 @@ TextureHost* CreateTextureHost(PTextureChild* aChild) {
   new RefPtr(rv);
 
   return rv;
+}
+
+static void EncodeGraphics(const char* aMimeType,
+                           const char* aEncodeOptions) {
+  AutoPassThroughThreadEvents pt;
+
+  // Get an image encoder for the media type.
+  nsPrintfCString encoderCID("@mozilla.org/image/encoder;2?type=%s",
+                             nsCString(aMimeType).get());
+  nsCOMPtr<imgIEncoder> encoder = do_CreateInstance(encoderCID.get());
+
+  size_t stride = layers::ImageDataSerializer::ComputeRGBStride(SurfaceFormat,
+                                                                gPaintWidth);
+
+  nsString options = NS_ConvertUTF8toUTF16(aEncodeOptions);
+  nsresult rv = encoder->InitFromData(
+      (const uint8_t*)gDrawTargetBuffer, stride * gPaintHeight, gPaintWidth,
+      gPaintHeight, stride, imgIEncoder::INPUT_FORMAT_RGBA, options);
+  if (NS_FAILED(rv)) {
+    PrintLog("Error: encoder->InitFromData() failed");
+    return;
+  }
+
+  uint64_t count;
+  rv = encoder->Available(&count);
+  if (NS_FAILED(rv)) {
+    PrintLog("Error: encoder->Available() failed");
+    return;
+  }
+
+  nsCString data;
+  rv = Base64EncodeInputStream(encoder, data, count);
+  if (NS_FAILED(rv)) {
+    PrintLog("Error: Base64EncodeInputStream() failed");
+    return;
+  }
+
+  OnPaint(aMimeType, aEncodeOptions, data.get());
+}
+
+static void ReportPaint() {
+  EncodeGraphics("image/png", "");
+  EncodeGraphics("image/jpeg", "quality=50");
 }
 
 } // namespace mozilla::recordreplay
