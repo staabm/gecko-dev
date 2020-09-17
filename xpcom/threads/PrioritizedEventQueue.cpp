@@ -24,9 +24,13 @@ PrioritizedEventQueue::PrioritizedEventQueue(
       mDeferredTimersQueue(
           MakeUnique<EventQueue>(EventQueuePriority::DeferredTimers)),
       mIdleQueue(MakeUnique<EventQueue>(EventQueuePriority::Idle)),
-      mIdlePeriodState(std::move(aIdlePeriod)) {}
+      mIdlePeriodState(std::move(aIdlePeriod)) {
+  recordreplay::RegisterThing(this);
+}
 
-PrioritizedEventQueue::~PrioritizedEventQueue() = default;
+PrioritizedEventQueue::~PrioritizedEventQueue() {
+  recordreplay::UnregisterThing(this);
+}
 
 void PrioritizedEventQueue::PutEvent(already_AddRefed<nsIRunnable>&& aEvent,
                                      EventQueuePriority aPriority,
@@ -44,8 +48,13 @@ void PrioritizedEventQueue::PutEvent(already_AddRefed<nsIRunnable>&& aEvent,
     priority = EventQueuePriority::Normal;
   }
 
+recordreplay::RecordReplayAssert("PrioritizedEventQueue::PutEvent %d %d",
+                                 recordreplay::ThingIndex(this), priority);
+
   switch (priority) {
     case EventQueuePriority::High:
+      recordreplay::RecordReplayAssert("PrioritizedEventQueue::PutEvent HIGH %d",
+                                       recordreplay::ThingIndex(this));
       mHighQueue->PutEvent(event.forget(), priority, aProofOfLock, aDelay);
       break;
     case EventQueuePriority::Input:
@@ -89,6 +98,9 @@ EventQueuePriority PrioritizedEventQueue::SelectQueue(
     bool aUpdateState, const MutexAutoLock& aProofOfLock) {
   size_t inputCount = mInputQueue->Count(aProofOfLock);
 
+  recordreplay::RecordReplayAssert("PrioritizedEventQueue::SelectQueue Start %d %d",
+                                   recordreplay::ThingIndex(this), inputCount);
+
   if (aUpdateState && mInputQueueState == STATE_ENABLED &&
       mInputHandlingStartTime.IsNull() && inputCount > 0) {
     mInputHandlingStartTime =
@@ -117,31 +129,38 @@ EventQueuePriority PrioritizedEventQueue::SelectQueue(
   EventQueuePriority queue;
   if (!mHighQueue->IsEmpty(aProofOfLock)) {
     queue = EventQueuePriority::High;
+    recordreplay::RecordReplayAssert("PrioritizedEventQueue::SelectQueue #1");
   } else if (inputCount > 0 && (mInputQueueState == STATE_FLUSHING ||
                                 (mInputQueueState == STATE_ENABLED &&
                                  !mInputHandlingStartTime.IsNull() &&
                                  TimeStamp::Now() > mInputHandlingStartTime))) {
     queue = EventQueuePriority::Input;
+    recordreplay::RecordReplayAssert("PrioritizedEventQueue::SelectQueue #2");
   } else if (!mMediumHighQueue->IsEmpty(aProofOfLock)) {
     MOZ_ASSERT(
         mInputQueueState != STATE_FLUSHING,
         "Shouldn't consume medium high event when flushing input events");
     queue = EventQueuePriority::MediumHigh;
+    recordreplay::RecordReplayAssert("PrioritizedEventQueue::SelectQueue #3");
   } else if (!mNormalQueue->IsEmpty(aProofOfLock)) {
     MOZ_ASSERT(mInputQueueState != STATE_FLUSHING,
                "Shouldn't consume normal event when flushing input events");
     queue = EventQueuePriority::Normal;
+    recordreplay::RecordReplayAssert("PrioritizedEventQueue::SelectQueue #4");
   } else if (inputCount > 0 && mInputQueueState != STATE_SUSPEND) {
     MOZ_ASSERT(
         mInputQueueState != STATE_DISABLED,
         "Shouldn't consume input events when the input queue is disabled");
     queue = EventQueuePriority::Input;
+    recordreplay::RecordReplayAssert("PrioritizedEventQueue::SelectQueue #5");
   } else if (!mDeferredTimersQueue->IsEmpty(aProofOfLock)) {
     // We may not actually return an idle event in this case.
     queue = EventQueuePriority::DeferredTimers;
+    recordreplay::RecordReplayAssert("PrioritizedEventQueue::SelectQueue #6");
   } else {
     // We may not actually return an idle event in this case.
     queue = EventQueuePriority::Idle;
+    recordreplay::RecordReplayAssert("PrioritizedEventQueue::SelectQueue #7");
   }
 
   MOZ_ASSERT_IF(
@@ -186,6 +205,8 @@ already_AddRefed<nsIRunnable> PrioritizedEventQueue::GetEvent(
 
   EventQueuePriority queue = SelectQueue(true, aProofOfLock);
 
+  recordreplay::RecordReplayAssert("PrioritizedEventQueue::GetEvent Priority %d", queue);
+
   if (aPriority) {
     *aPriority = queue;
   }
@@ -205,6 +226,8 @@ already_AddRefed<nsIRunnable> PrioritizedEventQueue::GetEvent(
       break;
 
     case EventQueuePriority::High:
+      recordreplay::RecordReplayAssert("PrioritizedEventQueue::GetEvent HIGH %d",
+                                       recordreplay::ThingIndex(this));
       event = mHighQueue->GetEvent(aPriority, aProofOfLock,
                                    aHypotheticalInputEventDelay);
       MOZ_ASSERT(event);

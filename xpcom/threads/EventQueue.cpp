@@ -11,6 +11,11 @@ using namespace mozilla;
 using namespace mozilla::detail;
 
 template <size_t ItemsPerPage>
+EventQueueInternal<ItemsPerPage>::EventQueueInternal() {
+  recordreplay::RegisterThing(this);
+}
+
+template <size_t ItemsPerPage>
 EventQueueInternal<ItemsPerPage>::EventQueueInternal(
     EventQueuePriority aPriority) {
   recordreplay::RegisterThing(this);
@@ -38,19 +43,25 @@ void EventQueueInternal<ItemsPerPage>::PutEvent(
 
   nsCOMPtr<nsIRunnable> event(aEvent);
 
-  recordreplay::RecordReplayAssert("EventQueueInternal::PutEvent %d %d",
+  MOZ_RELEASE_ASSERT(!recordreplay::AreThreadEventsPassedThrough());
+  recordreplay::RecordReplayAssert("EventQueueInternal::PutEvent %d %d %d %d",
                                    recordreplay::ThingIndex(this),
-                                   recordreplay::ThingIndex(event));
+                                   recordreplay::ThingIndex(event),
+                                   mQueue.Count(),
+                                   mNumOperations);
 
   mQueue.Push(std::move(event));
+
+  mNumOperations++;
 }
 
 template <size_t ItemsPerPage>
 already_AddRefed<nsIRunnable> EventQueueInternal<ItemsPerPage>::GetEvent(
     EventQueuePriority* aPriority, const MutexAutoLock& aProofOfLock,
     mozilla::TimeDuration* aLastEventDelay) {
-  recordreplay::RecordReplayAssert("EventQueueInternal::GetEvent %d",
-                                   recordreplay::ThingIndex(this));
+  recordreplay::RecordReplayAssert("EventQueueInternal::GetEvent %d %d",
+                                   recordreplay::ThingIndex(this),
+                                   mQueue.Count());
 
   if (mQueue.IsEmpty()) {
     if (aLastEventDelay) {
@@ -88,9 +99,13 @@ already_AddRefed<nsIRunnable> EventQueueInternal<ItemsPerPage>::GetEvent(
 
   nsCOMPtr<nsIRunnable> result = mQueue.Pop();
 
-  recordreplay::RecordReplayAssert("EventQueueInternal::GetEvent RETURN %d %d",
+  MOZ_RELEASE_ASSERT(!recordreplay::AreThreadEventsPassedThrough());
+  recordreplay::RecordReplayAssert("EventQueueInternal::GetEvent RETURN %d %d %d %d",
                                    recordreplay::ThingIndex(this),
-                                   recordreplay::ThingIndex(result));
+                                   recordreplay::ThingIndex(result),
+                                   mQueue.Count(),
+                                  mNumOperations);
+  mNumOperations++;
 
   return result.forget();
 }

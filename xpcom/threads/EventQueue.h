@@ -24,7 +24,7 @@ class EventQueueInternal : public AbstractEventQueue {
  public:
   static const bool SupportsPrioritization = false;
 
-  EventQueueInternal() {}
+  EventQueueInternal();
   explicit EventQueueInternal(EventQueuePriority aPriority);
   ~EventQueueInternal();
 
@@ -92,6 +92,7 @@ class EventQueueInternal : public AbstractEventQueue {
   mozilla::Queue<mozilla::TimeStamp, ItemsPerPage> mDispatchTimes;
   TimeDuration mLastEventDelay;
 #endif
+  int mNumOperations = 0;
 };
 
 }  // namespace detail

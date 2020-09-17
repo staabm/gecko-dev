@@ -82,7 +82,9 @@ class Monitor {
     if (mRecordReplayOrderedLockId) {
       if (recordreplay::IsRecording()) {
         CVStatus rv = mCondVar.Wait(aDuration);
-        recordreplay::AutoOrderedLock ordered(mRecordReplayOrderedLockId);
+        {
+          recordreplay::AutoOrderedLock ordered(mRecordReplayOrderedLockId);
+        }
         return (CVStatus)recordreplay::RecordReplayValue(mMutex.Name(), (int)rv);
       } else {
         // Don't wait on the condvar, as above.
