@@ -152,7 +152,13 @@ gDebugger.onNewScript = script => {
   */
 
   const id = String(gSources.add(script.source));
-  RecordReplayControl.onScriptParsed(id, "scriptSource", script.source.url);
+
+  let kind = "scriptSource";
+  if (script.source.introductionType == "scriptElement") {
+    kind = "inlineScript";
+  }
+
+  RecordReplayControl.onScriptParsed(id, kind, script.source.url);
 
   function addScript(script) {
     const id = gScripts.add(script);
@@ -177,12 +183,27 @@ Services.obs.addObserver(
   "webnavigation-create"
 );
 
+const gHtmlContent = new Map();
+
+function getHTMLSource({ url }) {
+  const info = gHtmlContent.get(url);
+  const contents = info ? info.content : "";
+  return { contents };
+};
+
+function OnHTMLContent(data) {
+  const { uri, contents } = JSON.parse(data);
+  if (gHtmlContent.has(uri)) {
+    gHtmlContent.get(uri).content += contents;
+  } else {
+    gHtmlContent.set(uri, { content: contents, contentType: "text/html" });
+  }
+}
+
 Services.obs.addObserver(
   {
     observe(_1, _2, data) {
-      if (exports.OnHTMLContent) {
-        exports.OnHTMLContent(data);
-      }
+      OnHTMLContent(data);
     },
   },
   "devtools-html-content"
@@ -300,13 +321,18 @@ function getAllFrames() {
   return {};
 }
 
-function getScriptSource(params) {
-  // FIXME
+function getScriptSource({ scriptId }) {
+  const source = gSources.getObject(Number(scriptId));
+  return {
+    scriptSource: source.text,
+    contentType: "text/javascript",
+  };
 }
 
 const commands = {
   "Pause.getAllFrames": getAllFrames,
   "Debugger.getScriptSource": getScriptSource,
+  "Internal.getHTMLSource": getHTMLSource,
 };
 
 function OnProtocolCommand(method, params) {
