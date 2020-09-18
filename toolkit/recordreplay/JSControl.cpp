@@ -196,8 +196,6 @@ void SendRecordingFinished(const char* aRecordingId) {
   }
 }
 
-}  // namespace js
-
 ///////////////////////////////////////////////////////////////////////////////
 // Module Interface
 ///////////////////////////////////////////////////////////////////////////////
@@ -235,9 +233,9 @@ static bool RecordReplay_OnScriptParsed(JSContext* aCx, unsigned aArgc,
   }
 
   nsAutoCString id, kind, url;
-  js::ConvertJSStringToCString(aCx, args.get(0).toString(), id);
-  js::ConvertJSStringToCString(aCx, args.get(1).toString(), kind);
-  js::ConvertJSStringToCString(aCx, args.get(2).toString(), url);
+  ConvertJSStringToCString(aCx, args.get(0).toString(), id);
+  ConvertJSStringToCString(aCx, args.get(1).toString(), kind);
+  ConvertJSStringToCString(aCx, args.get(2).toString(), url);
   OnScriptParsed(id.get(), kind.get(), url.get());
 
   args.rval().setUndefined();
@@ -287,16 +285,12 @@ static bool RecordReplay_ShouldUpdateProgressCounter(JSContext* aCx,
     }
 
     nsAutoCString str;
-    js::ConvertJSStringToCString(aCx, args.get(0).toString(), str);
+    ConvertJSStringToCString(aCx, args.get(0).toString(), str);
     args.rval().setBoolean(ShouldUpdateProgressCounter(str.get()));
   }
 
   return true;
 }
-
-///////////////////////////////////////////////////////////////////////////////
-// Plumbing
-///////////////////////////////////////////////////////////////////////////////
 
 static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("log", RecordReplay_Log, 1, 0),
@@ -309,6 +303,61 @@ static const JSFunctionSpec gRecordReplayMethods[] = {
         RecordReplay_ShouldUpdateProgressCounter, 1, 0),
   JS_FS_END
 };
+
+static bool FillStringCallback(const char16_t* buf, uint32_t len, void* data) {
+  nsCString* str = (nsCString*)data;
+  MOZ_RELEASE_ASSERT(str->Length() == 0);
+  *str = NS_ConvertUTF16toUTF8(buf, len);
+  return true;
+}
+
+char* CommandCallback(const char* aMethod, const char* aParams) {
+  MOZ_RELEASE_ASSERT(js::IsInitialized());
+
+  AutoSafeJSContext cx;
+  JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
+
+  RootedString method(cx, JS_NewStringCopyZ(cx, aMethod));
+  RootedString paramsStr(cx, JS_NewStringCopyZ(cx, aParams));
+  MOZ_RELEASE_ASSERT(method && paramsStr);
+
+  RootedValue params(cx);
+  if (!JS_ParseJSON(cx, paramsStr, &params)) {
+    PrintLog("Error: CommandCallback ParseJSON failed %s %s", aMethod, aParams);
+    MOZ_CRASH("CommandCallback");
+  }
+
+  JS::AutoValueArray<2> args(cx);
+  args[0].setString(method);
+  args[1].set(params);
+
+  RootedValue rv(cx);
+  if (!JS_CallFunctionName(cx, *js::gModuleObject, "OnProtocolCommand", args, &rv)) {
+    PrintLog("Error: CommandCallback result must be an object %s", aMethod);
+    MOZ_CRASH("CommandCallback");
+  }
+
+  if (!rv.isObject()) {
+    PrintLog("Error: CommandCallback result must be an object %s", aMethod);
+    MOZ_CRASH("CommandCallback");
+  }
+
+  RootedObject obj(cx, &rv.toObject());
+
+  nsCString str;
+  if (!JS::ToJSONMaybeSafely(cx, obj, FillStringCallback, &str)) {
+    PrintLog("Error: CommandCallback ToJSON failed");
+    MOZ_CRASH("CommandCallback");
+  }
+
+  return strdup(str.get());
+}
+
+}  // namespace js
+
+///////////////////////////////////////////////////////////////////////////////
+// Plumbing
+///////////////////////////////////////////////////////////////////////////////
 
 bool DefineRecordReplayControlObject(JSContext* aCx, JS::HandleObject object) {
   MOZ_RELEASE_ASSERT(IsRecordingOrReplaying());
@@ -329,7 +378,7 @@ bool DefineRecordReplayControlObject(JSContext* aCx, JS::HandleObject object) {
     }
   }
 
-  if (!JS_DefineFunctions(aCx, staticObject, gRecordReplayMethods)) {
+  if (!JS_DefineFunctions(aCx, staticObject, js::gRecordReplayMethods)) {
     return false;
   }
 

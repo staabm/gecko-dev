@@ -89,6 +89,7 @@ static void (*gOrderedUnlock)(int aLock);
 static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
 static void (*gOnScriptParsed)(const char* aId, const char* aKind, const char* aUrl);
 static void (*gOnPaint)(const char* aMimeType, const char* aOptions, const char* aData);
+static void (*gSetDefaultCommandCallback)(char* (*aCallback)(const char*, const char*));
 
 template <typename T>
 static void LoadSymbol(void* handle, const char* name, T& function) {
@@ -160,6 +161,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol(handle, "RecordReplayAddOrderedPthreadMutex", gAddOrderedPthreadMutex);
   LoadSymbol(handle, "RecordReplayOnScriptParsed", gOnScriptParsed);
   LoadSymbol(handle, "RecordReplayOnPaint", gOnPaint);
+  LoadSymbol(handle, "RecordReplaySetDefaultCommandCallback", gSetDefaultCommandCallback);
 
   char buildId[128];
   snprintf(buildId, sizeof(buildId), "macOS-gecko-%s", PlatformBuildID());
@@ -173,6 +175,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   ParseJSFilters("RECORD_REPLAY_RECORD_EXECUTION_ASSERTS", gExecutionAsserts);
   ParseJSFilters("RECORD_REPLAY_RECORD_JS_ASSERTS", gJSAsserts);
 
+  gSetDefaultCommandCallback(js::CommandCallback);
   gRecordCommandLineArguments(aArgc, aArgv);
 }
 

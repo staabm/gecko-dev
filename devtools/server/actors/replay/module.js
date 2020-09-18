@@ -30,6 +30,8 @@ const {
 // In non-recording/replaying processes there are no properties on RecordReplayControl.
 const isRecordingOrReplaying = !!RecordReplayControl.progressCounter;
 
+const log = RecordReplayControl.log;
+
 const { require } = ChromeUtils.import("resource://devtools/shared/Loader.jsm");
 
 let gWindow;
@@ -293,11 +295,34 @@ function OnTestCommand(str) {
   }
 }
 
+function getAllFrames() {
+  // FIXME
+  return {};
+}
+
+function getScriptSource(params) {
+  // FIXME
+}
+
+const commands = {
+  "Pause.getAllFrames": getAllFrames,
+  "Debugger.getScriptSource": getScriptSource,
+};
+
+function OnProtocolCommand(method, params) {
+  log(`OnProtocolCommand ${method} ${JSON.stringify(params)}`);
+  if (commands[method]) {
+    return commands[method](params);
+  }
+  log(`Error: Unsupported command ${method}`);
+}
+
 const exports = {
   CanCreateCheckpoint,
   OnMouseEvent,
   SendRecordingFinished,
   OnTestCommand,
+  OnProtocolCommand,
 };
 
 function Initialize() {

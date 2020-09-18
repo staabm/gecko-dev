@@ -30,6 +30,10 @@ void EnsureInitialized();
 // Notify the UI process that the recording was finished.
 void SendRecordingFinished(const char* aRecordingId);
 
+// Callback used when the recording driver is sending us a command to look up
+// some state.
+char* CommandCallback(const char* aMethod, const char* aParams);
+
 }  // namespace js
 }  // namespace recordreplay
 }  // namespace mozilla
