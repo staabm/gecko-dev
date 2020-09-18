@@ -161,6 +161,11 @@ struct MOZ_RAII AutoOrderedLock {
   ~AutoOrderedLock() { OrderedUnlock(mLock); }
 };
 
+// Mark an existing mutex so that locking operations on it will occur in the
+// same order when replaying as when recording.
+static inline void AddOrderedPthreadMutex(const char* aName,
+                                          pthread_mutex_t* aMutex);
+
 // Determine whether this is a recording/replaying process, and
 // initialize record/replay state if so.
 MFBT_API void Initialize(int* aArgc, char*** aArgv);
@@ -283,6 +288,9 @@ MOZ_MAKE_RECORD_REPLAY_WRAPPER(CreateOrderedLock, int, 0,
                                (const char* aName), (aName))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(OrderedLock, (int aLock), (aLock))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(OrderedUnlock, (int aLock), (aLock))
+MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AddOrderedPthreadMutex,
+                                    (const char* aName, pthread_mutex_t* aMutex),
+                                    (aName, aMutex));
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AssertScriptedCaller, (const char* aWhy), (aWhy))
 
 #undef MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID

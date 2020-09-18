@@ -86,6 +86,7 @@ static bool (*gRecordReplayIsReplaying)();
 static int (*gCreateOrderedLock)(const char* aName);
 static void (*gOrderedLock)(int aLock);
 static void (*gOrderedUnlock)(int aLock);
+static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
 static void (*gOnPaint)(const char* aMimeType, const char* aOptions, const char* aData);
 
 template <typename T>
@@ -155,6 +156,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol(handle, "RecordReplayCreateOrderedLock", gCreateOrderedLock);
   LoadSymbol(handle, "RecordReplayOrderedLock", gOrderedLock);
   LoadSymbol(handle, "RecordReplayOrderedUnlock", gOrderedUnlock);
+  LoadSymbol(handle, "RecordReplayAddOrderedPthreadMutex", gAddOrderedPthreadMutex);
   LoadSymbol(handle, "RecordReplayOnPaint", gOnPaint);
 
   char buildId[128];
@@ -307,6 +309,11 @@ MOZ_EXPORT void RecordReplayInterface_InternalOrderedLock(int aLock) {
 
 MOZ_EXPORT void RecordReplayInterface_InternalOrderedUnlock(int aLock) {
   gOrderedUnlock(aLock);
+}
+
+MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedPthreadMutex(const char* aName,
+                                                                     pthread_mutex_t* aMutex) {
+  gAddOrderedPthreadMutex(aName, aMutex);
 }
 
 }  // extern "C"

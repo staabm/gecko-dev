@@ -50,7 +50,7 @@ class OffTheBooksMutex : public detail::MutexImpl, BlockingResourceBase {
 #endif
   {
     if (aOrdered) {
-      mRecordReplayOrderedLockId = recordreplay::CreateOrderedLock(aName);
+      recordreplay::AddOrderedPthreadMutex(aName, NativeHandle());
     }
   }
 
@@ -64,34 +64,17 @@ class OffTheBooksMutex : public detail::MutexImpl, BlockingResourceBase {
   /**
    * Lock this mutex.
    **/
-  void Lock() {
-    Maybe<recordreplay::AutoOrderedLock> ordered;
-    if (mRecordReplayOrderedLockId) {
-      ordered.emplace(mRecordReplayOrderedLockId);
-    }
-    this->lock();
-  }
+  void Lock() { this->lock(); }
 
   /**
    * Try to lock this mutex, returning true if we were successful.
    **/
-  bool TryLock() {
-    Maybe<recordreplay::AutoOrderedLock> ordered;
-    if (mRecordReplayOrderedLockId) {
-      ordered.emplace(mRecordReplayOrderedLockId);
-    }
-    return this->tryLock();
-  }
+  bool TryLock() { return this->tryLock(); }
 
   /**
    * Unlock this mutex.
    **/
-  void Unlock() {
-    if (mRecordReplayOrderedLockId) {
-      recordreplay::RecordReplayAssert("MutexUnlock %s", Name());
-    }
-    this->unlock();
-  }
+  void Unlock() { this->unlock(); }
 
   /**
    * Assert that the current thread owns this mutex in debug builds.
@@ -123,8 +106,6 @@ class OffTheBooksMutex : public detail::MutexImpl, BlockingResourceBase {
 
 #endif  // ifndef DEBUG
 
-  const char* Name() { return BlockingResourceBase::Name(); }
-
  private:
   OffTheBooksMutex();
   OffTheBooksMutex(const OffTheBooksMutex&);
@@ -135,8 +116,6 @@ class OffTheBooksMutex : public detail::MutexImpl, BlockingResourceBase {
 #ifdef DEBUG
   PRThread* mOwningThread;
 #endif
-
-  int mRecordReplayOrderedLockId = 0;
 };
 
 /**

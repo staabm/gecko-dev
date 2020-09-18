@@ -52,6 +52,8 @@ namespace recordreplay {
   Macro(InternalUnregisterThing, (void* aThing), (aThing))                     \
   Macro(InternalOrderedLock, (int aLock), (aLock))                             \
   Macro(InternalOrderedUnlock, (int aLock), (aLock))                           \
+  Macro(InternalAddOrderedPthreadMutex,                                        \
+        (const char* aName, pthread_mutex_t* aMutex), (aName, aMutex))         \
   Macro(BeginContentParse,                                                     \
         (const void* aToken, const char* aURL, const char* aContentType),      \
         (aToken, aURL, aContentType))                                          \

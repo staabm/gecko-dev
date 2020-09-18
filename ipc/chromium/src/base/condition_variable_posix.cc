@@ -15,9 +15,7 @@
 #include "build/build_config.h"
 
 ConditionVariable::ConditionVariable(Lock* user_lock)
-    : user_lock_(user_lock),
-      record_replay_lock_id_(user_lock->record_replay_lock_id_),
-      user_mutex_(user_lock->lock_.native_handle()) {
+    : user_mutex_(user_lock->lock_.native_handle()) {
   int rv = 0;
   // http://crbug.com/293736
   // NaCl doesn't support monotonic clock based absolute deadlines.
@@ -58,12 +56,12 @@ ConditionVariable::~ConditionVariable() {
   DCHECK_EQ(0, rv);
 }
 
-void ConditionVariable::WaitInternal() {
+void ConditionVariable::Wait() {
   int rv = pthread_cond_wait(&condition_, user_mutex_);
   DCHECK_EQ(0, rv);
 }
 
-void ConditionVariable::TimedWaitInternal(const base::TimeDelta& max_time) {
+void ConditionVariable::TimedWait(const base::TimeDelta& max_time) {
   int64_t usecs = max_time.InMicroseconds();
   struct timespec relative_time;
   relative_time.tv_sec = usecs / base::Time::kMicrosecondsPerSecond;

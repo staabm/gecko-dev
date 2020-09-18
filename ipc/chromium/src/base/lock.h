@@ -11,7 +11,6 @@
 #include "base/lock_impl.h"
 #include "base/platform_thread.h"
 #include "build/build_config.h"
-
 #include "mozilla/RecordReplay.h"
 
 // A convenient wrapper for an OS specific critical section.
@@ -20,38 +19,18 @@ class Lock {
   // Optimized wrapper implementation
   Lock(bool ordered = false) : lock_() {
     if (ordered) {
-      record_replay_lock_id_ = mozilla::recordreplay::CreateOrderedLock("Lock");
+      mozilla::recordreplay::AddOrderedPthreadMutex("Lock", lock_.native_handle());
     }
   }
   ~Lock() {}
-  void Acquire() {
-    if (record_replay_lock_id_) {
-      // See Monitor.h for the rationale here.
-      if (mozilla::recordreplay::IsRecording()) {
-        lock_.Lock();
-        mozilla::recordreplay::AutoOrderedLock ordered(record_replay_lock_id_);
-      } else {
-        mozilla::recordreplay::AutoOrderedLock ordered(record_replay_lock_id_);
-        lock_.Lock();
-      }
-    } else {
-      lock_.Lock();
-    }
-  }
+  void Acquire() { lock_.Lock(); }
   void Release() { lock_.Unlock(); }
 
   // If the lock is not held, take it and return true. If the lock is already
   // held by another thread, immediately return false. This must not be called
   // by a thread already holding the lock (what happens is undefined and an
   // assertion may fail).
-  bool Try() {
-    if (record_replay_lock_id_) {
-      mozilla::recordreplay::AutoOrderedLock ordered(record_replay_lock_id_);
-      return lock_.Try();
-    } else {
-      return lock_.Try();
-    }
-  }
+  bool Try() { return lock_.Try(); }
 
   // Null implementation if not debug.
   void AssertAcquired() const {}
@@ -83,8 +62,6 @@ class Lock {
  private:
   // Platform specific underlying lock implementation.
   ::base::internal::LockImpl lock_;
-
-  int record_replay_lock_id_ = 0;
 
   DISALLOW_COPY_AND_ASSIGN(Lock);
 };

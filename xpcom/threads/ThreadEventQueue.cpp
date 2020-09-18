@@ -184,17 +184,17 @@ already_AddRefed<nsIRunnable> ThreadEventQueue<InnerQueueT>::GetEvent(
           // our idle state is not up to date.  We need to update the idle state
           // and try again.  We need to temporarily release the lock while we do
           // that.
-          recordreplay::RecordReplayAssert("ThreadEventQueue AutoUnlock #1")
+          recordreplay::RecordReplayAssert("ThreadEventQueue AutoUnlock #1");
           MutexAutoUnlock unlock(mLock);
           idleState->UpdateCachedIdleDeadline(unlock);
         } else {
           // We need to notify our idle state that we're out of tasks to run.
           // This needs to be done while not holding the lock.
-          recordreplay::RecordReplayAssert("ThreadEventQueue AutoUnlock #2")
+          recordreplay::RecordReplayAssert("ThreadEventQueue AutoUnlock #2");
           MutexAutoUnlock unlock(mLock);
           idleState->RanOutOfTasks(unlock);
         }
-        recordreplay::RecordReplayAssert("ThreadEventQueue AutoUnlock AFTER")
+        recordreplay::RecordReplayAssert("ThreadEventQueue AutoUnlock AFTER");
 
         // When we unlocked, someone may have queued a new runnable on us.  So
         // we _must_ try to get a runnable again before we start sleeping, since

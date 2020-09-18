@@ -93,34 +93,8 @@ class ConditionVariable {
   // Wait() releases the caller's critical section atomically as it starts to
   // sleep, and the reacquires it when it is signaled. The wait functions are
   // susceptible to spurious wakeups. (See usage note 1 for more details.)
-  void Wait() {
-    if (record_replay_lock_id_) {
-      // See Monitor.h for the rationale here.
-      if (mozilla::recordreplay::IsRecording()) {
-        WaitInternal();
-        mozilla::recordreplay::AutoOrderedLock ordered(record_replay_lock_id_);
-      } else {
-        user_lock_->Release();
-        user_lock_->Acquire();
-      }
-    } else {
-      WaitInternal();
-    }
-  }
-  void TimedWait(const base::TimeDelta& max_time) {
-    if (record_replay_lock_id_) {
-      // See Monitor.h for the rationale here.
-      if (mozilla::recordreplay::IsRecording()) {
-        TimedWaitInternal(max_time);
-        mozilla::recordreplay::AutoOrderedLock ordered(record_replay_lock_id_);
-      } else {
-        user_lock_->Release();
-        user_lock_->Acquire();
-      }
-    } else {
-      TimedWaitInternal(max_time);
-    }
-  }
+  void Wait();
+  void TimedWait(const base::TimeDelta& max_time);
 
   // Broadcast() revives all waiting threads. (See usage note 2 for more
   // details.)
@@ -129,12 +103,6 @@ class ConditionVariable {
   void Signal();
 
  private:
-  void WaitInternal();
-  void TimedWaitInternal(const base::TimeDelta& max_time);
-
-  Lock* user_lock_ = nullptr;
-  int record_replay_lock_id_ = 0;
-
 #if defined(OS_WIN)
   CONDITION_VARIABLE cv_;
   SRWLOCK* const srwlock_;
