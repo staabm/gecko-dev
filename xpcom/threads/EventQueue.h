@@ -85,6 +85,10 @@ class EventQueueInternal : public AbstractEventQueue {
     return size;
   }
 
+  size_t NumOperations() {
+    return mNumOperations;
+  }
+
  private:
   mozilla::Queue<nsCOMPtr<nsIRunnable>, ItemsPerPage> mQueue;
 #ifdef MOZ_GECKO_PROFILER

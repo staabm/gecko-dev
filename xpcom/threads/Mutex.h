@@ -86,7 +86,12 @@ class OffTheBooksMutex : public detail::MutexImpl, BlockingResourceBase {
   /**
    * Unlock this mutex.
    **/
-  void Unlock() { this->unlock(); }
+  void Unlock() {
+    if (mRecordReplayOrderedLockId) {
+      recordreplay::RecordReplayAssert("MutexUnlock %s", Name());
+    }
+    this->unlock();
+  }
 
   /**
    * Assert that the current thread owns this mutex in debug builds.

@@ -98,6 +98,9 @@ bool ThreadEventQueue<InnerQueueT>::PutEventInternal(
     }
 
     MutexAutoLock lock(mLock);
+    recordreplay::RecordReplayAssert("ThreadEventQueue::PutEvent %d %d",
+                                     recordreplay::ThingIndex(mBaseQueue.get()),
+                                     mBaseQueue->NumOperations());
 
     if (mEventsAreDoomed) {
       return false;
@@ -120,6 +123,10 @@ bool ThreadEventQueue<InnerQueueT>::PutEventInternal(
     // this nsThread before the calling thread is scheduled again. We would then
     // crash while trying to access a dead nsThread.
     obs = mObserver;
+
+    recordreplay::RecordReplayAssert("ThreadEventQueue::PutEvent DONE %d %d",
+                                     recordreplay::ThingIndex(mBaseQueue.get()),
+                                     mBaseQueue->NumOperations());
   }
 
   if (obs) {
@@ -147,6 +154,10 @@ already_AddRefed<nsIRunnable> ThreadEventQueue<InnerQueueT>::GetEvent(
     // before returning.
     MutexAutoLock lock(mLock);
 
+    recordreplay::RecordReplayAssert("ThreadEventQueue::GetEvent %d %d",
+                                     recordreplay::ThingIndex(mBaseQueue.get()),
+                                     mBaseQueue->NumOperations());
+
     for (;;) {
       const bool noNestedQueue = mNestedQueues.IsEmpty();
       if (noNestedQueue) {
@@ -173,14 +184,17 @@ already_AddRefed<nsIRunnable> ThreadEventQueue<InnerQueueT>::GetEvent(
           // our idle state is not up to date.  We need to update the idle state
           // and try again.  We need to temporarily release the lock while we do
           // that.
+          recordreplay::RecordReplayAssert("ThreadEventQueue AutoUnlock #1")
           MutexAutoUnlock unlock(mLock);
           idleState->UpdateCachedIdleDeadline(unlock);
         } else {
           // We need to notify our idle state that we're out of tasks to run.
           // This needs to be done while not holding the lock.
+          recordreplay::RecordReplayAssert("ThreadEventQueue AutoUnlock #2")
           MutexAutoUnlock unlock(mLock);
           idleState->RanOutOfTasks(unlock);
         }
+        recordreplay::RecordReplayAssert("ThreadEventQueue AutoUnlock AFTER")
 
         // When we unlocked, someone may have queued a new runnable on us.  So
         // we _must_ try to get a runnable again before we start sleeping, since
@@ -209,6 +223,10 @@ already_AddRefed<nsIRunnable> ThreadEventQueue<InnerQueueT>::GetEvent(
       AUTO_PROFILER_THREAD_SLEEP;
       mEventsAvailable.Wait();
     }
+
+    recordreplay::RecordReplayAssert("ThreadEventQueue::GetEvent DONE %d %d",
+                                     recordreplay::ThingIndex(mBaseQueue.get()),
+                                     mBaseQueue->NumOperations());
   }
 
   if (idleState) {
@@ -319,6 +337,10 @@ template <class InnerQueueT>
 void ThreadEventQueue<InnerQueueT>::PopEventQueue(nsIEventTarget* aTarget) {
   MutexAutoLock lock(mLock);
 
+  recordreplay::RecordReplayAssert("ThreadEventQueue::PopEventQueue %d %d",
+                                   recordreplay::ThingIndex(mBaseQueue.get()),
+                                   mBaseQueue->NumOperations());
+
   MOZ_ASSERT(!mNestedQueues.IsEmpty());
 
   NestedQueueItem& item = mNestedQueues.LastElement();
@@ -344,6 +366,10 @@ void ThreadEventQueue<InnerQueueT>::PopEventQueue(nsIEventTarget* aTarget) {
   }
 
   mNestedQueues.RemoveLastElement();
+
+  recordreplay::RecordReplayAssert("ThreadEventQueue::PopEventQueue DONE %d %d",
+                                   recordreplay::ThingIndex(mBaseQueue.get()),
+                                   mBaseQueue->NumOperations());
 }
 
 template <class InnerQueueT>

@@ -104,7 +104,7 @@ already_AddRefed<nsIRunnable> EventQueueInternal<ItemsPerPage>::GetEvent(
                                    recordreplay::ThingIndex(this),
                                    recordreplay::ThingIndex(result),
                                    mQueue.Count(),
-                                  mNumOperations);
+                                   mNumOperations);
   mNumOperations++;
 
   return result.forget();
@@ -113,6 +113,9 @@ already_AddRefed<nsIRunnable> EventQueueInternal<ItemsPerPage>::GetEvent(
 template <size_t ItemsPerPage>
 bool EventQueueInternal<ItemsPerPage>::IsEmpty(
     const MutexAutoLock& aProofOfLock) {
+  recordreplay::RecordReplayAssert("EventQueueInternal::IsEmpty %d %d %d",
+                                   recordreplay::ThingIndex(this), mQueue.Count(),
+                                   mNumOperations);
   return mQueue.IsEmpty();
 }
 

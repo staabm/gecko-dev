@@ -301,6 +301,7 @@ void PrioritizedEventQueue::DidRunEvent(const MutexAutoLock& aProofOfLock) {
     MutexAutoUnlock unlock(*mMutex);
     mIdlePeriodState.RanOutOfTasks(unlock);
   }
+  recordreplay::RecordReplayAssert("PrioritizedEventQueue::DidRunEvent AFTER_UNLOCK");
 }
 
 bool PrioritizedEventQueue::IsEmpty(const MutexAutoLock& aProofOfLock) {
@@ -344,6 +345,9 @@ bool PrioritizedEventQueue::HasReadyEvent(const MutexAutoLock& aProofOfLock) {
     MutexAutoUnlock unlock(*mMutex);
     mIdlePeriodState.CachePeekedIdleDeadline(unlock);
   }
+
+  recordreplay::RecordReplayAssert("PrioritizedEventQueue::HasReadyEvent AFTER_UNLOCK");
+
   TimeStamp idleDeadline = mIdlePeriodState.GetCachedIdleDeadline();
   mIdlePeriodState.ClearCachedIdleDeadline();
 
