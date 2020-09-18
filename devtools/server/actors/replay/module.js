@@ -26,7 +26,8 @@ const {
   findClosestPoint,
 } = sandbox;
 
-// This script can be loaded into no-recording/replaying processes during automated tests.
+// This script can be loaded into non-recording/replaying processes during automated tests.
+// In non-recording/replaying processes there are no properties on RecordReplayControl.
 const isRecordingOrReplaying = !!RecordReplayControl.progressCounter;
 
 const { require } = ChromeUtils.import("resource://devtools/shared/Loader.jsm");
@@ -120,7 +121,7 @@ IdMap.prototype = {
 };
 
 const gScripts = new IdMap();
-const gSources = new Set();
+const gSources = new IdMap();
 
 gDebugger.onNewScript = script => {
   if (!isRecordingOrReplaying || RecordReplayControl.areThreadEventsDisallowed()) {
@@ -134,8 +135,8 @@ gDebugger.onNewScript = script => {
 
   addScript(script);
 
-  if (!gSources.has(script.source)) {
-    gSources.add(script.source);
+  /*
+  if (!gSources.getId(script.source)) {
     if (script.source.sourceMapURL &&
         Services.prefs.getBoolPref("devtools.recordreplay.uploadSourceMaps")) {
       const pid = RecordReplayControl.middlemanPid();
@@ -146,10 +147,10 @@ gDebugger.onNewScript = script => {
       );
     }
   }
+  */
 
-  if (exports.OnNewScript) {
-    exports.OnNewScript(script);
-  }
+  const id = String(gSources.add(script.source));
+  RecordReplayControl.onScriptParsed(id, "scriptSource", script.source.url);
 
   function addScript(script) {
     const id = gScripts.add(script);

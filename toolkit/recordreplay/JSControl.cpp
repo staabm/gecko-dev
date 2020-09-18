@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "JSControl.h"
+#include "ProcessRecordReplay.h"
 
 #include "mozilla/Base64.h"
 #include "mozilla/ClearOnShutdown.h"
@@ -85,8 +86,7 @@ extern "C" {
 MOZ_EXPORT bool RecordReplayInterface_ShouldUpdateProgressCounter(
     const char* aURL) {
   // Progress counters are only updated for scripts which are exposed to the
-  // debugger. The devtools timeline is based on progress values and we don't
-  // want gaps on the timeline which users can't seek to.
+  // debugger.
   return aURL && strncmp(aURL, "resource:", 9) && strncmp(aURL, "chrome:", 7);
 }
 
@@ -199,13 +199,118 @@ void SendRecordingFinished(const char* aRecordingId) {
 }  // namespace js
 
 ///////////////////////////////////////////////////////////////////////////////
+// Module Interface
+///////////////////////////////////////////////////////////////////////////////
+
+// Define the methods which the module uses to interact with the recording driver.
+
+static bool RecordReplay_Log(JSContext* aCx, unsigned aArgc, Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  RootedString str(aCx, ToString(aCx, args.get(0)));
+  if (!str) {
+    return false;
+  }
+
+  JS::UniqueChars cstr = JS_EncodeStringToLatin1(aCx, str);
+  if (!cstr) {
+    return false;
+  }
+
+  PrintLog(cstr.get());
+
+  args.rval().setUndefined();
+  return true;
+}
+
+static bool RecordReplay_OnScriptParsed(JSContext* aCx, unsigned aArgc,
+                                        Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  if (!args.get(0).isString() ||
+      !args.get(1).isString() ||
+      !args.get(2).isString()) {
+    JS_ReportErrorASCII(aCx, "Bad arguments");
+    return false;
+  }
+
+  nsAutoCString id, kind, url;
+  js::ConvertJSStringToCString(aCx, args.get(0).toString(), id);
+  js::ConvertJSStringToCString(aCx, args.get(1).toString(), kind);
+  js::ConvertJSStringToCString(aCx, args.get(2).toString(), url);
+  OnScriptParsed(id.get(), kind.get(), url.get());
+
+  args.rval().setUndefined();
+  return true;
+}
+
+static bool RecordReplay_AreThreadEventsDisallowed(JSContext* aCx,
+                                                   unsigned aArgc, Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+  args.rval().setBoolean(AreThreadEventsDisallowed());
+  return true;
+}
+
+static bool RecordReplay_ProgressCounter(JSContext* aCx, unsigned aArgc,
+                                         Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+  args.rval().setNumber((double)*ExecutionProgressCounter());
+  return true;
+}
+
+static bool RecordReplay_SetProgressCounter(JSContext* aCx, unsigned aArgc,
+                                            Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  if (!args.get(0).isNumber()) {
+    JS_ReportErrorASCII(aCx, "Expected numeric argument");
+    return false;
+  }
+
+  *ExecutionProgressCounter() = args.get(0).toNumber();
+
+  args.rval().setUndefined();
+  return true;
+}
+
+static bool RecordReplay_ShouldUpdateProgressCounter(JSContext* aCx,
+                                                     unsigned aArgc,
+                                                     Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  if (args.get(0).isNull()) {
+    args.rval().setBoolean(ShouldUpdateProgressCounter(nullptr));
+  } else {
+    if (!args.get(0).isString()) {
+      JS_ReportErrorASCII(aCx, "Expected string or null as first argument");
+      return false;
+    }
+
+    nsAutoCString str;
+    js::ConvertJSStringToCString(aCx, args.get(0).toString(), str);
+    args.rval().setBoolean(ShouldUpdateProgressCounter(str.get()));
+  }
+
+  return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // Plumbing
 ///////////////////////////////////////////////////////////////////////////////
 
 static const JSFunctionSpec gRecordReplayMethods[] = {
-    JS_FS_END};
+  JS_FN("log", RecordReplay_Log, 1, 0),
+  JS_FN("onScriptParsed", RecordReplay_OnScriptParsed, 3, 0),
+  JS_FN("areThreadEventsDisallowed", RecordReplay_AreThreadEventsDisallowed,
+        0, 0),
+  JS_FN("progressCounter", RecordReplay_ProgressCounter, 0, 0),
+  JS_FN("setProgressCounter", RecordReplay_SetProgressCounter, 1, 0),
+  JS_FN("shouldUpdateProgressCounter",
+        RecordReplay_ShouldUpdateProgressCounter, 1, 0),
+  JS_FS_END
+};
 
-  bool DefineRecordReplayControlObject(JSContext* aCx, JS::HandleObject object) {
+bool DefineRecordReplayControlObject(JSContext* aCx, JS::HandleObject object) {
   MOZ_RELEASE_ASSERT(IsRecordingOrReplaying());
 
   RootedObject staticObject(aCx, JS_NewObject(aCx, nullptr));

@@ -87,6 +87,7 @@ static int (*gCreateOrderedLock)(const char* aName);
 static void (*gOrderedLock)(int aLock);
 static void (*gOrderedUnlock)(int aLock);
 static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
+static void (*gOnScriptParsed)(const char* aId, const char* aKind, const char* aUrl);
 static void (*gOnPaint)(const char* aMimeType, const char* aOptions, const char* aData);
 
 template <typename T>
@@ -157,6 +158,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol(handle, "RecordReplayOrderedLock", gOrderedLock);
   LoadSymbol(handle, "RecordReplayOrderedUnlock", gOrderedUnlock);
   LoadSymbol(handle, "RecordReplayAddOrderedPthreadMutex", gAddOrderedPthreadMutex);
+  LoadSymbol(handle, "RecordReplayOnScriptParsed", gOnScriptParsed);
   LoadSymbol(handle, "RecordReplayOnPaint", gOnPaint);
 
   char buildId[128];
@@ -403,6 +405,10 @@ void FinishRecording() {
   // fully uploaded. The ContentParent will not kill this process after
   // finishing the recording, so we have to it ourselves.
   exit(0);
+}
+
+void OnScriptParsed(const char* aId, const char* aKind, const char* aUrl) {
+  gOnScriptParsed(aId, aKind, aUrl);
 }
 
 void OnPaint(const char* aMimeType, const char* aOptions, const char* aData) {

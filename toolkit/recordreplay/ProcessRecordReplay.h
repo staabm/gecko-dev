@@ -21,6 +21,7 @@ static inline bool TestEnv(const char* env) {
   return value && value[0];
 }
 
+void OnScriptParsed(const char* aId, const char* aKind, const char* aUrl);
 void OnPaint(const char* aMimeType, const char* aOptions, const char* aData);
 
 }  // namespace mozilla::recordreplay
