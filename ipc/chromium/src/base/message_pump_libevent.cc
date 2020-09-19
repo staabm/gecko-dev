@@ -342,7 +342,13 @@ void MessagePumpLibevent::Run(Delegate* delegate) {
         poll_tv.tv_sec = delay.InSeconds();
         poll_tv.tv_usec = delay.InMicroseconds() % Time::kMicrosecondsPerSecond;
         event_base_loopexit(event_base_, &poll_tv);
+        mozilla::recordreplay::RecordReplayAssert(
+          "MessagePumpLibevent::Run event_base_loop BEFORE"
+        );
         event_base_loop(event_base_, EVLOOP_ONCE);
+        mozilla::recordreplay::RecordReplayAssert(
+          "MessagePumpLibevent::Run event_base_loop AFTER"
+        );
       } else {
         // It looks like delayed_work_time_ indicates a time in the past, so we
         // need to call DoDelayedWork now.
