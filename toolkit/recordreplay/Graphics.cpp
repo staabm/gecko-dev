@@ -54,8 +54,6 @@ static void ReportPaint();
 void SendUpdate(const TransactionInfo& aInfo) {
   EnsureInitialized();
 
-  PrintLog("GraphicsSendUpdate");
-
   ipc::IPCResult rv = gLayerTransactionParent->RecvUpdate(aInfo);
   MOZ_RELEASE_ASSERT(rv == ipc::IPCResult::Ok());
 
