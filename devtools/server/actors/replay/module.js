@@ -21,9 +21,6 @@ const {
   Debugger,
   RecordReplayControl,
   Services,
-  InspectorUtils,
-  CSSRule,
-  findClosestPoint,
 } = sandbox;
 
 // This script can be loaded into non-recording/replaying processes during automated tests.
@@ -63,26 +60,11 @@ function countScriptFrames() {
   return count;
 }
 
-function CanCreateCheckpoint() {
-  return countScriptFrames() == 0;
-}
+///////////////////////////////////////////////////////////////////////////////
+// Utilities
+///////////////////////////////////////////////////////////////////////////////
 
-const gNewGlobalHooks = [];
-gDebugger.onNewGlobalObject = global => {
-  try {
-    gDebugger.addDebuggee(global);
-    gAllGlobals.push(global);
-    gNewGlobalHooks.forEach(hook => hook(global));
-  } catch (e) {}
-};
-
-// The UI process must wait until the content global is created here before
-// URLs can be loaded.
-Services.obs.addObserver(
-  { observe: () => Services.cpmm.sendAsyncMessage("RecordingInitialized") },
-  "content-document-global-created"
-);
-
+// Bidirectional map between values and numeric IDs.
 function IdMap() {
   this._idMap = [undefined];
   this._objectMap = new Map();
@@ -122,8 +104,53 @@ IdMap.prototype = {
   },
 };
 
+// Map from keys to arrays of values.
+function ArrayMap() {
+  this.map = new Map();
+}
+
+ArrayMap.prototype = {
+  add(key, value) {
+    if (this.map.has(key)) {
+      this.map.get(key).push(value);
+    } else {
+      this.map.set(key, [value]);
+    }
+  },
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// Main Logic
+///////////////////////////////////////////////////////////////////////////////
+
+function CanCreateCheckpoint() {
+  return countScriptFrames() == 0;
+}
+
+const gNewGlobalHooks = [];
+gDebugger.onNewGlobalObject = global => {
+  try {
+    gDebugger.addDebuggee(global);
+    gAllGlobals.push(global);
+    gNewGlobalHooks.forEach(hook => hook(global));
+  } catch (e) {}
+};
+
+// The UI process must wait until the content global is created here before
+// URLs can be loaded.
+Services.obs.addObserver(
+  { observe: () => Services.cpmm.sendAsyncMessage("RecordingInitialized") },
+  "content-document-global-created"
+);
+
+// Associate each Debugger.Script with a numeric ID.
 const gScripts = new IdMap();
+
+// Associate each Debugger.Source with a numeric ID.
 const gSources = new IdMap();
+
+// Map Debugger.Source to arrays of the top level scripts for that source.
+const gSourceRoots = new ArrayMap();
 
 gDebugger.onNewScript = script => {
   if (!isRecordingOrReplaying || RecordReplayControl.areThreadEventsDisallowed()) {
@@ -136,6 +163,8 @@ gDebugger.onNewScript = script => {
   }
 
   addScript(script);
+
+  gSourceRoots.add(script.source, script);
 
   /*
   if (!gSources.getId(script.source)) {
@@ -185,7 +214,7 @@ Services.obs.addObserver(
 
 const gHtmlContent = new Map();
 
-function getHTMLSource({ url }) {
+function Internal_getHTMLSource({ url }) {
   const info = gHtmlContent.get(url);
   const contents = info ? info.content : "";
   return { contents };
@@ -316,35 +345,28 @@ function OnTestCommand(str) {
   }
 }
 
-function getAllFrames() {
+function Pause_getAllFrames() {
   // FIXME
   return {};
 }
 
-function getScriptSource({ scriptId }) {
-  const source = gSources.getObject(Number(scriptId));
-
-  let scriptSource = source.text;
-  if (source.startLine > 1) {
-    scriptSource = "\n".repeat(source.startLine - 1) + scriptSource;
-  }
-
-  return {
-    scriptSource,
-    contentType: "text/javascript",
-  };
-}
-
 const commands = {
-  "Pause.getAllFrames": getAllFrames,
-  "Debugger.getScriptSource": getScriptSource,
-  "Internal.getHTMLSource": getHTMLSource,
+  "Pause.getAllFrames": Pause_getAllFrames,
+  "Debugger.getPossibleBreakpoints": Debugger_getPossibleBreakpoints,
+  "Debugger.getScriptSource": Debugger_getScriptSource,
+  "Internal.convertLocationToFunctionOffset": Internal_convertLocationToFunctionOffset,
+  "Internal.getHTMLSource": Internal_getHTMLSource,
 };
 
 function OnProtocolCommand(method, params) {
   log(`OnProtocolCommand ${method} ${JSON.stringify(params)}`);
   if (commands[method]) {
-    return commands[method](params);
+    try {
+      return commands[method](params);
+    } catch (e) {
+      log(`Error: Exception processing command ${method}: ${e}`);
+      return null;
+    }
   }
   log(`Error: Unsupported command ${method}`);
 }
@@ -362,3 +384,142 @@ function Initialize() {
 }
 
 var EXPORTED_SYMBOLS = ["Initialize"];
+
+///////////////////////////////////////////////////////////////////////////////
+// Debugger Commands
+///////////////////////////////////////////////////////////////////////////////
+
+// Invoke callback on an overapproximation of all scripts in a source
+// between begin and end.
+function forMatchingScripts(source, begin, end, callback) {
+  const roots = gSourceRoots.map.get(source);
+  if (roots) {
+    processScripts(roots);
+  }
+
+  // Whether script overaps with the selected range.
+  function scriptMatches(script) {
+    let lineCount;
+    try {
+      lineCount = script.lineCount;
+    } catch (e) {
+      // Watch for optimized out scripts.
+      return false;
+    }
+
+    if (end) {
+      const startPos = { line: script.startLine, column: script.startColumn };
+      if (positionPrecedes(end, startPos)) {
+        return false;
+      }
+    }
+
+    if (begin) {
+      const endPos = {
+        line: script.startLine + lineCount - 1,
+
+        // There is no endColumn accessor, so we can only compute this accurately
+        // if the script is on a single line.
+        column: (lineCount == 1) ? script.startColumn + script.sourceLength : 1e9,
+      };
+      if (positionPrecedes(endPos, begin)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function processScripts(scripts) {
+    for (const script of scripts) {
+      if (scriptMatches(script)) {
+        callback(script);
+        processScripts(script.getChildScripts());
+      }
+    }
+  }
+
+  function positionPrecedes(posA, posB) {
+    return posA.line < posB.line || posA.line == posB.line && posA.column < posB.column;
+  }
+}
+
+// Invoke callback all positions in a source between begin and end (inclusive / optional).
+function forMatchingBreakpointPositions(source, begin, end, callback) {
+  forMatchingScripts(source, begin, end, script => {
+    script.getPossibleBreakpoints().forEach(({ offset, lineNumber, columnNumber }, i) => {
+      if (positionMatches(lineNumber, columnNumber)) {
+        callback(script, offset, lineNumber, columnNumber);
+      } else if (i == 0 && positionMatches(script.startLine, script.startColumn)) {
+        // The start location of the script is considered to match the first
+        // breakpoint position. This allows setting breakpoints or analyses by
+        // using the function location provided in the protocol, instead of
+        // requiring the client to find the exact breakpoint position.
+        callback(script, offset, lineNumber, columnNumber);
+      }
+    });
+  });
+
+  // Whether line/column are in the range described by begin/end.
+  function positionMatches(line, column) {
+    if (begin && positionPrecedes({ line, column }, begin)) {
+      return false;
+    }
+    if (end && positionPrecedes(end, { line, column })) {
+      return false;
+    }
+    return true;
+  }
+}
+
+function scriptIdToSource(scriptId) {
+  return gSources.getObject(Number(scriptId));
+}
+
+// Map breakpoint locations we've generated to function/offset information.
+const gBreakpointLocations = new Map();
+
+function breakpointLocationKey({ scriptId, line, column }) {
+  return `${scriptId}:${line}:${column}`;
+}
+
+function Debugger_getPossibleBreakpoints({ scriptId, begin, end}) {
+  const source = scriptIdToSource(scriptId);
+
+  const lineLocations = new ArrayMap();
+  forMatchingBreakpointPositions(source, begin, end, (script, offset, line, column) => {
+    const functionId = String(gScripts.getId(script));
+    gBreakpointLocations.set(
+      breakpointLocationKey({ scriptId, line, column }),
+      { functionId, offset }
+    );
+    lineLocations.add(line, column);
+  });
+
+  return { lineLocations: finishLineLocations(lineLocations) };
+
+  // Convert a line => columns ArrayMap into a lineLocations WRP object.
+  function finishLineLocations(lineLocations) {
+    return [...lineLocations.map.entries()].map(([line, columns]) => {
+      return { line, columns };
+    });
+  }
+}
+
+function Internal_convertLocationToFunctionOffset({ location }) {
+  return gBreakpointLocations.get(breakpointLocationKey(location));
+}
+
+function Debugger_getScriptSource({ scriptId }) {
+  const source = scriptIdToSource(scriptId);
+
+  let scriptSource = source.text;
+  if (source.startLine > 1) {
+    scriptSource = "\n".repeat(source.startLine - 1) + scriptSource;
+  }
+
+  return {
+    scriptSource,
+    contentType: "text/javascript",
+  };
+}

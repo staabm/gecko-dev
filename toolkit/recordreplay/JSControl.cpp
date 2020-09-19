@@ -333,7 +333,7 @@ char* CommandCallback(const char* aMethod, const char* aParams) {
 
   RootedValue rv(cx);
   if (!JS_CallFunctionName(cx, *js::gModuleObject, "OnProtocolCommand", args, &rv)) {
-    PrintLog("Error: CommandCallback result must be an object %s", aMethod);
+    PrintLog("Error: CommandCallback failed %s", aMethod);
     MOZ_CRASH("CommandCallback");
   }
 
