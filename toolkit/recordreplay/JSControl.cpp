@@ -202,7 +202,7 @@ void SendRecordingFinished(const char* aRecordingId) {
 
 // Define the methods which the module uses to interact with the recording driver.
 
-static bool RecordReplay_Log(JSContext* aCx, unsigned aArgc, Value* aVp) {
+static bool Method_Log(JSContext* aCx, unsigned aArgc, Value* aVp) {
   CallArgs args = CallArgsFromVp(aArgc, aVp);
 
   RootedString str(aCx, ToString(aCx, args.get(0)));
@@ -221,8 +221,8 @@ static bool RecordReplay_Log(JSContext* aCx, unsigned aArgc, Value* aVp) {
   return true;
 }
 
-static bool RecordReplay_OnScriptParsed(JSContext* aCx, unsigned aArgc,
-                                        Value* aVp) {
+static bool Method_OnScriptParsed(JSContext* aCx, unsigned aArgc,
+                                  Value* aVp) {
   CallArgs args = CallArgsFromVp(aArgc, aVp);
 
   if (!args.get(0).isString() ||
@@ -242,22 +242,22 @@ static bool RecordReplay_OnScriptParsed(JSContext* aCx, unsigned aArgc,
   return true;
 }
 
-static bool RecordReplay_AreThreadEventsDisallowed(JSContext* aCx,
-                                                   unsigned aArgc, Value* aVp) {
+static bool Method_AreThreadEventsDisallowed(JSContext* aCx,
+                                             unsigned aArgc, Value* aVp) {
   CallArgs args = CallArgsFromVp(aArgc, aVp);
   args.rval().setBoolean(AreThreadEventsDisallowed());
   return true;
 }
 
-static bool RecordReplay_ProgressCounter(JSContext* aCx, unsigned aArgc,
+static bool Method_ProgressCounter(JSContext* aCx, unsigned aArgc,
                                          Value* aVp) {
   CallArgs args = CallArgsFromVp(aArgc, aVp);
   args.rval().setNumber((double)*ExecutionProgressCounter());
   return true;
 }
 
-static bool RecordReplay_SetProgressCounter(JSContext* aCx, unsigned aArgc,
-                                            Value* aVp) {
+static bool Method_SetProgressCounter(JSContext* aCx, unsigned aArgc,
+                                      Value* aVp) {
   CallArgs args = CallArgsFromVp(aArgc, aVp);
 
   if (!args.get(0).isNumber()) {
@@ -271,9 +271,8 @@ static bool RecordReplay_SetProgressCounter(JSContext* aCx, unsigned aArgc,
   return true;
 }
 
-static bool RecordReplay_ShouldUpdateProgressCounter(JSContext* aCx,
-                                                     unsigned aArgc,
-                                                     Value* aVp) {
+static bool Method_ShouldUpdateProgressCounter(JSContext* aCx,
+                                               unsigned aArgc, Value* aVp) {
   CallArgs args = CallArgsFromVp(aArgc, aVp);
 
   if (args.get(0).isNull()) {
@@ -292,15 +291,56 @@ static bool RecordReplay_ShouldUpdateProgressCounter(JSContext* aCx,
   return true;
 }
 
+static bool gScanningScripts;
+
+// This is called by the recording driver to notify us when to start/stop scanning.
+void SetScanningScriptsCallback(bool aValue) {
+  MOZ_RELEASE_ASSERT(IsInitialized());
+
+  if (gScanningScripts == aValue) {
+    return;
+  }
+  gScanningScripts = aValue;
+
+  AutoSafeJSContext cx;
+  JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
+
+  JS::AutoValueArray<1> args(cx);
+  args[0].setBoolean(aValue);
+
+  RootedValue rv(cx);
+  if (!JS_CallFunctionName(cx, *js::gModuleObject, "SetScanningScripts", args, &rv)) {
+    MOZ_CRASH("SetScanningScripts");
+  }
+}
+
+static bool Method_InstrumentationCallback(JSContext* aCx, unsigned aArgc,
+                                           Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  PrintLog("InstrumentationCallback");
+
+  args.rval().setUndefined();
+  return true;
+}
+
+static bool Method_IsScanningScripts(JSContext* aCx, unsigned aArgc,
+                                     Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  args.rval().setBoolean(gScanningScripts);
+  return true;
+}
+
 static const JSFunctionSpec gRecordReplayMethods[] = {
-  JS_FN("log", RecordReplay_Log, 1, 0),
-  JS_FN("onScriptParsed", RecordReplay_OnScriptParsed, 3, 0),
-  JS_FN("areThreadEventsDisallowed", RecordReplay_AreThreadEventsDisallowed,
-        0, 0),
-  JS_FN("progressCounter", RecordReplay_ProgressCounter, 0, 0),
-  JS_FN("setProgressCounter", RecordReplay_SetProgressCounter, 1, 0),
-  JS_FN("shouldUpdateProgressCounter",
-        RecordReplay_ShouldUpdateProgressCounter, 1, 0),
+  JS_FN("log", Method_Log, 1, 0),
+  JS_FN("onScriptParsed", Method_OnScriptParsed, 3, 0),
+  JS_FN("areThreadEventsDisallowed", Method_AreThreadEventsDisallowed, 0, 0),
+  JS_FN("progressCounter", Method_ProgressCounter, 0, 0),
+  JS_FN("setProgressCounter", Method_SetProgressCounter, 1, 0),
+  JS_FN("shouldUpdateProgressCounter", Method_ShouldUpdateProgressCounter, 1, 0),
+  JS_FN("instrumentationCallback", Method_InstrumentationCallback, 3, 0),
+  JS_FN("isScanningScripts", Method_IsScanningScripts, 0, 0),
   JS_FS_END
 };
 

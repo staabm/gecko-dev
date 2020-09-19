@@ -34,6 +34,9 @@ void SendRecordingFinished(const char* aRecordingId);
 // some state.
 char* CommandCallback(const char* aMethod, const char* aParams);
 
+// Callback used to change whether execution is being scanned.
+void SetScanningScriptsCallback(bool aValue);
+
 }  // namespace js
 }  // namespace recordreplay
 }  // namespace mozilla

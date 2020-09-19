@@ -346,8 +346,11 @@ function OnTestCommand(str) {
 }
 
 function Pause_getAllFrames() {
-  // FIXME
-  return {};
+  if (countScriptFrames() == 0) {
+    return { frames: [], data: {} };
+  }
+  log(`Error: getAllFrames NYI`);
+  return null;
 }
 
 const commands = {
@@ -377,6 +380,7 @@ const exports = {
   SendRecordingFinished,
   OnTestCommand,
   OnProtocolCommand,
+  SetScanningScripts,
 };
 
 function Initialize() {
@@ -384,6 +388,25 @@ function Initialize() {
 }
 
 var EXPORTED_SYMBOLS = ["Initialize"];
+
+///////////////////////////////////////////////////////////////////////////////
+// Instrumentation
+///////////////////////////////////////////////////////////////////////////////
+
+gNewGlobalHooks.push(global => {
+  global.setInstrumentation(
+    global.makeDebuggeeNativeFunction(RecordReplayControl.instrumentationCallback),
+    ["main", "entry", "breakpoint", "exit", "generator"]
+  );
+
+  if (RecordReplayControl.isScanningScripts()) {
+    global.setInstrumentationActive(true);
+  }
+});
+
+function SetScanningScripts(value) {
+  gAllGlobals.forEach(g => g.setInstrumentationActive(value));
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Debugger Commands
