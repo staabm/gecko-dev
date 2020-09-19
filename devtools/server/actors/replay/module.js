@@ -21,6 +21,7 @@ const {
   Debugger,
   RecordReplayControl,
   Services,
+  InspectorUtils,
 } = sandbox;
 
 // This script can be loaded into non-recording/replaying processes during automated tests.
@@ -60,9 +61,32 @@ function countScriptFrames() {
   return count;
 }
 
+function scriptFrameForIndex(index) {
+  index = countScriptFrames() - 1 - index;
+  for (let frame = gDebugger.getNewestFrame(); frame; frame = frame.older) {
+    if (considerScript(frame.script)) {
+      if (index-- == 0) {
+        return frame;
+      }
+    }
+  }
+  throw new Error("Can't find frame");
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Utilities
 ///////////////////////////////////////////////////////////////////////////////
+
+function assert(v) {
+  if (!v) {
+    log(`Error: Assertion failed ${Error().stack}`);
+    throw new Error("Assertion failed!");
+  }
+}
+
+function isNonNullObject(obj) {
+  return obj && (typeof obj == "object" || typeof obj == "function");
+}
 
 // Bidirectional map between values and numeric IDs.
 function IdMap() {
@@ -180,7 +204,8 @@ gDebugger.onNewScript = script => {
   }
   */
 
-  const id = String(gSources.add(script.source));
+  gSources.add(script.source);
+  const id = sourceToProtocolScriptId(script.source);
 
   let kind = "scriptSource";
   if (script.source.introductionType == "scriptElement") {
@@ -345,16 +370,9 @@ function OnTestCommand(str) {
   }
 }
 
-function Pause_getAllFrames() {
-  if (countScriptFrames() == 0) {
-    return { frames: [], data: {} };
-  }
-  log(`Error: getAllFrames NYI`);
-  return null;
-}
-
 const commands = {
   "Pause.getAllFrames": Pause_getAllFrames,
+  "Pause.getObjectPreview": Pause_getObjectPreview,
   "Debugger.getPossibleBreakpoints": Debugger_getPossibleBreakpoints,
   "Debugger.getScriptSource": Debugger_getScriptSource,
   "Internal.convertFunctionOffsetToLocation": Internal_convertFunctionOffsetToLocation,
@@ -500,6 +518,10 @@ function scriptIdToSource(scriptId) {
   return gSources.getObject(Number(scriptId));
 }
 
+function sourceToProtocolScriptId(source) {
+  return String(gSources.getId(source));
+}
+
 // Map breakpoint locations we've generated to function/offset information.
 const gBreakpointLocations = new Map();
 
@@ -512,7 +534,7 @@ function Debugger_getPossibleBreakpoints({ scriptId, begin, end}) {
 
   const lineLocations = new ArrayMap();
   forMatchingBreakpointPositions(source, begin, end, (script, offset, line, column) => {
-    const functionId = String(gScripts.getId(script));
+    const functionId = scriptToFunctionId(script);
     gBreakpointLocations.set(
       breakpointLocationKey({ scriptId, line, column }),
       { functionId, offset }
@@ -530,9 +552,17 @@ function Debugger_getPossibleBreakpoints({ scriptId, begin, end}) {
   }
 }
 
+function functionIdToScript(functionId) {
+  return gScripts.getObject(Number(functionId));
+}
+
+function scriptToFunctionId(script) {
+  return String(gScripts.getId(script));
+}
+
 function Internal_convertFunctionOffsetToLocation({ functionId, offset}) {
-  const script = gScripts.getObject(Number(functionId));
-  const scriptId = String(gSources.getId(script.source));
+  const script = functionIdToScript(functionId);
+  const scriptId = sourceToProtocolScriptId(script.source);
 
   if (offset === undefined) {
     const location = { scriptId, line: script.startLine, column: script.startColumn };
@@ -564,4 +594,646 @@ function Debugger_getScriptSource({ scriptId }) {
     scriptSource,
     contentType: "text/javascript",
   };
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Pause Commands
+///////////////////////////////////////////////////////////////////////////////
+
+// Associate Debugger.{Object,Env} with the number to use for the protocol ID.
+const gPauseObjects = new IdMap();
+
+// Map raw object => Debugger.Object
+const gCanonicalObjects = new Map();
+
+function getObjectId(obj) {
+  if (!obj) {
+    return "0";
+  }
+  assert(obj instanceof Debugger.Object || obj instanceof Debugger.Environment);
+
+  let id = gPauseObjects.getId(obj);
+  if (id) {
+    return String(id);
+  }
+
+  // Sometimes there are multiple Debugger.Objects for the same underlying
+  // object. Make sure a consistent ID is used.
+  if (obj instanceof Debugger.Object) {
+    const raw = obj.unsafeDereference();
+    if (gCanonicalObjects.has(raw)) {
+      const canonical = gCanonicalObjects.get(raw);
+      return String(gPauseObjects.getId(canonical));
+    }
+    gCanonicalObjects.set(raw, obj);
+  }
+
+  return String(gPauseObjects.add(obj));
+}
+
+function makeDebuggeeValue(value) {
+  if (!isNonNullObject(value)) {
+    return value;
+  }
+  assert(!(value instanceof Debugger.Object));
+  try {
+    const dbgGlobal = gDebugger.makeGlobalObjectReference(Cu.getGlobalForObject(value));
+    return dbgGlobal.makeDebuggeeValue(value);
+  } catch (e) {
+    return gSandboxGlobal.makeDebuggeeValue(value);
+  }
+}
+
+const UnserializablePrimitives = [
+  [ Infinity, "Infinity" ],
+  [ -Infinity, "-Infinity" ],
+  [ NaN, "NaN" ],
+  [ -0, "-0" ],
+];
+
+function maybeUnserializableNumber(v) {
+  for (const [unserializable, str] of UnserializablePrimitives) {
+    if (Object.is(v, unserializable)) {
+      return str;
+    }
+  }
+}
+
+function createProtocolValue(v) {
+  if (isNonNullObject(v)) {
+    if (v.optimizedOut || v.missingArguments) {
+      return { unavailable: true };
+    }
+    if (v.uninitialized) {
+      return { uninitialized: true };
+    }
+    return { object: getObjectId(v) };
+  }
+  if (v === undefined) {
+    return {};
+  }
+  const unserializableNumber = maybeUnserializableNumber(v);
+  if (unserializableNumber) {
+    return { unserializableNumber };
+  }
+  if (typeof v == "bigint") {
+    return { bigint: v.toString() };
+  }
+  return { value: v };
+}
+
+function createProtocolValueRaw(v) {
+  return createProtocolValue(makeDebuggeeValue(v));
+}
+
+function createProtocolPropertyDescriptor(name, desc) {
+  const rv = createProtocolValue(desc.value);
+  rv.name = name;
+
+  let flags = 0;
+  if (desc.writable) {
+    flags |= 1;
+  }
+  if (desc.configurable) {
+    flags |= 2;
+  }
+  if (desc.enumerable) {
+    flags |= 4;
+  }
+  if (flags != 7) {
+    rv.flags = flags;
+  }
+
+  if (desc.get) {
+    rv.get = getObjectId(desc.get);
+  }
+  if (desc.set) {
+    rv.set = getObjectId(desc.set);
+  }
+
+  return rv;
+}
+
+function getFunctionName(obj) {
+  return obj.name || obj.displayName;
+}
+
+function getFunctionLocation(obj) {
+  let { script } = obj;
+  if (!script && obj.isBoundFunction) {
+    script = obj.boundTargetFunction.script;
+  }
+  if (script) {
+    return {
+      scriptId: gSources.getId(script.source).toString(),
+      line: script.startLine,
+      column: script.startColumn,
+    };
+  }
+}
+
+function createProtocolFrame(frameId, frame) {
+  const type = getFrameType(frame);
+  const scriptId = sourceToProtocolScriptId(frame.script.source);
+
+  // Find the line/column for this frame. This is a bit tricky because we want
+  // positions that are consistent with those for any breakpoint we are
+  // paused at. When pausing at a breakpoint the frame won't actually be at
+  // that breakpoint, it will be at an instrumentation opcode shortly before
+  // the breakpoint, which might have a different position. So, we adjust the
+  // frame offset by a fixed amount to get to the breakpoint, and if it isn't
+  // a breakpoint then we are not at an instrumentation opcode in the frame
+  // and can use the frame's normal offset.
+  const CallBreakpointOffset = 9;
+  let offset = frame.offset;
+  try {
+    if (frame.script.getOffsetMetadata(offset + CallBreakpointOffset).isBreakpoint) {
+      offset += CallBreakpointOffset;
+    }
+  } catch (e) {}
+  const { lineNumber, columnNumber } = frame.script.getOffsetMetadata(offset);
+
+  const location = [{
+    scriptId,
+    line: lineNumber,
+    column: columnNumber,
+  }];
+
+  let functionName;
+  let functionLocation;
+  if (frame.type == "call") {
+    functionName = getFunctionName(frame.callee);
+    functionLocation = [getFunctionLocation(frame.callee)];
+  }
+
+  const scopeChain = getScopeChain(frame, frameId);
+  const thisv = createProtocolValue(frame.this);
+
+  return {
+    frameId,
+    type,
+    functionName,
+    functionLocation,
+    location,
+    scopeChain,
+    "this": thisv,
+  };
+
+  // Get the protocol type to use for frame.
+  function getFrameType(frame) {
+    switch (frame.type) {
+      case "call":
+      case "wasmcall":
+        return "call";
+      case "eval":
+      case "debugger":
+        return "eval";
+      case "global":
+        return "global";
+      case "module":
+        return "module";
+    }
+    ThrowError("Bad frame type");
+  }
+
+  function getScopeChain(frame, frameId) {
+    const scopeChain = [];
+    for (let env = frame.environment; env; env = env.parent) {
+      const scopeId = getObjectId(env);
+      scopeChain.push(scopeId);
+    }
+    return scopeChain;
+  }
+}
+
+function createProtocolObject(objectId) {
+  const obj = gPauseObjects.getObject(Number(objectId));
+
+  const className = obj.class;
+  const preview = new ProtocolObjectPreview(obj).fill();
+
+  return { objectId, className, preview };
+}
+
+// Return whether an object should be ignored when generating previews.
+function isObjectBlacklisted(obj) {
+  // Accessing Storage object properties can cause hangs when trying to
+  // communicate with the non-existent parent process.
+  return obj.class == "Storage";
+}
+
+// Return whether an object's property should be ignored when generating previews.
+function isObjectPropertyBlacklisted(obj, name) {
+  if (isObjectBlacklisted(obj)) {
+    return true;
+  }
+  switch (`${obj.class}.${name}`) {
+    case "Window.localStorage":
+    case "Window.sysinfo":
+    case "Navigator.hardwareConcurrency":
+    case "XPCWrappedNative_NoHelper.isParentWindowMainWidgetVisible":
+    case "XPCWrappedNative_NoHelper.systemFont":
+      return true;
+  }
+  switch (name) {
+    case "__proto__":
+      // Accessing __proto__ doesn't cause problems, but is redundant with the
+      // prototype reference included in the preview directly.
+      return true;
+  }
+  return false;
+}
+
+// Get the "own" property names of an object to use.
+function propertyNames(object) {
+  if (isObjectBlacklisted(object)) {
+    return [];
+  }
+  try {
+    return object.getOwnPropertyNames();
+  } catch (e) {
+    return [];
+  }
+}
+
+// Return whether a getter should be callable without having side effects.
+function safeGetter(getter) {
+  // For now we only allow calling native C++ getters.
+  return getter.class == "Function" && !getter.script;
+}
+
+// Structure for managing construction of protocol ObjectPreview objects.
+function ProtocolObjectPreview(obj) {
+  // Underlying Debugger.Object
+  this.obj = obj;
+
+  // Underlying JSObject
+  this.raw = obj.unsafeDereference();
+
+  // Additional properties to add to the resulting preview.
+  this.extra = {};
+}
+
+ProtocolObjectPreview.prototype = {
+  addProperty(property) {
+    if (!this.properties) {
+      this.properties = [];
+    }
+    this.properties.push(property);
+  },
+
+  addGetterValue(name) {
+    if (isObjectPropertyBlacklisted(this.obj, name)) {
+      return;
+    }
+    if (!this.getterValues) {
+      this.getterValues = [];
+    }
+    if (this.getterValues.some(v => v.name == name)) {
+      return;
+    }
+    try {
+      const value = createProtocolValueRaw(this.raw[name]);
+      this.getterValues.push({ name, ...value });
+    } catch (e) {}
+  },
+
+  addContainerEntry(entry) {
+    if (!this.containerEntries) {
+      this.containerEntries = [];
+    }
+    this.containerEntries.push(entry);
+  },
+
+  addContainerEntryRaw(value, key, hasKey) {
+    key = hasKey ? createProtocolValueRaw(key) : undefined;
+    value = createProtocolValueRaw(value);
+    this.addContainerEntry({ key, value });
+  },
+
+  fill() {
+    let prototypeId;
+    if (this.obj.proto) {
+      try {
+        prototypeId = getObjectId(this.obj.proto);
+      } catch (e) {}
+    }
+
+    // Add "own" properties of the object.
+    for (const name of propertyNames(this.obj)) {
+      try {
+        const desc = this.obj.getOwnPropertyDescriptor(name);
+        const property = createProtocolPropertyDescriptor(name, desc);
+        this.addProperty(property);
+      } catch (e) {}
+    }
+
+    // Add getter values on the object.
+    for (const name of this.findPrototypeGetterNames()) {
+      this.addGetterValue(name);
+    }
+
+    // Add class-specific data.
+    const previewer = CustomPreviewers[this.obj.class];
+    if (previewer) {
+      if (Array.isArray(previewer)) {
+        for (const name of previewer) {
+          this.addGetterValue(name);
+        }
+      } else {
+        previewer.call(this);
+      }
+    }
+
+    // Add data for DOM/CSS objects.
+    if (Node.isInstance(this.raw)) {
+      this.extra.node = nodeContents(this.raw);
+    } else if (CSSRule.isInstance(this.raw)) {
+      this.extra.rule = ruleContents(this.raw);
+    } else if (CSSStyleDeclaration.isInstance(this.raw)) {
+      this.extra.style = styleContents(this.raw);
+    } else if (StyleSheet.isInstance(this.raw)) {
+      this.extra.styleSheet = styleSheetContents(this.raw);
+    }
+
+    return {
+      prototypeId,
+      properties: this.properties,
+      containerEntries: this.containerEntries,
+      getterValues: this.getterValues,
+      ...this.extra,
+    };
+  },
+
+  // Get the names of getters on the prototype chain which should be called to
+  // produce a full preview.
+  findPrototypeGetterNames() {
+    const seen = new Set();
+    const getterNames = [];
+    let proto = this.obj;
+    while (proto) {
+      for (const name of propertyNames(proto)) {
+        if (seen.has(name)) {
+          continue;
+        }
+        seen.add(name);
+        try {
+          const desc = proto.getOwnPropertyDescriptor(name);
+          if (desc.get && safeGetter(desc.get)) {
+            getterNames.push(name);
+          }
+        } catch (e) {}
+      }
+      try {
+        proto = proto.proto;
+      } catch (e) {
+        break;
+      }
+    }
+    return getterNames;
+  },
+};
+
+function previewMap() {
+  for (const [k, v] of Cu.waiveXrays(Map.prototype.entries.call(this.raw))) {
+    if (!this.addContainerEntryRaw(v, k, true)) {
+      break;
+    }
+  }
+
+  this.addGetterValue("size");
+  this.extra.containerEntryCount = this.raw.size;
+}
+
+function previewWeakMap() {
+  const keys = ChromeUtils.nondeterministicGetWeakMapKeys(this.raw);
+  this.extra.containerEntryCount = keys.length;
+
+  for (const k of keys) {
+    const v = WeakMap.prototype.get.call(this.raw, k);
+    if (!this.addContainerEntryRaw(v, k, true)) {
+      break;
+    }
+  }
+}
+
+function previewSet() {
+  for (const v of Cu.waiveXrays(Set.prototype.values.call(this.raw))) {
+    if (!this.addContainerEntryRaw(v)) {
+      break;
+    }
+  }
+
+  this.addGetterValue("size");
+  this.extra.containerEntryCount = this.raw.size;
+}
+
+function previewWeakSet() {
+  const keys = ChromeUtils.nondeterministicGetWeakSetKeys(this.raw);
+  this.extra.containerEntryCount = keys.length;
+
+  for (const k of keys) {
+    if (!this.addContainerEntryRaw(k)) {
+      break;
+    }
+  }
+}
+
+function previewRegExp() {
+  this.addGetterValue("global");
+  this.addGetterValue("source");
+  this.extra.regexpString = this.raw.toString();
+}
+
+function previewDate() {
+  this.extra.dateTime = this.raw.getTime();
+}
+
+function previewError() {
+  this.addGetterValue("name");
+  this.addGetterValue("message");
+  this.addGetterValue("stack");
+  this.addGetterValue("fileName");
+  this.addGetterValue("lineNumber");
+  this.addGetterValue("columnNumber");
+}
+
+function previewFunction() {
+  this.extra.functionName = getFunctionName(this.obj);
+
+  const functionLocation = getFunctionLocation(this.obj);
+  if (functionLocation) {
+    this.extra.functionLocation = [functionLocation];
+  }
+
+  const parameterNames = (this.obj.parameterNames || []).filter(n => typeof n == "string");
+  this.extra.functionParameterNames = parameterNames;
+}
+
+const CustomPreviewers = {
+  Array: ["length"],
+  Int8Array: ["length"],
+  Uint8Array: ["length"],
+  Uint8ClampedArray: ["length"],
+  Int16Array: ["length"],
+  Uint16Array: ["length"],
+  Int32Array: ["length"],
+  Uint32Array: ["length"],
+  Float32Array: ["length"],
+  Float64Array: ["length"],
+  BigInt64Array: ["length"],
+  BigUint64Array: ["length"],
+  Map: previewMap,
+  WeakMap: previewWeakMap,
+  Set: previewSet,
+  WeakSet: previewWeakSet,
+  RegExp: previewRegExp,
+  Date: previewDate,
+  Error: previewError,
+  EvalError: previewError,
+  RangeError: previewError,
+  ReferenceError: previewError,
+  SyntaxError: previewError,
+  TypeError: previewError,
+  URIError: previewError,
+  Function: previewFunction,
+  MouseEvent: ["type", "target", "clientX", "clientY", "layerX", "layerY"],
+  KeyboardEvent: ["type", "target", "key", "charCode", "keyCode", "altKey", "ctrlKey", "metaKey", "shiftKey"],
+  MessageEvent: ["type", "target", "isTrusted", "data"],
+};
+
+function getPseudoType(node) {
+  switch (node.localName) {
+    case "_moz_generated_content_marker": return "marker";
+    case "_moz_generated_content_before": return "before";
+    case "_moz_generated_content_after": return "after";
+  }
+}
+
+function nodeContents(node) {
+  let attributes, pseudoType;
+  if (Element.isInstance(node)) {
+    attributes = [];
+    for (const { name, value } of node.attributes) {
+      attributes.push({ name, value });
+    }
+    pseudoType = getPseudoType(node);
+  }
+
+  let style;
+  if (node.style) {
+    style = getObjectId(node.style);
+  }
+
+  let parentNode;
+  if (node.parentNode) {
+    parentNode = getObjectId(node.parentNode);
+  } else if (node.defaultView && node.defaultView.parent != node.defaultView) {
+    // Nested documents use the parent element instead of null.
+    const iframes = node.defaultView.parent.document.getElementsByTagName("iframe");
+    const iframe = [...iframes].find(f => f.contentDocument == node);
+    if (iframe) {
+      parentNode = getObjectId(iframe);
+    }
+  }
+
+  let childNodes;
+  if (node.childNodes.length) {
+    childNodes = [...node.childNodes].map(n => getObjectId(n));
+  } else if (node.nodeName == "IFRAME") {
+    // Treat an iframe's content document as one of its child nodes.
+    childNodes = [getObjectId(node.contentDocument)];
+  }
+
+  let documentURL;
+  if (node.nodeType == Node.DOCUMENT_NODE) {
+    documentURL = node.URL;
+  }
+
+  return {
+    nodeType: node.nodeType,
+    nodeName: node.nodeName,
+    nodeValue: node.nodeValue ? node.nodeValue : undefined,
+    isConnected: node.isConnected,
+    attributes,
+    pseudoType,
+    style,
+    parentNode,
+    childNodes,
+    documentURL,
+  };
+}
+
+function ruleContents(pool, rule) {
+  let parentStyleSheet;
+  if (rule.parentStyleSheet) {
+    parentStyleSheet = getObjectId(rule.parentStyleSheet);
+  }
+
+  let style;
+  if (rule.style) {
+    style = getObjectId(rule.style);
+  }
+
+  return {
+    type: rule.type,
+    cssText: rule.cssText,
+    parentStyleSheet,
+    startLine: InspectorUtils.getRelativeRuleLine(rule),
+    startColumn: InspectorUtils.getRuleColumn(rule),
+    selectorText: rule.selectorText,
+    style,
+    // If specified, these will be used in the control side to source map the location.
+    sourceMapURL: rule.parentStyleSheet.sourceMapURL || undefined,
+    sheetURL: rule.parentStyleSheet.sourceMapURL ? rule.parentStyleSheet.href : undefined,
+  };
+}
+
+function styleContents(pool, style) {
+  let parentRule;
+  if (style.parentRule) {
+    parentRule = getObjectId(style.parentRule);
+  }
+
+  const properties = [];
+  for (let i = 0; i < style.length; i++) {
+    const name = style.item(i);
+    const value = style.getPropertyValue(name);
+    const important = style.getPropertyPriority(name) == "important" ? true : undefined;
+    properties.push({ name, value, important });
+  }
+
+  return {
+    cssText: style.cssText,
+    parentRule,
+    properties,
+  };
+}
+
+function styleSheetContents(pool, styleSheet) {
+  return {
+    href: styleSheet.href || undefined,
+    isSystem: styleSheet.parsingMode != "author",
+  };
+}
+
+function Pause_getAllFrames() {
+  const frameIds = [];
+  const frameData = [];
+  const numFrames = countScriptFrames();
+  for (let i = 0; i < numFrames; i++) {
+    const frame = scriptFrameForIndex(i);
+    const id = String(i);
+    frameIds.push(id);
+    frameData.push(createProtocolFrame(id, frame));
+  }
+  return {
+    frames: frameIds.reverse(),
+    data: { frames: frameData },
+  };
+}
+
+function Pause_getObjectPreview({ object }) {
+  const objectData = createProtocolObject(object);
+  return { data: { objects: [objectData ]}};
 }
