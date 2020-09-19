@@ -40,6 +40,13 @@ static bool IsInitialized() {
   return !!gModule;
 }
 
+// Interned atoms for the various instrumented operations.
+static JSString* gMainAtom;
+static JSString* gEntryAtom;
+static JSString* gBreakpointAtom;
+static JSString* gExitAtom;
+static JSString* gGeneratorAtom;
+
 void EnsureInitialized() {
   if (IsInitialized()) {
     return;
@@ -64,6 +71,14 @@ void EnsureInitialized() {
 
   gModuleObject = new PersistentRootedObject(cx);
   *gModuleObject = &value.toObject();
+
+  gMainAtom = JS_AtomizeAndPinString(cx, "main");
+  gEntryAtom = JS_AtomizeAndPinString(cx, "entry");
+  gBreakpointAtom = JS_AtomizeAndPinString(cx, "breakpoint");
+  gExitAtom = JS_AtomizeAndPinString(cx, "exit");
+  gGeneratorAtom = JS_AtomizeAndPinString(cx, "generator");
+
+  MOZ_RELEASE_ASSERT(gMainAtom && gEntryAtom && gBreakpointAtom && gExitAtom && gGeneratorAtom);
 }
 
 void ConvertJSStringToCString(JSContext* aCx, JSString* aString,
@@ -316,9 +331,35 @@ void SetScanningScriptsCallback(bool aValue) {
 
 static bool Method_InstrumentationCallback(JSContext* aCx, unsigned aArgc,
                                            Value* aVp) {
+  MOZ_RELEASE_ASSERT(gScanningScripts);
   CallArgs args = CallArgsFromVp(aArgc, aVp);
 
-  PrintLog("InstrumentationCallback");
+  if (!args.get(0).isString() || !args.get(1).isNumber() || !args.get(2).isNumber()) {
+    JS_ReportErrorASCII(aCx, "Bad parameters");
+    return false;
+  }
+
+  // The kind string should be an atom which we have captured already.
+  JSString* kindStr = args.get(0).toString();
+
+  const char* kind;
+  if (kindStr == gBreakpointAtom) {
+    kind = "breakpoint";
+  } else if (kindStr == gMainAtom || kindStr == gGeneratorAtom) {
+    kind = "main";
+  } else if (kindStr == gEntryAtom) {
+    kind = "entry";
+  } else if (kindStr == gExitAtom) {
+    kind = "exit";
+  }
+
+  uint32_t script = args.get(1).toNumber();
+  uint32_t offset = args.get(2).toNumber();
+
+  char functionId[32];
+  snprintf(functionId, sizeof(functionId), "%u", script);
+
+  OnInstrument(kind, functionId, offset);
 
   args.rval().setUndefined();
   return true;
