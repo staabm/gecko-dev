@@ -357,6 +357,7 @@ const commands = {
   "Pause.getAllFrames": Pause_getAllFrames,
   "Debugger.getPossibleBreakpoints": Debugger_getPossibleBreakpoints,
   "Debugger.getScriptSource": Debugger_getScriptSource,
+  "Internal.convertFunctionOffsetToLocation": Internal_convertFunctionOffsetToLocation,
   "Internal.convertLocationToFunctionOffset": Internal_convertLocationToFunctionOffset,
   "Internal.getHTMLSource": Internal_getHTMLSource,
 };
@@ -527,6 +528,24 @@ function Debugger_getPossibleBreakpoints({ scriptId, begin, end}) {
       return { line, columns };
     });
   }
+}
+
+function Internal_convertFunctionOffsetToLocation({ functionId, offset}) {
+  const script = gScripts.getObject(Number(functionId));
+  const scriptId = String(gSources.getId(script.source));
+
+  if (offset === undefined) {
+    const location = { scriptId, line: script.startLine, column: script.startColumn };
+    return { location };
+  }
+
+  const breakpoints = script.getPossibleBreakpoints();
+  const bp = breakpoints.find(bp => bp.offset == offset);
+  if (!bp) {
+    throw new Error(`convertFunctionOffsetToLocation unknown offset ${offset}`);
+  }
+  const location = { scriptId, line: bp.lineNumber, column: bp.columnNumber };
+  return { location };
 }
 
 function Internal_convertLocationToFunctionOffset({ location }) {
