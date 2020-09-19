@@ -323,8 +323,14 @@ function getAllFrames() {
 
 function getScriptSource({ scriptId }) {
   const source = gSources.getObject(Number(scriptId));
+
+  let scriptSource = source.text;
+  if (source.startLine > 1) {
+    scriptSource = "\n".repeat(source.startLine - 1) + scriptSource;
+  }
+
   return {
-    scriptSource: source.text,
+    scriptSource,
     contentType: "text/javascript",
   };
 }
