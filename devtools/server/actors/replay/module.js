@@ -374,6 +374,7 @@ const commands = {
   "Pause.evaluateInFrame": Pause_evaluateInFrame,
   "Pause.getAllFrames": Pause_getAllFrames,
   "Pause.getObjectPreview": Pause_getObjectPreview,
+  "Pause.getObjectProperty": Pause_getObjectProperty,
   "Pause.getScope": Pause_getScope,
   "Debugger.getPossibleBreakpoints": Debugger_getPossibleBreakpoints,
   "Debugger.getScriptSource": Debugger_getScriptSource,
@@ -633,6 +634,10 @@ function getObjectId(obj) {
   return String(gPauseObjects.add(obj));
 }
 
+function getObjectFromId(id) {
+  return gPauseObjects.getObject(Number(id));
+}
+
 function makeDebuggeeValue(value) {
   if (!isNonNullObject(value)) {
     return value;
@@ -809,7 +814,7 @@ function createProtocolFrame(frameId, frame) {
 }
 
 function createProtocolObject(objectId) {
-  const obj = gPauseObjects.getObject(Number(objectId));
+  const obj = getObjectFromId(objectId);
 
   const className = obj.class;
   const preview = new ProtocolObjectPreview(obj).fill();
@@ -1213,7 +1218,7 @@ function styleContents(style) {
 }
 
 function createProtocolScope(scopeId) {
-  const env = gPauseObjects.getObject(Number(scopeId));
+  const env = getObjectFromId(scopeId);
 
   const type = getEnvType(env);
   const functionLexical = (env.scopeKind == "function lexical");
@@ -1278,7 +1283,7 @@ function convertValueFromParent(value) {
     return value.value;
   }
   if ("object" in value) {
-    return gPauseObjects.getObject(Number(value.object));
+    return getObjectFromId(value.object);
   }
   if ("unserializableNumber" in value) {
     return Number(value.unserializableNumber);
@@ -1299,7 +1304,7 @@ function convertBindings(bindings) {
   return newBindings;
 }
 
-function Pause_evaluateInFrame({ frameId, expression }) {
+function Pause_evaluateInFrame({ frameId, expression, bindings }) {
   const frame = scriptFrameForIndex(Number(frameId));
 
   const newBindings = convertBindings(bindings);
@@ -1326,6 +1331,12 @@ function Pause_getAllFrames() {
 function Pause_getObjectPreview({ object }) {
   const objectData = createProtocolObject(object);
   return { data: { objects: [objectData ]}};
+}
+
+function Pause_getObjectProperty({ object, name }) {
+  const dbgObject = getObjectFromId(object);
+  const completion = dbgObject.getProperty(name);
+  return { result: completionToProtocolResult(completion) };
 }
 
 function Pause_getScope({ scope }) {
