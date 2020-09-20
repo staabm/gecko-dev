@@ -371,8 +371,10 @@ function OnTestCommand(str) {
 }
 
 const commands = {
+  "Pause.evaluateInFrame": Pause_evaluateInFrame,
   "Pause.getAllFrames": Pause_getAllFrames,
   "Pause.getObjectPreview": Pause_getObjectPreview,
+  "Pause.getScope": Pause_getScope,
   "Debugger.getPossibleBreakpoints": Debugger_getPossibleBreakpoints,
   "Debugger.getScriptSource": Debugger_getScriptSource,
   "Internal.convertFunctionOffsetToLocation": Internal_convertFunctionOffsetToLocation,
@@ -1164,7 +1166,7 @@ function nodeContents(node) {
   };
 }
 
-function ruleContents(pool, rule) {
+function ruleContents(rule) {
   let parentStyleSheet;
   if (rule.parentStyleSheet) {
     parentStyleSheet = getObjectId(rule.parentStyleSheet);
@@ -1189,7 +1191,7 @@ function ruleContents(pool, rule) {
   };
 }
 
-function styleContents(pool, style) {
+function styleContents(style) {
   let parentRule;
   if (style.parentRule) {
     parentRule = getObjectId(style.parentRule);
@@ -1210,11 +1212,99 @@ function styleContents(pool, style) {
   };
 }
 
-function styleSheetContents(pool, styleSheet) {
+function createProtocolScope(scopeId) {
+  const env = gPauseObjects.getObject(Number(scopeId));
+
+  const type = getEnvType(env);
+  const functionLexical = (env.scopeKind == "function lexical");
+
+  let object, bindings;
+  if (env.type == "declarative") {
+    bindings = [];
+    for (const name of env.names()) {
+      const v = env.getVariable(name);
+      bindings.push({ name, ...createProtocolValue(v) });
+    }
+  } else {
+    object = getObjectId(env.object);
+  }
+
+  let functionName;
+  if (env.callee) {
+    functionName = getFunctionName(env.callee);
+  }
+
+  return {
+    scopeId,
+    type,
+    functionLexical,
+    object,
+    functionName,
+    bindings,
+  };
+
+  // Get the prototocl type to use for env.
+  function getEnvType(env) {
+    switch (env.type) {
+      case "object": return "global";
+      case "with": return "with";
+      case "declarative":
+        return env.callee ? "function" : "block";
+    }
+    ThrowError("Bad environment type");
+  }
+}
+
+function styleSheetContents(styleSheet) {
   return {
     href: styleSheet.href || undefined,
     isSystem: styleSheet.parsingMode != "author",
   };
+}
+
+function completionToProtocolResult(completion) {
+  let returned, exception;
+  if ("return" in completion) {
+    returned = createProtocolValue(completion.return);
+  }
+  if ("throw" in completion) {
+    exception = createProtocolValue(completion.throw);
+  }
+  return { returned, exception, data: {} };
+}
+
+function convertValueFromParent(value) {
+  if ("value" in value) {
+    return value.value;
+  }
+  if ("object" in value) {
+    return gPauseObjects.getObject(Number(value.object));
+  }
+  if ("unserializableNumber" in value) {
+    return Number(value.unserializableNumber);
+  }
+  if ("bigint" in value) {
+    return BigInt(value.bigint);
+  }
+  return undefined;
+}
+
+function convertBindings(bindings) {
+  const newBindings = {};
+  if (bindings) {
+    for (const binding of bindings) {
+      newBindings[binding.name] = convertValueFromParent(binding);
+    }
+  }
+  return newBindings;
+}
+
+function Pause_evaluateInFrame({ frameId, expression }) {
+  const frame = scriptFrameForIndex(Number(frameId));
+
+  const newBindings = convertBindings(bindings);
+  const completion = frame.evalWithBindings(expression, newBindings);
+  return { result: completionToProtocolResult(completion) };
 }
 
 function Pause_getAllFrames() {
@@ -1236,4 +1326,9 @@ function Pause_getAllFrames() {
 function Pause_getObjectPreview({ object }) {
   const objectData = createProtocolObject(object);
   return { data: { objects: [objectData ]}};
+}
+
+function Pause_getScope({ scope }) {
+  const scopeData = createProtocolScope(scope);
+  return { data: { scopes: [scopeData] } };
 }
