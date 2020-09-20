@@ -373,6 +373,16 @@ static bool Method_IsScanningScripts(JSContext* aCx, unsigned aArgc,
   return true;
 }
 
+static bool Method_OnExceptionUnwind(JSContext* aCx, unsigned aArgc,
+                                     Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  OnExceptionUnwind();
+
+  args.rval().setUndefined();
+  return true;
+}
+
 static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("log", Method_Log, 1, 0),
   JS_FN("onScriptParsed", Method_OnScriptParsed, 3, 0),
@@ -382,6 +392,7 @@ static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("shouldUpdateProgressCounter", Method_ShouldUpdateProgressCounter, 1, 0),
   JS_FN("instrumentationCallback", Method_InstrumentationCallback, 3, 0),
   JS_FN("isScanningScripts", Method_IsScanningScripts, 0, 0),
+  JS_FN("onExceptionUnwind", Method_OnExceptionUnwind, 0, 0),
   JS_FS_END
 };
 
