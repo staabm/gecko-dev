@@ -2701,6 +2701,8 @@ void AsyncErrorReporter::SerializeStack(JSContext* aCx,
 }
 
 NS_IMETHODIMP AsyncErrorReporter::Run() {
+  recordreplay::RecordReplayAssert("AsyncErrorReporter::Run");
+
   AutoJSAPI jsapi;
   DebugOnly<bool> ok = jsapi.Init(xpc::UnprivilegedJunkScope());
   MOZ_ASSERT(ok, "Problem with junk scope?");
