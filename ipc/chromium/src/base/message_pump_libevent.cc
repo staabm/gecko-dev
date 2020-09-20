@@ -312,21 +312,31 @@ void MessagePumpLibevent::OnLibeventSignalNotification(int sig, short flags,
 void MessagePumpLibevent::Run(Delegate* delegate) {
   DCHECK(keep_running_) << "Quit must have been called outside of Run!";
 
+  mozilla::recordreplay::RecordReplayAssert("MessagePumpLibevent::Run");
+
   bool old_in_run = in_run_;
   in_run_ = true;
 
   for (;;) {
     ScopedNSAutoreleasePool autorelease_pool;
 
+    mozilla::recordreplay::RecordReplayAssert("MessagePumpLibevent::Run LOOP");
+
     bool did_work = delegate->DoWork();
+    mozilla::recordreplay::RecordReplayAssert("MessagePumpLibevent::Run #1 %d", did_work);
+
     if (!keep_running_) break;
 
     did_work |= delegate->DoDelayedWork(&delayed_work_time_);
+    mozilla::recordreplay::RecordReplayAssert("MessagePumpLibevent::Run #2 %d", did_work);
+
     if (!keep_running_) break;
 
     if (did_work) continue;
 
     did_work = delegate->DoIdleWork();
+    mozilla::recordreplay::RecordReplayAssert("MessagePumpLibevent::Run #3 %d", did_work);
+
     if (!keep_running_) break;
 
     if (did_work) continue;
@@ -334,7 +344,13 @@ void MessagePumpLibevent::Run(Delegate* delegate) {
     // EVLOOP_ONCE tells libevent to only block once,
     // but to service all pending events when it wakes up.
     if (delayed_work_time_.is_null()) {
+      mozilla::recordreplay::RecordReplayAssert(
+        "MessagePumpLibevent::Run event_base_loop BEFORE #1"
+      );
       event_base_loop(event_base_, EVLOOP_ONCE);
+      mozilla::recordreplay::RecordReplayAssert(
+        "MessagePumpLibevent::Run event_base_loop AFTER #1"
+      );
     } else {
       TimeDelta delay = delayed_work_time_ - TimeTicks::Now();
       if (delay > TimeDelta()) {
@@ -343,11 +359,11 @@ void MessagePumpLibevent::Run(Delegate* delegate) {
         poll_tv.tv_usec = delay.InMicroseconds() % Time::kMicrosecondsPerSecond;
         event_base_loopexit(event_base_, &poll_tv);
         mozilla::recordreplay::RecordReplayAssert(
-          "MessagePumpLibevent::Run event_base_loop BEFORE"
+          "MessagePumpLibevent::Run event_base_loop BEFORE #2"
         );
         event_base_loop(event_base_, EVLOOP_ONCE);
         mozilla::recordreplay::RecordReplayAssert(
-          "MessagePumpLibevent::Run event_base_loop AFTER"
+          "MessagePumpLibevent::Run event_base_loop AFTER #2"
         );
       } else {
         // It looks like delayed_work_time_ indicates a time in the past, so we
