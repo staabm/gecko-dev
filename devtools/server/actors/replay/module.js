@@ -389,6 +389,7 @@ const commands = {
   "Internal.convertFunctionOffsetToLocation": Internal_convertFunctionOffsetToLocation,
   "Internal.convertLocationToFunctionOffset": Internal_convertLocationToFunctionOffset,
   "Internal.getHTMLSource": Internal_getHTMLSource,
+  "Internal.getStepOffsets": Internal_getStepOffsets,
 };
 
 function OnProtocolCommand(method, params) {
@@ -591,6 +592,14 @@ function Internal_convertFunctionOffsetToLocation({ functionId, offset}) {
 
 function Internal_convertLocationToFunctionOffset({ location }) {
   return gBreakpointLocations.get(breakpointLocationKey(location));
+}
+
+function Internal_getStepOffsets({ functionId }) {
+  const script = functionIdToScript(functionId);
+  const offsets = script.getPossibleBreakpoints()
+    .filter(bp => bp.isStepStart)
+    .map(bp => bp.offset);
+  return { offsets };
 }
 
 function Debugger_getScriptSource({ scriptId }) {
