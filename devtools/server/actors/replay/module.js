@@ -216,7 +216,11 @@ gDebugger.onNewScript = script => {
   const id = sourceToProtocolScriptId(script.source);
 
   let kind = "scriptSource";
-  if (script.source.introductionType == "scriptElement") {
+
+  // This test is pretty lame but the "scriptElement" introduction type doesn't
+  // distinguish between script elements with inline content and with a "src"
+  // attribute.
+  if (script.source.url.endsWith("html")) {
     kind = "inlineScript";
   }
 
@@ -388,6 +392,7 @@ const commands = {
   "Debugger.getScriptSource": Debugger_getScriptSource,
   "Host.convertFunctionOffsetToLocation": Host_convertFunctionOffsetToLocation,
   "Host.convertLocationToFunctionOffset": Host_convertLocationToFunctionOffset,
+  "Host.getFunctionsInRange": Host_getFunctionsInRange,
   "Host.getHTMLSource": Host_getHTMLSource,
   "Host.getStepOffsets": Host_getStepOffsets,
 };
@@ -443,6 +448,21 @@ function SetScanningScripts(value) {
 // Debugger Commands
 ///////////////////////////////////////////////////////////////////////////////
 
+function positionPrecedes(posA, posB) {
+  return posA.line < posB.line || posA.line == posB.line && posA.column < posB.column;
+}
+
+// Whether line/column are in the range described by begin/end.
+function positionMatches(begin, end, line, column) {
+  if (begin && positionPrecedes({ line, column }, begin)) {
+    return false;
+  }
+  if (end && positionPrecedes(end, { line, column })) {
+    return false;
+  }
+  return true;
+}
+
 // Invoke callback on an overapproximation of all scripts in a source
 // between begin and end.
 function forMatchingScripts(source, begin, end, callback) {
@@ -492,19 +512,15 @@ function forMatchingScripts(source, begin, end, callback) {
       }
     }
   }
-
-  function positionPrecedes(posA, posB) {
-    return posA.line < posB.line || posA.line == posB.line && posA.column < posB.column;
-  }
 }
 
 // Invoke callback all positions in a source between begin and end (inclusive / optional).
 function forMatchingBreakpointPositions(source, begin, end, callback) {
   forMatchingScripts(source, begin, end, script => {
     script.getPossibleBreakpoints().forEach(({ offset, lineNumber, columnNumber }, i) => {
-      if (positionMatches(lineNumber, columnNumber)) {
+      if (positionMatches(begin, end, lineNumber, columnNumber)) {
         callback(script, offset, lineNumber, columnNumber);
-      } else if (i == 0 && positionMatches(script.startLine, script.startColumn)) {
+      } else if (i == 0 && positionMatches(begin, end, script.startLine, script.startColumn)) {
         // The start location of the script is considered to match the first
         // breakpoint position. This allows setting breakpoints or analyses by
         // using the function location provided in the protocol, instead of
@@ -513,20 +529,9 @@ function forMatchingBreakpointPositions(source, begin, end, callback) {
       }
     });
   });
-
-  // Whether line/column are in the range described by begin/end.
-  function positionMatches(line, column) {
-    if (begin && positionPrecedes({ line, column }, begin)) {
-      return false;
-    }
-    if (end && positionPrecedes(end, { line, column })) {
-      return false;
-    }
-    return true;
-  }
 }
 
-function scriptIdToSource(scriptId) {
+function protocolScriptIdToSource(scriptId) {
   return gSources.getObject(Number(scriptId));
 }
 
@@ -542,7 +547,7 @@ function breakpointLocationKey({ scriptId, line, column }) {
 }
 
 function Debugger_getPossibleBreakpoints({ scriptId, begin, end}) {
-  const source = scriptIdToSource(scriptId);
+  const source = protocolScriptIdToSource(scriptId);
 
   const lineLocations = new ArrayMap();
   forMatchingBreakpointPositions(source, begin, end, (script, offset, line, column) => {
@@ -594,6 +599,16 @@ function Host_convertLocationToFunctionOffset({ location }) {
   return gBreakpointLocations.get(breakpointLocationKey(location));
 }
 
+function Host_getFunctionsInRange({ scriptId, begin, end }) {
+  const source = protocolScriptIdToSource(scriptId);
+
+  const functions = [];
+  forMatchingScripts(source, begin, end, script => {
+    functions.push(scriptToFunctionId(script));
+  });
+  return { functions };
+}
+
 function Host_getStepOffsets({ functionId }) {
   const script = functionIdToScript(functionId);
   const offsets = script.getPossibleBreakpoints()
@@ -603,7 +618,7 @@ function Host_getStepOffsets({ functionId }) {
 }
 
 function Debugger_getScriptSource({ scriptId }) {
-  const source = scriptIdToSource(scriptId);
+  const source = protocolScriptIdToSource(scriptId);
 
   let scriptSource = source.text;
   if (source.startLine > 1) {
