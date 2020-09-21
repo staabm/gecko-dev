@@ -25,6 +25,7 @@ void OnScriptParsed(const char* aId, const char* aKind, const char* aUrl);
 void OnPaint(const char* aMimeType, const char* aOptions, const char* aData);
 void OnInstrument(const char* aKind, const char* aFunctionId, int aOffset);
 void OnExceptionUnwind();
+void OnDebuggerStatement();
 
 }  // namespace mozilla::recordreplay
 

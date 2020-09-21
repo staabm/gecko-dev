@@ -93,6 +93,7 @@ static void (*gSetDefaultCommandCallback)(char* (*aCallback)(const char*, const 
 static void (*gSetScanScriptsCallback)(void (*aCallback)(bool));
 static void (*gInstrument)(const char* aKind, const char* aFunctionId, int aOffset);
 static void (*gOnExceptionUnwind)();
+static void (*gOnDebuggerStatement)();
 
 template <typename T>
 static void LoadSymbol(void* handle, const char* name, T& function) {
@@ -168,6 +169,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol(handle, "RecordReplaySetScanScriptsCallback", gSetScanScriptsCallback);
   LoadSymbol(handle, "RecordReplayInstrument", gInstrument);
   LoadSymbol(handle, "RecordReplayOnExceptionUnwind", gOnExceptionUnwind);
+  LoadSymbol(handle, "RecordReplayOnDebuggerStatement", gOnDebuggerStatement);
 
   char buildId[128];
   snprintf(buildId, sizeof(buildId), "macOS-gecko-%s", PlatformBuildID());
@@ -431,6 +433,10 @@ void OnInstrument(const char* aKind, const char* aFunctionId, int aOffset) {
 
 void OnExceptionUnwind() {
   gOnExceptionUnwind();
+}
+
+void OnDebuggerStatement() {
+  gOnDebuggerStatement();
 }
 
 }  // namespace recordreplay

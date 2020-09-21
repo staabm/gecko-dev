@@ -383,6 +383,16 @@ static bool Method_OnExceptionUnwind(JSContext* aCx, unsigned aArgc,
   return true;
 }
 
+static bool Method_OnDebuggerStatement(JSContext* aCx, unsigned aArgc,
+                                       Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  OnDebuggerStatement();
+
+  args.rval().setUndefined();
+  return true;
+}
+
 static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("log", Method_Log, 1, 0),
   JS_FN("onScriptParsed", Method_OnScriptParsed, 3, 0),
@@ -393,6 +403,7 @@ static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("instrumentationCallback", Method_InstrumentationCallback, 3, 0),
   JS_FN("isScanningScripts", Method_IsScanningScripts, 0, 0),
   JS_FN("onExceptionUnwind", Method_OnExceptionUnwind, 0, 0),
+  JS_FN("onDebuggerStatement", Method_OnDebuggerStatement, 0, 0),
   JS_FS_END
 };
 

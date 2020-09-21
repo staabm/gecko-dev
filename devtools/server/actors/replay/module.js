@@ -164,6 +164,10 @@ gDebugger.onExceptionUnwind = (frame, value) => {
   RecordReplayControl.onExceptionUnwind();
 };
 
+gDebugger.onDebuggerStatement = () => {
+  RecordReplayControl.onDebuggerStatement();
+};
+
 // The UI process must wait until the content global is created here before
 // URLs can be loaded.
 Services.obs.addObserver(
