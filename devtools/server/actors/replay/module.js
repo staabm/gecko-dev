@@ -247,7 +247,7 @@ Services.obs.addObserver(
 
 const gHtmlContent = new Map();
 
-function Internal_getHTMLSource({ url }) {
+function Host_getHTMLSource({ url }) {
   const info = gHtmlContent.get(url);
   const contents = info ? info.content : "";
   return { contents };
@@ -386,10 +386,10 @@ const commands = {
   "Pause.getScope": Pause_getScope,
   "Debugger.getPossibleBreakpoints": Debugger_getPossibleBreakpoints,
   "Debugger.getScriptSource": Debugger_getScriptSource,
-  "Internal.convertFunctionOffsetToLocation": Internal_convertFunctionOffsetToLocation,
-  "Internal.convertLocationToFunctionOffset": Internal_convertLocationToFunctionOffset,
-  "Internal.getHTMLSource": Internal_getHTMLSource,
-  "Internal.getStepOffsets": Internal_getStepOffsets,
+  "Host.convertFunctionOffsetToLocation": Host_convertFunctionOffsetToLocation,
+  "Host.convertLocationToFunctionOffset": Host_convertLocationToFunctionOffset,
+  "Host.getHTMLSource": Host_getHTMLSource,
+  "Host.getStepOffsets": Host_getStepOffsets,
 };
 
 function OnProtocolCommand(method, params) {
@@ -572,7 +572,7 @@ function scriptToFunctionId(script) {
   return String(gScripts.getId(script));
 }
 
-function Internal_convertFunctionOffsetToLocation({ functionId, offset}) {
+function Host_convertFunctionOffsetToLocation({ functionId, offset}) {
   const script = functionIdToScript(functionId);
   const scriptId = sourceToProtocolScriptId(script.source);
 
@@ -590,11 +590,11 @@ function Internal_convertFunctionOffsetToLocation({ functionId, offset}) {
   return { location };
 }
 
-function Internal_convertLocationToFunctionOffset({ location }) {
+function Host_convertLocationToFunctionOffset({ location }) {
   return gBreakpointLocations.get(breakpointLocationKey(location));
 }
 
-function Internal_getStepOffsets({ functionId }) {
+function Host_getStepOffsets({ functionId }) {
   const script = functionIdToScript(functionId);
   const offsets = script.getPossibleBreakpoints()
     .filter(bp => bp.isStepStart)
