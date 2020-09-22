@@ -26,6 +26,7 @@ void OnPaint(const char* aMimeType, const char* aOptions, const char* aData);
 void OnInstrument(const char* aKind, const char* aFunctionId, int aOffset);
 void OnExceptionUnwind();
 void OnDebuggerStatement();
+void OnEvent(const char* aEvent, bool aBefore);
 
 }  // namespace mozilla::recordreplay
 

@@ -356,13 +356,8 @@ const { eventBreakpointForNotification } = require("devtools/server/actors/utils
 
 function eventListener(info) {
   const event = eventBreakpointForNotification(gDebugger, info);
-  if (!event) {
-    return;
-  }
-  advanceProgressCounter();
-
-  if (exports.OnEvent) {
-    exports.OnEvent(info.phase, event);
+  if (event && info.phase == "pre" || info.phase == "post") {
+    RecordReplayControl.onEvent(event, info.phase == "pre");
   }
 }
 
@@ -681,6 +676,10 @@ function makeDebuggeeValue(value) {
   } catch (e) {
     return gSandboxGlobal.makeDebuggeeValue(value);
   }
+}
+
+function getObjectIdRaw(obj) {
+  return getObjectId(makeDebuggeeValue(obj));
 }
 
 const UnserializablePrimitives = [
@@ -1161,27 +1160,27 @@ function nodeContents(node) {
 
   let style;
   if (node.style) {
-    style = getObjectId(node.style);
+    style = getObjectIdRaw(node.style);
   }
 
   let parentNode;
   if (node.parentNode) {
-    parentNode = getObjectId(node.parentNode);
+    parentNode = getObjectIdRaw(node.parentNode);
   } else if (node.defaultView && node.defaultView.parent != node.defaultView) {
     // Nested documents use the parent element instead of null.
     const iframes = node.defaultView.parent.document.getElementsByTagName("iframe");
     const iframe = [...iframes].find(f => f.contentDocument == node);
     if (iframe) {
-      parentNode = getObjectId(iframe);
+      parentNode = getObjectIdRaw(iframe);
     }
   }
 
   let childNodes;
   if (node.childNodes.length) {
-    childNodes = [...node.childNodes].map(n => getObjectId(n));
+    childNodes = [...node.childNodes].map(n => getObjectIdRaw(n));
   } else if (node.nodeName == "IFRAME") {
     // Treat an iframe's content document as one of its child nodes.
-    childNodes = [getObjectId(node.contentDocument)];
+    childNodes = [getObjectIdRaw(node.contentDocument)];
   }
 
   let documentURL;
@@ -1206,12 +1205,12 @@ function nodeContents(node) {
 function ruleContents(rule) {
   let parentStyleSheet;
   if (rule.parentStyleSheet) {
-    parentStyleSheet = getObjectId(rule.parentStyleSheet);
+    parentStyleSheet = getObjectIdRaw(rule.parentStyleSheet);
   }
 
   let style;
   if (rule.style) {
-    style = getObjectId(rule.style);
+    style = getObjectIdRaw(rule.style);
   }
 
   return {
@@ -1231,7 +1230,7 @@ function ruleContents(rule) {
 function styleContents(style) {
   let parentRule;
   if (style.parentRule) {
-    parentRule = getObjectId(style.parentRule);
+    parentRule = getObjectIdRaw(style.parentRule);
   }
 
   const properties = [];
