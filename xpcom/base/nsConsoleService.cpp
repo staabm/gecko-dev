@@ -248,6 +248,8 @@ class LogMessageRunnable : public Runnable {
 
 NS_IMETHODIMP
 LogMessageRunnable::Run() {
+  recordreplay::RecordReplayAssert("LogMessageRunnable::Run Start");
+
   // Snapshot of listeners so that we don't reenter this hash during
   // enumeration.
   nsCOMArray<nsIConsoleListener> listeners;
@@ -260,6 +262,8 @@ LogMessageRunnable::Run() {
   }
 
   mService->SetDoneDelivering();
+
+  recordreplay::RecordReplayAssert("LogMessageRunnable::Run End");
 
   return NS_OK;
 }

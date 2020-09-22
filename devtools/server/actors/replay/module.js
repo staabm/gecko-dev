@@ -216,7 +216,7 @@ gDebugger.onNewScript = script => {
       );
     }
 
-    gGeckoSources.set(script.source.id, scrpt.source);
+    gGeckoSources.set(script.source.id, script.source);
   }
 
   gSources.add(script.source);
@@ -431,13 +431,13 @@ function SetScanningScripts(value) {
 ///////////////////////////////////////////////////////////////////////////////
 
 function geckoSourceIdToProtocolId(sourceId) {
-  const source = gGeckoSources.get(message.sourceId);
+  const source = gGeckoSources.get(sourceId);
   return source ? sourceToProtocolScriptId(source) : undefined;
 }
 
 let gCurrentConsoleMessage;
 
-function OnConsoleError() {
+function OnConsoleError(message) {
   const target = message.timeWarpTarget || 0;
 
   let level = "error";
@@ -491,7 +491,7 @@ function OnConsoleAPICall(message) {
     argumentValues = message.arguments.map(createProtocolValueRaw);
   }
 
-  gCurrentMessage = {
+  gCurrentConsoleMessage = {
     source: "ConsoleAPI",
     level: consoleAPIMessageLevel(message),
     text: "",
@@ -501,7 +501,7 @@ function OnConsoleAPICall(message) {
     column: message.columnNumber,
     argumentValues,
   };
-  RecordReplayControl.onConsoleMessage(target);
+  RecordReplayControl.onConsoleMessage(0);
   gCurrentConsoleMessage = null;
 
   clearPauseState();
