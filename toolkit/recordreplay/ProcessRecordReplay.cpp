@@ -95,6 +95,7 @@ static void (*gInstrument)(const char* aKind, const char* aFunctionId, int aOffs
 static void (*gOnExceptionUnwind)();
 static void (*gOnDebuggerStatement)();
 static void (*gOnEvent)(const char* aEvent, bool aBefore);
+static void (*gOnConsoleMessage)(int aTimeWarpTarget);
 
 template <typename T>
 static void LoadSymbol(void* handle, const char* name, T& function) {
@@ -172,6 +173,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol(handle, "RecordReplayOnExceptionUnwind", gOnExceptionUnwind);
   LoadSymbol(handle, "RecordReplayOnDebuggerStatement", gOnDebuggerStatement);
   LoadSymbol(handle, "RecordReplayOnEvent", gOnEvent);
+  LoadSymbol(handle, "RecordReplayOnConsoleMessage", gOnConsoleMessage);
 
   char buildId[128];
   snprintf(buildId, sizeof(buildId), "macOS-gecko-%s", PlatformBuildID());
@@ -451,6 +453,10 @@ void OnDebuggerStatement() {
 
 void OnEvent(const char* aEvent, bool aBefore) {
   gOnEvent(aEvent, aBefore);
+}
+
+void OnConsoleMessage(int aTimeWarpTarget) {
+  gOnConsoleMessage(aTimeWarpTarget);
 }
 
 }  // namespace recordreplay

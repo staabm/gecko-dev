@@ -90,8 +90,7 @@ function isNonNullObject(obj) {
 
 // Bidirectional map between values and numeric IDs.
 function IdMap() {
-  this._idMap = [undefined];
-  this._objectMap = new Map();
+  this.clear();
 }
 
 IdMap.prototype = {
@@ -126,6 +125,11 @@ IdMap.prototype = {
       callback(i, this._idMap[i]);
     }
   },
+
+  clear() {
+    this._idMap = [undefined];
+    this._objectMap = new Map();
+  }
 };
 
 // Map from keys to arrays of values.
@@ -181,6 +185,9 @@ const gScripts = new IdMap();
 // Associate each Debugger.Source with a numeric ID.
 const gSources = new IdMap();
 
+// Map Debugger.Source.id to Debugger.Source.
+const gGeckoSources = new Map();
+
 // Map Debugger.Source to arrays of the top level scripts for that source.
 const gSourceRoots = new ArrayMap();
 
@@ -208,6 +215,8 @@ gDebugger.onNewScript = script => {
         { recordingId, url, sourceMapURL }
       );
     }
+
+    gGeckoSources.set(script.source.id, scrpt.source);
   }
 
   gSources.add(script.source);
@@ -272,28 +281,6 @@ Services.obs.addObserver(
   },
   "devtools-html-content"
 );
-
-Services.console.registerListener({
-  observe(message) {
-    if (!(message instanceof Ci.nsIScriptError)) {
-      return;
-    }
-
-    advanceProgressCounter();
-
-    if (exports.OnConsoleError) {
-      exports.OnConsoleError(message);
-    }
-  }
-});
-
-Services.obs.addObserver({
-  observe(message) {
-    if (exports.OnConsoleAPICall) {
-      exports.OnConsoleAPICall(message);
-    }
-  },
-}, "console-api-log-event");
 
 getWindow().docShell.chromeEventHandler.addEventListener(
   "DOMWindowCreated",
@@ -385,6 +372,7 @@ const commands = {
   "Debugger.getScriptSource": Debugger_getScriptSource,
   "Host.convertFunctionOffsetToLocation": Host_convertFunctionOffsetToLocation,
   "Host.convertLocationToFunctionOffset": Host_convertLocationToFunctionOffset,
+  "Host.getCurrentMessageContents": Host_getCurrentMessageContents,
   "Host.getFunctionsInRange": Host_getFunctionsInRange,
   "Host.getHTMLSource": Host_getHTMLSource,
   "Host.getStepOffsets": Host_getStepOffsets,
@@ -436,6 +424,98 @@ gNewGlobalHooks.push(global => {
 
 function SetScanningScripts(value) {
   gAllGlobals.forEach(g => g.setInstrumentationActive(value));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Console Commands
+///////////////////////////////////////////////////////////////////////////////
+
+function geckoSourceIdToProtocolId(sourceId) {
+  const source = gGeckoSources.get(message.sourceId);
+  return source ? sourceToProtocolScriptId(source) : undefined;
+}
+
+let gCurrentConsoleMessage;
+
+function OnConsoleError() {
+  const target = message.timeWarpTarget || 0;
+
+  let level = "error";
+  if (message.flags & Ci.nsIScriptError.warningFlag) {
+    level = "warning";
+  } else if (message.flags & Ci.nsIScriptError.infoFlag) {
+    level = "info";
+  }
+
+  // Diagnostics for TypeErrors that don't have an associated warp target.
+  if (!target && String(message.errorMessage).includes("TypeError")) {
+    log(`Error: TypeError message without a warp target "${message.errorMessage}" ${message.sourceId}`);
+  }
+
+  gCurrentConsoleMessage = {
+    source: "PageError",
+    level,
+    text: message.errorMessage,
+    url: message.sourceName,
+    scriptId: geckoSourceIdToProtocolId(message.sourceId),
+    line: message.lineNumber,
+    column: message.columnNumber,
+  };
+  RecordReplayControl.onConsoleMessage(target);
+  gCurrentConsoleMessage = null;
+}
+
+Services.console.registerListener({
+  observe(message) {
+    if (message instanceof Ci.nsIScriptError) {
+      OnConsoleError(message);
+    }
+  }
+});
+
+function consoleAPIMessageLevel({ level }) {
+  switch (level) {
+    case "trace": return "trace";
+    case "warn": return "warning";
+    case "error": return "error";
+    case "assert": return "assert";
+    default: return "info";
+  }
+}
+
+function OnConsoleAPICall(message) {
+  message = message.wrappedJSObject;
+
+  let argumentValues;
+  if (message.arguments) {
+    argumentValues = message.arguments.map(createProtocolValueRaw);
+  }
+
+  gCurrentMessage = {
+    source: "ConsoleAPI",
+    level: consoleAPIMessageLevel(message),
+    text: "",
+    url: message.filename,
+    sourceId: geckoSourceIdToProtocolId(message.sourceId),
+    line: message.lineNumber,
+    column: message.columnNumber,
+    argumentValues,
+  };
+  RecordReplayControl.onConsoleMessage(target);
+  gCurrentConsoleMessage = null;
+
+  clearPauseState();
+};
+
+Services.obs.addObserver({
+  observe(message) {
+    OnConsoleAPICall(message);
+  }
+}, "console-api-log-event");
+
+function Host_getCurrentMessageContents() {
+  assert(gCurrentConsoleMessage);
+  return gCurrentConsoleMessage;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -636,6 +716,13 @@ const gPauseObjects = new IdMap();
 
 // Map raw object => Debugger.Object
 const gCanonicalObjects = new Map();
+
+// Clear out object state and associated strong references after getting object
+// IDs for the protocol and then resuming execution.
+function clearPauseState() {
+  gPauseObjects.clear();
+  gCanonicalObjects.clear();
+}
 
 function getObjectId(obj) {
   if (!obj) {

@@ -424,6 +424,21 @@ static bool Method_RecordingId(JSContext* aCx, unsigned aArgc,
   return true;
 }
 
+static bool Method_OnConsoleMessage(JSContext* aCx, unsigned aArgc, Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  if (!args.get(0).isNumber()) {
+    JS_ReportErrorASCII(aCx, "Bad parameters");
+    return false;
+  }
+
+  int target = args.get(0).toNumber();
+  OnConsoleMessage(target);
+
+  args.rval().setUndefined();
+  return true;
+}
+
 static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("log", Method_Log, 1, 0),
   JS_FN("onScriptParsed", Method_OnScriptParsed, 3, 0),
@@ -436,6 +451,7 @@ static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("onExceptionUnwind", Method_OnExceptionUnwind, 0, 0),
   JS_FN("onDebuggerStatement", Method_OnDebuggerStatement, 0, 0),
   JS_FN("onEvent", Method_OnEvent, 2, 0),
+  JS_FN("onConsoleMessage", Method_OnConsoleMessage, 1, 0),
   JS_FN("recordingId", Method_RecordingId, 0, 0),
   JS_FS_END
 };

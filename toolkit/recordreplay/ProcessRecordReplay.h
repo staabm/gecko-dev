@@ -27,6 +27,7 @@ void OnInstrument(const char* aKind, const char* aFunctionId, int aOffset);
 void OnExceptionUnwind();
 void OnDebuggerStatement();
 void OnEvent(const char* aEvent, bool aBefore);
+void OnConsoleMessage(int aTimeWarpTarget);
 
 const char* GetRecordingId();
 
