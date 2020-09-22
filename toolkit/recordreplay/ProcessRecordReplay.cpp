@@ -409,9 +409,17 @@ void MaybeCreateCheckpoint() {
   }
 }
 
+static char* gRecordingId;
+
+const char* GetRecordingId() {
+  if (!gRecordingId) {
+    gRecordingId = gGetRecordingId();
+  }
+  return gRecordingId;
+}
+
 void FinishRecording() {
-  char* recordingId = gGetRecordingId();
-  js::SendRecordingFinished(recordingId);
+  js::SendRecordingFinished();
 
   gFinishRecording();
 

@@ -28,7 +28,7 @@ namespace js {
 void EnsureInitialized();
 
 // Notify the UI process that the recording was finished.
-void SendRecordingFinished(const char* aRecordingId);
+void SendRecordingFinished();
 
 // Callback used when the recording driver is sending us a command to look up
 // some state.

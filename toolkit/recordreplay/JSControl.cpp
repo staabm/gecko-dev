@@ -193,13 +193,13 @@ MOZ_EXPORT void RecordReplayInterface_EndContentParse(const void* aToken) {
 
 }  // extern "C"
 
-void SendRecordingFinished(const char* aRecordingId) {
+void SendRecordingFinished() {
   MOZ_RELEASE_ASSERT(IsInitialized());
 
   AutoSafeJSContext cx;
   JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
 
-  JSString* str = JS_NewStringCopyZ(cx, aRecordingId);
+  JSString* str = JS_NewStringCopyZ(cx, GetRecordingId());
   MOZ_RELEASE_ASSERT(str);
 
   JS::AutoValueArray<1> args(cx);
@@ -411,6 +411,19 @@ static bool Method_OnEvent(JSContext* aCx, unsigned aArgc, Value* aVp) {
   return true;
 }
 
+static bool Method_RecordingId(JSContext* aCx, unsigned aArgc,
+                                     Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  JSString* str = JS_NewStringCopyZ(aCx, GetRecordingId());
+  if (!str) {
+    return false;
+  }
+
+  args.rval().setString(str);
+  return true;
+}
+
 static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("log", Method_Log, 1, 0),
   JS_FN("onScriptParsed", Method_OnScriptParsed, 3, 0),
@@ -423,6 +436,7 @@ static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("onExceptionUnwind", Method_OnExceptionUnwind, 0, 0),
   JS_FN("onDebuggerStatement", Method_OnDebuggerStatement, 0, 0),
   JS_FN("onEvent", Method_OnEvent, 2, 0),
+  JS_FN("recordingId", Method_RecordingId, 0, 0),
   JS_FS_END
 };
 

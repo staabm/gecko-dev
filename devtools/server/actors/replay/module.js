@@ -198,19 +198,17 @@ gDebugger.onNewScript = script => {
 
   gSourceRoots.add(script.source, script);
 
-  /*
   if (!gSources.getId(script.source)) {
     if (script.source.sourceMapURL &&
         Services.prefs.getBoolPref("devtools.recordreplay.uploadSourceMaps")) {
-      const pid = RecordReplayControl.middlemanPid();
+      const recordingId = RecordReplayControl.recordingId();
       const { url, sourceMapURL } = script.source;
       Services.cpmm.sendAsyncMessage(
         "RecordReplayGeneratedSourceWithSourceMap",
-        { pid, url, sourceMapURL }
+        { recordingId, url, sourceMapURL }
       );
     }
   }
-  */
 
   gSources.add(script.source);
   const id = sourceToProtocolScriptId(script.source);
@@ -390,6 +388,7 @@ const commands = {
   "Host.getFunctionsInRange": Host_getFunctionsInRange,
   "Host.getHTMLSource": Host_getHTMLSource,
   "Host.getStepOffsets": Host_getStepOffsets,
+  "Host.getSourceMapURL": Host_getSourceMapURL,
 };
 
 function OnProtocolCommand(method, params) {
@@ -534,23 +533,11 @@ function sourceToProtocolScriptId(source) {
   return String(gSources.getId(source));
 }
 
-// Map breakpoint locations we've generated to function/offset information.
-const gBreakpointLocations = new Map();
-
-function breakpointLocationKey({ scriptId, line, column }) {
-  return `${scriptId}:${line}:${column}`;
-}
-
 function Debugger_getPossibleBreakpoints({ scriptId, begin, end}) {
   const source = protocolScriptIdToSource(scriptId);
 
   const lineLocations = new ArrayMap();
   forMatchingBreakpointPositions(source, begin, end, (script, offset, line, column) => {
-    const functionId = scriptToFunctionId(script);
-    gBreakpointLocations.set(
-      breakpointLocationKey({ scriptId, line, column }),
-      { functionId, offset }
-    );
     lineLocations.add(line, column);
   });
 
@@ -591,7 +578,15 @@ function Host_convertFunctionOffsetToLocation({ functionId, offset}) {
 }
 
 function Host_convertLocationToFunctionOffset({ location }) {
-  return gBreakpointLocations.get(breakpointLocationKey(location));
+  const { scriptId, line, column } = location;
+  const source = protocolScriptIdToSource(scriptId);
+  const target = { line, column };
+
+  let rv = {};
+  forMatchingBreakpointPositions(source, target, target, (script, offset) => {
+    rv = { functionId: scriptToFunctionId(script), offset };
+  });
+  return rv;
 }
 
 function Host_getFunctionsInRange({ scriptId, begin, end }) {
@@ -610,6 +605,12 @@ function Host_getStepOffsets({ functionId }) {
     .filter(bp => bp.isStepStart)
     .map(bp => bp.offset);
   return { offsets };
+}
+
+function Host_getSourceMapURL({ scriptId }) {
+  const source = protocolScriptIdToSource(scriptId);
+  const url = source.sourceMapURL;
+  return url ? { url } : {};
 }
 
 function Debugger_getScriptSource({ scriptId }) {

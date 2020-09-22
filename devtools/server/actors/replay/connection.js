@@ -148,7 +148,7 @@ function getResourceInfo(url, text) {
   };
 }
 
-async function addRecordingResource(info, recordingId, url) {
+async function addRecordingResource(recordingId, url) {
   try {
     const response = await fetch(url);
     if (response.status < 200 || response.status >= 300) {
@@ -159,19 +159,19 @@ async function addRecordingResource(info, recordingId, url) {
     const resource = getResourceInfo(url, text);
 
     await sendCommand(
-      info.messageChannelId,
+      gMainChannelId,
       "Internal.addRecordingResource",
       { recordingId, resource }
     );
 
     const { known } = await sendCommand(
-      info.messageChannelId,
+      gMainChannelId,
       "Internal.hasResource",
       { resource }
     );
     if (!known) {
       await sendCommand(
-        info.messageChannelId,
+        gMainChannelId,
         "Internal.addResource",
         { resource, contents: text }
       );
@@ -186,18 +186,7 @@ async function addRecordingResource(info, recordingId, url) {
 
 Services.ppmm.addMessageListener("RecordReplayGeneratedSourceWithSourceMap", {
   async receiveMessage(msg) {
-    const { pid, url, sourceMapURL } = msg.data;
-
-    // Wait for a recording to be created for this pid, if it hasn't already happened.
-    let info;
-    while (true) {
-      info = gRecordings.get(pid);
-      if (info) {
-        break;
-      }
-      await new Promise(resolve => gRecordingCreateWaiters.push(resolve));
-    }
-    const { recordingId } = await info.createPromise;
+    const { recordingId, url, sourceMapURL } = msg.data;
 
     let resolvedSourceMapURL;
     try {
@@ -205,10 +194,7 @@ Services.ppmm.addMessageListener("RecordReplayGeneratedSourceWithSourceMap", {
     } catch (e) {
       resolvedSourceMapURL = sourceMapURL;
     }
-    const promise = addRecordingResource(info, recordingId, resolvedSourceMapURL);
-    info.dataPromises.push(promise);
-
-    const text = await promise;
+    const text = await addRecordingResource(recordingId, resolvedSourceMapURL);
     if (text) {
       // Look for sources which are not inlined into the map, and add them as
       // additional recording resources.
@@ -216,7 +202,7 @@ Services.ppmm.addMessageListener("RecordReplayGeneratedSourceWithSourceMap", {
       for (let i = 0; i < sources.length; i++) {
         if (!sourcesContent[i]) {
           const sourceURL = computeSourceURL(url, sourceRoot, sources[i]);
-          info.dataPromises.push(addRecordingResource(info, recordingId, sourceURL));
+          addRecordingResource(recordingId, sourceURL);
         }
       }
     }
@@ -228,19 +214,6 @@ function computeSourceURL(url, root, path) {
     path = root + (root.endsWith("/") ? "" : "/") + path;
   }
   return new URL(path, url).href;
-}
-
-async function RecordingDestroyed(pid) {
-  const info = gRecordings.get(pid);
-  if (!info || info.destroyed) {
-    return;
-  }
-  info.destroyed = true;
-  gRecordings.delete(pid);
-
-  await Promise.all(info.dataPromises);
-
-  gWorker.postMessage({ kind: "closeChannel", id: info.uploadChannelId });
 }
 
 const gResultWaiters = new Map();
@@ -257,4 +230,4 @@ function onCommandResult(id, result) {
 }
 
 // eslint-disable-next-line no-unused-vars
-var EXPORTED_SYMBOLS = ["Initialize", "RecordingDestroyed"];
+var EXPORTED_SYMBOLS = ["Initialize"];

@@ -28,6 +28,8 @@ void OnExceptionUnwind();
 void OnDebuggerStatement();
 void OnEvent(const char* aEvent, bool aBefore);
 
+const char* GetRecordingId();
+
 }  // namespace mozilla::recordreplay
 
 #endif  // mozilla_recordreplay_ProcessRecordReplay_h
