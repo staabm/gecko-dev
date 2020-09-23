@@ -39,7 +39,7 @@ static void (*gOnExceptionUnwind)();
 static void (*gOnDebuggerStatement)();
 static void (*gOnEvent)(const char* aEvent, bool aBefore);
 static void (*gOnConsoleMessage)(int aTimeWarpTarget);
-static int (*gNewTimeWarpTarget)();
+static size_t (*gNewTimeWarpTarget)();
 
 // Callback used when the recording driver is sending us a command to look up
 // some state.
@@ -146,19 +146,11 @@ MOZ_EXPORT bool RecordReplayInterface_ShouldUpdateProgressCounter(
 extern "C" {
 
 MOZ_EXPORT ProgressCounter RecordReplayInterface_NewTimeWarpTarget() {
-  if (AreThreadEventsDisallowed()) {
+  if (AreThreadEventsDisallowed() || !IsModuleInitialized()) {
     return 0;
   }
 
-  // NewTimeWarpTarget() must be called at consistent points between recording
-  // and replaying.
-  RecordReplayAssert("NewTimeWarpTarget");
-
-  if (!IsModuleInitialized() || IsRecording()) {
-    return 0;
-  }
-
-  return NewTimeWarpTarget();
+  return gNewTimeWarpTarget();
 }
 
 }  // extern "C"
