@@ -116,6 +116,18 @@ static inline void RecordReplayBytes(const char* aWhy, void* aData, size_t aSize
 // see 'Unrecordable Executions' in the URL above.
 static inline void InvalidateRecording(const char* aWhy);
 
+// API for ensuring deterministic recording and replaying of PLDHashTables.
+// This allows PLDHashTables to behave deterministically by generating a custom
+// set of operations for each table and requiring no other instrumentation.
+// (PLHashTables have a similar mechanism, though it is not exposed here.)
+static inline const PLDHashTableOps* GeneratePLDHashTableCallbacks(
+    const PLDHashTableOps* aOps);
+static inline const PLDHashTableOps* UnwrapPLDHashTableCallbacks(
+    const PLDHashTableOps* aOps);
+static inline void DestroyPLDHashTableCallbacks(const PLDHashTableOps* aOps);
+static inline void MovePLDHashTableContents(const PLDHashTableOps* aFirstOps,
+                                            const PLDHashTableOps* aSecondOps);
+
 // Prevent a JS object from ever being collected while recording or replaying.
 // GC behavior is non-deterministic when recording/replaying, and preventing
 // an object from being collected ensures that finalizers which might interact
@@ -275,6 +287,18 @@ MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(RecordReplayBytes,
                                     (const char* aWhy, void* aData, size_t aSize),
                                     (aWhy, aData, aSize))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER(HasDivergedFromRecording, bool, false, (), ())
+MOZ_MAKE_RECORD_REPLAY_WRAPPER(GeneratePLDHashTableCallbacks,
+                               const PLDHashTableOps*, aOps,
+                               (const PLDHashTableOps* aOps), (aOps))
+MOZ_MAKE_RECORD_REPLAY_WRAPPER(UnwrapPLDHashTableCallbacks,
+                               const PLDHashTableOps*, aOps,
+                               (const PLDHashTableOps* aOps), (aOps))
+MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(DestroyPLDHashTableCallbacks,
+                                    (const PLDHashTableOps* aOps), (aOps))
+MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(MovePLDHashTableContents,
+                                    (const PLDHashTableOps* aFirstOps,
+                                     const PLDHashTableOps* aSecondOps),
+                                    (aFirstOps, aSecondOps))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(InvalidateRecording, (const char* aWhy),
                                     (aWhy))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(HoldJSObject, (void* aJSObj), (aJSObj))
