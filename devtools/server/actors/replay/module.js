@@ -164,8 +164,12 @@ gDebugger.onNewGlobalObject = global => {
   } catch (e) {}
 };
 
+let gExceptionValue;
+
 gDebugger.onExceptionUnwind = (frame, value) => {
+  gExceptionValue = { value };
   RecordReplayControl.onExceptionUnwind();
+  gExceptionValue = null;
 };
 
 gDebugger.onDebuggerStatement = () => {
@@ -366,6 +370,7 @@ const commands = {
   "Pause.evaluateInFrame": Pause_evaluateInFrame,
   "Pause.evaluateInGlobal": Pause_evaluateInGlobal,
   "Pause.getAllFrames": Pause_getAllFrames,
+  "Pause.getExceptionValue": Pause_getExceptionValue,
   "Pause.getObjectPreview": Pause_getObjectPreview,
   "Pause.getObjectProperty": Pause_getObjectProperty,
   "Pause.getScope": Pause_getScope,
@@ -1464,6 +1469,14 @@ function Host_countStackFrames() {
 function Host_currentGeneratorId() {
   const { generatorId } = gDebugger.getNewestFrame();
   return { id: generatorId };
+}
+
+function Pause_getExceptionValue() {
+  assert(gExceptionValue);
+  return {
+    exception: createProtocolValue(gExceptionValue.value),
+    data: {},
+  };
 }
 
 function Pause_getObjectPreview({ object }) {
