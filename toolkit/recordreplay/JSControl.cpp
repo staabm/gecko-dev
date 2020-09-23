@@ -345,8 +345,10 @@ static bool Method_InstrumentationCallback(JSContext* aCx, unsigned aArgc,
   const char* kind;
   if (kindStr == gBreakpointAtom) {
     kind = "breakpoint";
-  } else if (kindStr == gMainAtom || kindStr == gGeneratorAtom) {
+  } else if (kindStr == gMainAtom) {
     kind = "main";
+  } else if (kindStr == gGeneratorAtom) {
+    kind = "generator";
   } else if (kindStr == gEntryAtom) {
     kind = "entry";
   } else if (kindStr == gExitAtom) {

@@ -372,6 +372,8 @@ const commands = {
   "Debugger.getScriptSource": Debugger_getScriptSource,
   "Host.convertFunctionOffsetToLocation": Host_convertFunctionOffsetToLocation,
   "Host.convertLocationToFunctionOffset": Host_convertLocationToFunctionOffset,
+  "Host.countStackFrames": Host_countStackFrames,
+  "Host.currentGeneratorId": Host_currentGeneratorId,
   "Host.getCurrentMessageContents": Host_getCurrentMessageContents,
   "Host.getFunctionsInRange": Host_getFunctionsInRange,
   "Host.getHTMLSource": Host_getHTMLSource,
@@ -1445,6 +1447,15 @@ function Pause_getAllFrames() {
     frames: frameIds.reverse(),
     data: { frames: frameData },
   };
+}
+
+function Host_countStackFrames() {
+  return { count: countScriptFrames() };
+}
+
+function Host_currentGeneratorId() {
+  const { generatorId } = gDebugger.getNewestFrame();
+  return { id: generatorId };
 }
 
 function Pause_getObjectPreview({ object }) {
