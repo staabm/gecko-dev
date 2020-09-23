@@ -364,6 +364,7 @@ function OnTestCommand(str) {
 
 const commands = {
   "Pause.evaluateInFrame": Pause_evaluateInFrame,
+  "Pause.evaluateInGlobal": Pause_evaluateInGlobal,
   "Pause.getAllFrames": Pause_getAllFrames,
   "Pause.getObjectPreview": Pause_getObjectPreview,
   "Pause.getObjectProperty": Pause_getObjectProperty,
@@ -1430,6 +1431,13 @@ function Pause_evaluateInFrame({ frameId, expression, bindings }) {
 
   const newBindings = convertBindings(bindings);
   const completion = frame.evalWithBindings(expression, newBindings);
+  return { result: completionToProtocolResult(completion) };
+}
+
+function Pause_evaluateInGlobal({ expression, bindings }) {
+  const newBindings = convertBindings(bindings);
+  const dbgWindow = gDebugger.makeGlobalObjectReference(getWindow());
+  const completion = dbgWindow.executeInGlobalWithBindings(expression, newBindings);
   return { result: completionToProtocolResult(completion) };
 }
 
