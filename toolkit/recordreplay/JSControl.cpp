@@ -30,13 +30,48 @@ namespace mozilla {
 namespace recordreplay {
 namespace js {
 
+static void (*gOnScriptParsed)(const char* aId, const char* aKind, const char* aUrl);
+static char* (*gGetRecordingId)();
+static void (*gSetDefaultCommandCallback)(char* (*aCallback)(const char*, const char*));
+static void (*gSetScanScriptsCallback)(void (*aCallback)(bool));
+static void (*gInstrument)(const char* aKind, const char* aFunctionId, int aOffset);
+static void (*gOnExceptionUnwind)();
+static void (*gOnDebuggerStatement)();
+static void (*gOnEvent)(const char* aEvent, bool aBefore);
+static void (*gOnConsoleMessage)(int aTimeWarpTarget);
+static int (*gNewTimeWarpTarget)();
+
+// Callback used when the recording driver is sending us a command to look up
+// some state.
+static char* CommandCallback(const char* aMethod, const char* aParams);
+
+// Callback used to change whether execution is being scanned.
+static void SetScanningScriptsCallback(bool aValue);
+
+// Handle initialization at process startup.
+void InitializeJS() {
+  LoadSymbol("RecordReplayOnScriptParsed", gOnScriptParsed);
+  LoadSymbol("RecordReplayGetRecordingId", gGetRecordingId);
+  LoadSymbol("RecordReplaySetDefaultCommandCallback", gSetDefaultCommandCallback);
+  LoadSymbol("RecordReplaySetScanScriptsCallback", gSetScanScriptsCallback);
+  LoadSymbol("RecordReplayInstrument", gInstrument);
+  LoadSymbol("RecordReplayOnExceptionUnwind", gOnExceptionUnwind);
+  LoadSymbol("RecordReplayOnDebuggerStatement", gOnDebuggerStatement);
+  LoadSymbol("RecordReplayOnEvent", gOnEvent);
+  LoadSymbol("RecordReplayOnConsoleMessage", gOnConsoleMessage);
+  LoadSymbol("RecordReplayNewTimeWarpTarget", gNewTimeWarpTarget);
+
+  gSetDefaultCommandCallback(CommandCallback);
+  gSetScanScriptsCallback(SetScanningScriptsCallback);
+}
+
 // URL of the root module script.
 #define ModuleURL "resource://devtools/server/actors/replay/module.js"
 
 static StaticRefPtr<rrIModule> gModule;
 static PersistentRootedObject* gModuleObject;
 
-static bool IsInitialized() {
+static bool IsModuleInitialized() {
   return !!gModule;
 }
 
@@ -47,8 +82,9 @@ static JSString* gBreakpointAtom;
 static JSString* gExitAtom;
 static JSString* gGeneratorAtom;
 
-void EnsureInitialized() {
-  if (IsInitialized()) {
+// Handle initialization at the first checkpoint, when we can create JS modules.
+void EnsureModuleInitialized() {
+  if (IsModuleInitialized()) {
     return;
   }
 
@@ -65,7 +101,7 @@ void EnsureInitialized() {
 
   RootedValue value(cx);
   if (NS_FAILED(gModule->Initialize(&value))) {
-    MOZ_CRASH("EnsureInitialized: Initialize failed");
+    MOZ_CRASH("EnsureModuleInitialized: Initialize failed");
   }
   MOZ_RELEASE_ASSERT(value.isObject());
 
@@ -118,26 +154,11 @@ MOZ_EXPORT ProgressCounter RecordReplayInterface_NewTimeWarpTarget() {
   // and replaying.
   RecordReplayAssert("NewTimeWarpTarget");
 
-  if (!IsInitialized() || IsRecording()) {
+  if (!IsModuleInitialized() || IsRecording()) {
     return 0;
   }
 
-  // FIXME
-  return 0;
-
-  /*
-  AutoDisallowThreadEvents disallow;
-  AutoSafeJSContext cx;
-  JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
-
-  RootedValue rv(cx);
-  if (!JS_CallFunctionName(cx, *gModuleObject, "NewTimeWarpTarget", HandleValueArray::empty(), &rv)) {
-    MOZ_CRASH("NewTimeWarpTarget");
-  }
-
-  MOZ_RELEASE_ASSERT(rv.isNumber());
-  return rv.toNumber();
-  */
+  return NewTimeWarpTarget();
 }
 
 }  // extern "C"
@@ -149,7 +170,7 @@ void OnTestCommand(const char* aString) {
     return;
   }
 
-  EnsureInitialized();
+  EnsureModuleInitialized();
 
   AutoSafeJSContext cx;
   JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
@@ -193,8 +214,17 @@ MOZ_EXPORT void RecordReplayInterface_EndContentParse(const void* aToken) {
 
 }  // extern "C"
 
+static char* gRecordingId;
+
+static const char* GetRecordingId() {
+  if (!gRecordingId) {
+    gRecordingId = gGetRecordingId();
+  }
+  return gRecordingId;
+}
+
 void SendRecordingFinished() {
-  MOZ_RELEASE_ASSERT(IsInitialized());
+  MOZ_RELEASE_ASSERT(IsModuleInitialized());
 
   AutoSafeJSContext cx;
   JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
@@ -251,7 +281,7 @@ static bool Method_OnScriptParsed(JSContext* aCx, unsigned aArgc,
   ConvertJSStringToCString(aCx, args.get(0).toString(), id);
   ConvertJSStringToCString(aCx, args.get(1).toString(), kind);
   ConvertJSStringToCString(aCx, args.get(2).toString(), url);
-  OnScriptParsed(id.get(), kind.get(), url.get());
+  gOnScriptParsed(id.get(), kind.get(), url.get());
 
   args.rval().setUndefined();
   return true;
@@ -309,8 +339,8 @@ static bool Method_ShouldUpdateProgressCounter(JSContext* aCx,
 static bool gScanningScripts;
 
 // This is called by the recording driver to notify us when to start/stop scanning.
-void SetScanningScriptsCallback(bool aValue) {
-  MOZ_RELEASE_ASSERT(IsInitialized());
+static void SetScanningScriptsCallback(bool aValue) {
+  MOZ_RELEASE_ASSERT(IsModuleInitialized());
 
   if (gScanningScripts == aValue) {
     return;
@@ -361,7 +391,7 @@ static bool Method_InstrumentationCallback(JSContext* aCx, unsigned aArgc,
   char functionId[32];
   snprintf(functionId, sizeof(functionId), "%u", script);
 
-  OnInstrument(kind, functionId, offset);
+  gInstrument(kind, functionId, offset);
 
   args.rval().setUndefined();
   return true;
@@ -379,7 +409,7 @@ static bool Method_OnExceptionUnwind(JSContext* aCx, unsigned aArgc,
                                      Value* aVp) {
   CallArgs args = CallArgsFromVp(aArgc, aVp);
 
-  OnExceptionUnwind();
+  gOnExceptionUnwind();
 
   args.rval().setUndefined();
   return true;
@@ -389,7 +419,7 @@ static bool Method_OnDebuggerStatement(JSContext* aCx, unsigned aArgc,
                                        Value* aVp) {
   CallArgs args = CallArgsFromVp(aArgc, aVp);
 
-  OnDebuggerStatement();
+  gOnDebuggerStatement();
 
   args.rval().setUndefined();
   return true;
@@ -407,7 +437,7 @@ static bool Method_OnEvent(JSContext* aCx, unsigned aArgc, Value* aVp) {
   ConvertJSStringToCString(aCx, args.get(0).toString(), event);
   bool before = args.get(1).toBoolean();
 
-  OnEvent(event.get(), before);
+  gOnEvent(event.get(), before);
 
   args.rval().setUndefined();
   return true;
@@ -435,7 +465,7 @@ static bool Method_OnConsoleMessage(JSContext* aCx, unsigned aArgc, Value* aVp) 
   }
 
   int target = args.get(0).toNumber();
-  OnConsoleMessage(target);
+  gOnConsoleMessage(target);
 
   args.rval().setUndefined();
   return true;
@@ -465,8 +495,8 @@ static bool FillStringCallback(const char16_t* buf, uint32_t len, void* data) {
   return true;
 }
 
-char* CommandCallback(const char* aMethod, const char* aParams) {
-  MOZ_RELEASE_ASSERT(js::IsInitialized());
+static char* CommandCallback(const char* aMethod, const char* aParams) {
+  MOZ_RELEASE_ASSERT(js::IsModuleInitialized());
 
   AutoSafeJSContext cx;
   JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());

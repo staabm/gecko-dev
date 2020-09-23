@@ -25,17 +25,11 @@ class ChildProcessInfo;
 
 namespace js {
 
-void EnsureInitialized();
+void InitializeJS();
+void EnsureModuleInitialized();
 
 // Notify the UI process that the recording was finished.
 void SendRecordingFinished();
-
-// Callback used when the recording driver is sending us a command to look up
-// some state.
-char* CommandCallback(const char* aMethod, const char* aParams);
-
-// Callback used to change whether execution is being scanned.
-void SetScanningScriptsCallback(bool aValue);
 
 }  // namespace js
 }  // namespace recordreplay

@@ -81,31 +81,20 @@ static void (*gEndDisallowEvents)();
 static bool (*gAreEventsDisallowed)();
 static bool (*gHasDivergedFromRecording)();
 static void (*gRecordReplayNewCheckpoint)();
-static char* (*gGetRecordingId)();
 static bool (*gRecordReplayIsReplaying)();
 static int (*gCreateOrderedLock)(const char* aName);
 static void (*gOrderedLock)(int aLock);
 static void (*gOrderedUnlock)(int aLock);
 static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
-static void (*gOnScriptParsed)(const char* aId, const char* aKind, const char* aUrl);
-static void (*gOnPaint)(const char* aMimeType, const char* aOptions, const char* aData);
-static void (*gSetDefaultCommandCallback)(char* (*aCallback)(const char*, const char*));
-static void (*gSetScanScriptsCallback)(void (*aCallback)(bool));
-static void (*gInstrument)(const char* aKind, const char* aFunctionId, int aOffset);
-static void (*gOnExceptionUnwind)();
-static void (*gOnDebuggerStatement)();
-static void (*gOnEvent)(const char* aEvent, bool aBefore);
-static void (*gOnConsoleMessage)(int aTimeWarpTarget);
 
-template <typename T>
-static void LoadSymbol(void* handle, const char* name, T& function) {
-  void* sym = dlsym(handle, name);
-  if (!sym) {
+static void* gDriverHandle;
+
+void LoadSymbolInternal(const char* name, void** psym) {
+  *psym = dlsym(gDriverHandle, name);
+  if (!*psym) {
     fprintf(stderr, "Could not find %s in Record Replay driver, crashing.\n", name);
     MOZ_CRASH();
   }
-
-  BitwiseCast(sym, &function);
 }
 
 extern "C" {
@@ -132,48 +121,41 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   // Don't create a stylo thread pool when recording or replaying.
   putenv((char*)"STYLO_THREADS=1");
 
-  void* handle = dlopen(driver, RTLD_LAZY);
-  if (!handle) {
+  gDriverHandle = dlopen(driver, RTLD_LAZY);
+  if (!gDriverHandle) {
     fprintf(stderr, "Loading Record Replay driver failed.\n");
     return;
   }
 
-  LoadSymbol(handle, "RecordReplayAttach", gAttach);
-  LoadSymbol(handle, "RecordReplayRecordCommandLineArguments",
+  LoadSymbol("RecordReplayAttach", gAttach);
+  LoadSymbol("RecordReplayRecordCommandLineArguments",
              gRecordCommandLineArguments);
-  LoadSymbol(handle, "RecordReplayValue", gRecordReplayValue);
-  LoadSymbol(handle, "RecordReplayBytes", gRecordReplayBytes);
-  LoadSymbol(handle, "RecordReplayPrintVA", gPrintVA);
-  LoadSymbol(handle, "RecordReplayFinishRecording", gFinishRecording);
-  LoadSymbol(handle, "RecordReplayRegisterPointer", gRegisterPointer);
-  LoadSymbol(handle, "RecordReplayUnregisterPointer", gUnregisterPointer);
-  LoadSymbol(handle, "RecordReplayPointerId", gPointerId);
-  LoadSymbol(handle, "RecordReplayAssert", gAssert);
-  LoadSymbol(handle, "RecordReplayAssertBytes", gAssertBytes);
-  LoadSymbol(handle, "RecordReplayProgressCounter", gProgressCounter);
-  LoadSymbol(handle, "RecordReplayBeginPassThroughEvents", gBeginPassThroughEvents);
-  LoadSymbol(handle, "RecordReplayEndPassThroughEvents", gEndPassThroughEvents);
-  LoadSymbol(handle, "RecordReplayAreEventsPassedThrough", gAreEventsPassedThrough);
-  LoadSymbol(handle, "RecordReplayBeginDisallowEvents", gBeginDisallowEvents);
-  LoadSymbol(handle, "RecordReplayEndDisallowEvents", gEndDisallowEvents);
-  LoadSymbol(handle, "RecordReplayAreEventsDisallowed", gAreEventsDisallowed);
-  LoadSymbol(handle, "RecordReplayHasDivergedFromRecording", gHasDivergedFromRecording);
-  LoadSymbol(handle, "RecordReplayNewCheckpoint", gRecordReplayNewCheckpoint);
-  LoadSymbol(handle, "RecordReplayGetRecordingId", gGetRecordingId);
-  LoadSymbol(handle, "RecordReplayIsReplaying", gRecordReplayIsReplaying);
-  LoadSymbol(handle, "RecordReplayCreateOrderedLock", gCreateOrderedLock);
-  LoadSymbol(handle, "RecordReplayOrderedLock", gOrderedLock);
-  LoadSymbol(handle, "RecordReplayOrderedUnlock", gOrderedUnlock);
-  LoadSymbol(handle, "RecordReplayAddOrderedPthreadMutex", gAddOrderedPthreadMutex);
-  LoadSymbol(handle, "RecordReplayOnScriptParsed", gOnScriptParsed);
-  LoadSymbol(handle, "RecordReplayOnPaint", gOnPaint);
-  LoadSymbol(handle, "RecordReplaySetDefaultCommandCallback", gSetDefaultCommandCallback);
-  LoadSymbol(handle, "RecordReplaySetScanScriptsCallback", gSetScanScriptsCallback);
-  LoadSymbol(handle, "RecordReplayInstrument", gInstrument);
-  LoadSymbol(handle, "RecordReplayOnExceptionUnwind", gOnExceptionUnwind);
-  LoadSymbol(handle, "RecordReplayOnDebuggerStatement", gOnDebuggerStatement);
-  LoadSymbol(handle, "RecordReplayOnEvent", gOnEvent);
-  LoadSymbol(handle, "RecordReplayOnConsoleMessage", gOnConsoleMessage);
+  LoadSymbol("RecordReplayValue", gRecordReplayValue);
+  LoadSymbol("RecordReplayBytes", gRecordReplayBytes);
+  LoadSymbol("RecordReplayPrintVA", gPrintVA);
+  LoadSymbol("RecordReplayFinishRecording", gFinishRecording);
+  LoadSymbol("RecordReplayRegisterPointer", gRegisterPointer);
+  LoadSymbol("RecordReplayUnregisterPointer", gUnregisterPointer);
+  LoadSymbol("RecordReplayPointerId", gPointerId);
+  LoadSymbol("RecordReplayAssert", gAssert);
+  LoadSymbol("RecordReplayAssertBytes", gAssertBytes);
+  LoadSymbol("RecordReplayProgressCounter", gProgressCounter);
+  LoadSymbol("RecordReplayBeginPassThroughEvents", gBeginPassThroughEvents);
+  LoadSymbol("RecordReplayEndPassThroughEvents", gEndPassThroughEvents);
+  LoadSymbol("RecordReplayAreEventsPassedThrough", gAreEventsPassedThrough);
+  LoadSymbol("RecordReplayBeginDisallowEvents", gBeginDisallowEvents);
+  LoadSymbol("RecordReplayEndDisallowEvents", gEndDisallowEvents);
+  LoadSymbol("RecordReplayAreEventsDisallowed", gAreEventsDisallowed);
+  LoadSymbol("RecordReplayHasDivergedFromRecording", gHasDivergedFromRecording);
+  LoadSymbol("RecordReplayNewCheckpoint", gRecordReplayNewCheckpoint);
+  LoadSymbol("RecordReplayIsReplaying", gRecordReplayIsReplaying);
+  LoadSymbol("RecordReplayCreateOrderedLock", gCreateOrderedLock);
+  LoadSymbol("RecordReplayOrderedLock", gOrderedLock);
+  LoadSymbol("RecordReplayOrderedUnlock", gOrderedUnlock);
+  LoadSymbol("RecordReplayAddOrderedPthreadMutex", gAddOrderedPthreadMutex);
+
+  js::InitializeJS();
+  InitializeGraphics();
 
   char buildId[128];
   snprintf(buildId, sizeof(buildId), "macOS-gecko-%s", PlatformBuildID());
@@ -187,8 +169,6 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   ParseJSFilters("RECORD_REPLAY_RECORD_EXECUTION_ASSERTS", gExecutionAsserts);
   ParseJSFilters("RECORD_REPLAY_RECORD_JS_ASSERTS", gJSAsserts);
 
-  gSetDefaultCommandCallback(js::CommandCallback);
-  gSetScanScriptsCallback(js::SetScanningScriptsCallback);
   gRecordCommandLineArguments(aArgc, aArgv);
 }
 
@@ -398,7 +378,7 @@ void OnWidgetEvent(dom::BrowserChild* aChild, const WidgetMouseEvent& aEvent) {
 static bool gHasCheckpoint = false;
 
 void CreateCheckpoint() {
-  js::EnsureInitialized();
+  js::EnsureModuleInitialized();
   gRecordReplayNewCheckpoint();
 }
 
@@ -411,15 +391,6 @@ void MaybeCreateCheckpoint() {
   }
 }
 
-static char* gRecordingId;
-
-const char* GetRecordingId() {
-  if (!gRecordingId) {
-    gRecordingId = gGetRecordingId();
-  }
-  return gRecordingId;
-}
-
 void FinishRecording() {
   js::SendRecordingFinished();
 
@@ -429,34 +400,6 @@ void FinishRecording() {
   // fully uploaded. The ContentParent will not kill this process after
   // finishing the recording, so we have to it ourselves.
   exit(0);
-}
-
-void OnScriptParsed(const char* aId, const char* aKind, const char* aUrl) {
-  gOnScriptParsed(aId, aKind, aUrl);
-}
-
-void OnPaint(const char* aMimeType, const char* aOptions, const char* aData) {
-  gOnPaint(aMimeType, aOptions, aData);
-}
-
-void OnInstrument(const char* aKind, const char* aFunctionId, int aOffset) {
-  gInstrument(aKind, aFunctionId, aOffset);
-}
-
-void OnExceptionUnwind() {
-  gOnExceptionUnwind();
-}
-
-void OnDebuggerStatement() {
-  gOnDebuggerStatement();
-}
-
-void OnEvent(const char* aEvent, bool aBefore) {
-  gOnEvent(aEvent, aBefore);
-}
-
-void OnConsoleMessage(int aTimeWarpTarget) {
-  gOnConsoleMessage(aTimeWarpTarget);
 }
 
 }  // namespace recordreplay

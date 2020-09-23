@@ -16,20 +16,21 @@
 
 namespace mozilla::recordreplay {
 
+void LoadSymbolInternal(const char* name, void** psym);
+
+template <typename T>
+inline void LoadSymbol(const char* name, T& function) {
+  void* sym;
+  LoadSymbolInternal(name, &sym);
+  BitwiseCast(sym, &function);
+}
+
 static inline bool TestEnv(const char* env) {
   const char* value = getenv(env);
   return value && value[0];
 }
 
-void OnScriptParsed(const char* aId, const char* aKind, const char* aUrl);
-void OnPaint(const char* aMimeType, const char* aOptions, const char* aData);
-void OnInstrument(const char* aKind, const char* aFunctionId, int aOffset);
-void OnExceptionUnwind();
-void OnDebuggerStatement();
-void OnEvent(const char* aEvent, bool aBefore);
-void OnConsoleMessage(int aTimeWarpTarget);
-
-const char* GetRecordingId();
+void InitializeGraphics();
 
 }  // namespace mozilla::recordreplay
 
