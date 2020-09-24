@@ -383,6 +383,7 @@ const commands = {
   "Host.getCurrentMessageContents": Host_getCurrentMessageContents,
   "Host.getFunctionsInRange": Host_getFunctionsInRange,
   "Host.getHTMLSource": Host_getHTMLSource,
+  "Host.getObjectPreviewRequiredProperties": Host_getObjectPreviewRequiredProperties,
   "Host.getStepOffsets": Host_getStepOffsets,
   "Host.getSourceMapURL": Host_getSourceMapURL,
 };
@@ -1070,12 +1071,12 @@ ProtocolObjectPreview.prototype = {
     // Add class-specific data.
     const previewer = CustomPreviewers[this.obj.class];
     if (previewer) {
-      if (Array.isArray(previewer)) {
-        for (const name of previewer) {
-          this.addGetterValue(name);
+      for (const entry of previewer) {
+        if (typeof entry == "string") {
+          this.addGetterValue(entry);
+        } else {
+          entry.call(this);
         }
-      } else {
-        previewer.call(this);
       }
     }
 
@@ -1130,12 +1131,9 @@ ProtocolObjectPreview.prototype = {
 
 function previewMap() {
   for (const [k, v] of Cu.waiveXrays(Map.prototype.entries.call(this.raw))) {
-    if (!this.addContainerEntryRaw(v, k, true)) {
-      break;
-    }
+    this.addContainerEntryRaw(v, k, true);
   }
 
-  this.addGetterValue("size");
   this.extra.containerEntryCount = this.raw.size;
 }
 
@@ -1145,20 +1143,15 @@ function previewWeakMap() {
 
   for (const k of keys) {
     const v = WeakMap.prototype.get.call(this.raw, k);
-    if (!this.addContainerEntryRaw(v, k, true)) {
-      break;
-    }
+    this.addContainerEntryRaw(v, k, true);
   }
 }
 
 function previewSet() {
   for (const v of Cu.waiveXrays(Set.prototype.values.call(this.raw))) {
-    if (!this.addContainerEntryRaw(v)) {
-      break;
-    }
+    this.addContainerEntryRaw(v);
   }
 
-  this.addGetterValue("size");
   this.extra.containerEntryCount = this.raw.size;
 }
 
@@ -1167,15 +1160,11 @@ function previewWeakSet() {
   this.extra.containerEntryCount = keys.length;
 
   for (const k of keys) {
-    if (!this.addContainerEntryRaw(k)) {
-      break;
-    }
+    this.addContainerEntryRaw(k);
   }
 }
 
 function previewRegExp() {
-  this.addGetterValue("global");
-  this.addGetterValue("source");
   this.extra.regexpString = this.raw.toString();
 }
 
@@ -1183,14 +1172,14 @@ function previewDate() {
   this.extra.dateTime = this.raw.getTime();
 }
 
-function previewError() {
-  this.addGetterValue("name");
-  this.addGetterValue("message");
-  this.addGetterValue("stack");
-  this.addGetterValue("fileName");
-  this.addGetterValue("lineNumber");
-  this.addGetterValue("columnNumber");
-}
+const ErrorProperties = [
+  "name",
+  "message",
+  "stack",
+  "fileName",
+  "lineNumber",
+  "columnNumber",
+];
 
 function previewFunction() {
   this.extra.functionName = getFunctionName(this.obj);
@@ -1217,20 +1206,20 @@ const CustomPreviewers = {
   Float64Array: ["length"],
   BigInt64Array: ["length"],
   BigUint64Array: ["length"],
-  Map: previewMap,
-  WeakMap: previewWeakMap,
-  Set: previewSet,
-  WeakSet: previewWeakSet,
-  RegExp: previewRegExp,
-  Date: previewDate,
-  Error: previewError,
-  EvalError: previewError,
-  RangeError: previewError,
-  ReferenceError: previewError,
-  SyntaxError: previewError,
-  TypeError: previewError,
-  URIError: previewError,
-  Function: previewFunction,
+  Map: ["size", previewMap],
+  WeakMap: [previewWeakMap],
+  Set: ["size", previewSet],
+  WeakSet: [previewWeakSet],
+  RegExp: ["global", "source", previewRegExp],
+  Date: [previewDate],
+  Error: ErrorProperties,
+  EvalError: ErrorProperties,
+  RangeError: ErrorProperties,
+  ReferenceError: ErrorProperties,
+  SyntaxError: ErrorProperties,
+  TypeError: ErrorProperties,
+  URIError: ErrorProperties,
+  Function: [previewFunction],
   MouseEvent: ["type", "target", "clientX", "clientY", "layerX", "layerY"],
   KeyboardEvent: ["type", "target", "key", "charCode", "keyCode", "altKey", "ctrlKey", "metaKey", "shiftKey"],
   MessageEvent: ["type", "target", "isTrusted", "data"],
@@ -1481,7 +1470,25 @@ function Pause_getExceptionValue() {
 
 function Pause_getObjectPreview({ object }) {
   const objectData = createProtocolObject(object);
-  return { data: { objects: [objectData ]}};
+  return { data: { objects: [objectData] }};
+}
+
+function Host_getObjectPreviewRequiredProperties({ object }) {
+  const obj = getObjectFromId(object);
+  const properties = [];
+
+  // Any names in custom previewers for the object should always be included
+  // in previews, regardless of overflow.
+  const previewer = CustomPreviewers[obj.class];
+  if (previewer) {
+    for (const entry of previewer) {
+      if (typeof entry == "string") {
+        properties.push(entry);
+      }
+    }
+  }
+
+  return { properties };
 }
 
 function Pause_getObjectProperty({ object, name }) {
