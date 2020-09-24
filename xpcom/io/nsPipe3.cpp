@@ -67,11 +67,13 @@ class nsPipeEvents {
 
   inline void NotifyInputReady(nsIAsyncInputStream* aStream,
                                nsIInputStreamCallback* aCallback) {
+    recordreplay::RecordReplayAssert("nsPipeEvents::NotifyInputReady");
     mInputList.AppendElement(InputEntry(aStream, aCallback));
   }
 
   inline void NotifyOutputReady(nsIAsyncOutputStream* aStream,
                                 nsIOutputStreamCallback* aCallback) {
+    recordreplay::RecordReplayAssert("nsPipeEvents::NotifyOutputReady");
     MOZ_DIAGNOSTIC_ASSERT(!mOutputCallback);
     mOutputStream = aStream;
     mOutputCallback = aCallback;
@@ -842,6 +844,9 @@ nsresult nsPipe::GetWriteSegment(char*& aSegment, uint32_t& aSegmentLen) {
 void nsPipe::AdvanceWriteCursor(uint32_t aBytesWritten) {
   MOZ_DIAGNOSTIC_ASSERT(aBytesWritten > 0);
 
+  recordreplay::RecordReplayAssert("nsPipe::AdvanceWriteCursor Start");
+
+  {
   nsPipeEvents events;
   {
     ReentrantMonitorAutoEnter mon(mReentrantMonitor);
@@ -876,6 +881,9 @@ void nsPipe::AdvanceWriteCursor(uint32_t aBytesWritten) {
       mon.NotifyAll();
     }
   }
+  }
+
+  recordreplay::RecordReplayAssert("nsPipe::AdvanceWriteCursor End");
 }
 
 void nsPipe::OnInputStreamException(nsPipeInputStream* aStream,
