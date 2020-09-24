@@ -286,34 +286,27 @@ Services.obs.addObserver(
   "devtools-html-content"
 );
 
+// Listen for style sheet changes. This has to be set after creating the window.
 getWindow().docShell.chromeEventHandler.addEventListener(
   "DOMWindowCreated",
   () => {
     const window = getWindow();
-
     window.document.styleSheetChangeEventsEnabled = true;
-
-    if (exports.OnWindowCreated) {
-      exports.OnWindowCreated(window);
-    }
   },
   true
 );
 
+// Notify the UI process when we find a style sheet with a source map.
 getWindow().docShell.chromeEventHandler.addEventListener(
   "StyleSheetApplicableStateChanged",
   ({ stylesheet }) => {
     if (stylesheet.sourceMapURL &&
         Services.prefs.getBoolPref("devtools.recordreplay.uploadSourceMaps")) {
-      const pid = RecordReplayControl.middlemanPid();
+      const recordingId = RecordReplayControl.recordingId();
       Services.cpmm.sendAsyncMessage(
         "RecordReplayGeneratedSourceWithSourceMap",
-        { pid, url: stylesheet.href, sourceMapURL: stylesheet.sourceMapURL }
+        { recordingId, url: stylesheet.href, sourceMapURL: stylesheet.sourceMapURL }
       );
-    }
-
-    if (exports.OnStyleSheetChange) {
-      exports.OnStyleSheetChange(stylesheet);
     }
   },
   true
