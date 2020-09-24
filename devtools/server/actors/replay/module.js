@@ -387,7 +387,8 @@ const commands = {
   "Host.getHTMLSource": Host_getHTMLSource,
   "Host.getObjectPreviewRequiredProperties": Host_getObjectPreviewRequiredProperties,
   "Host.getStepOffsets": Host_getStepOffsets,
-  "Host.getSourceMapURL": Host_getSourceMapURL,
+  "Host.getScriptSourceMapURL": Host_getScriptSourceMapURL,
+  "Host.getSheetSourceMapURL": Host_getSheetSourceMapURL,
 };
 
 function OnProtocolCommand(method, params) {
@@ -698,7 +699,7 @@ function Host_getStepOffsets({ functionId }) {
   return { offsets };
 }
 
-function Host_getSourceMapURL({ scriptId }) {
+function Host_getScriptSourceMapURL({ scriptId }) {
   const source = protocolScriptIdToSource(scriptId);
   const url = source.sourceMapURL;
   return url ? { url } : {};
@@ -1308,9 +1309,6 @@ function ruleContents(rule) {
     startColumn: InspectorUtils.getRuleColumn(rule),
     selectorText: rule.selectorText,
     style,
-    // If specified, these will be used in the control side to source map the location.
-    sourceMapURL: rule.parentStyleSheet.sourceMapURL || undefined,
-    sheetURL: rule.parentStyleSheet.sourceMapURL ? rule.parentStyleSheet.href : undefined,
   };
 }
 
@@ -1582,6 +1580,12 @@ function CSS_getComputedStyle({ node }) {
     });
   }
   return { computedStyle };
+}
+
+function Host_getSheetSourceMapURL({ sheet }) {
+  const sheetObj = getObjectFromId(sheet).unsafeDereference();
+  const url = sheetObj.sourceMapURL || undefined;
+  return { url };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
