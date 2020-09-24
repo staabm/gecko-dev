@@ -378,6 +378,7 @@ const commands = {
   "Debugger.getScriptSource": Debugger_getScriptSource,
   "CSS.getAppliedRules": CSS_getAppliedRules,
   "CSS.getComputedStyle": CSS_getComputedStyle,
+  "DOM.getAllBoundingClientRects": DOM_getAllBoundingClientRects,
   "DOM.getBoundingClientRect": DOM_getBoundingClientRect,
   "DOM.getBoxModel": DOM_getBoxModel,
   "DOM.getDocument": DOM_getDocument,
@@ -1593,6 +1594,255 @@ function CSS_getComputedStyle({ node }) {
 ///////////////////////////////////////////////////////////////////////////////
 // DOM Commands
 ///////////////////////////////////////////////////////////////////////////////
+
+// Mouse Targets Overview
+//
+// Mouse target data is used to figure out which element to highlight when the
+// mouse is hovered/clicked on different parts of the screen when the element
+// picker is used. To determine this, we need to know the bounding client rects
+// of every element (easy) and the order in which different elements are stacked
+// (not easy).
+//
+// To figure out the order in which elements are stacked, we reconstruct the
+// stacking contexts on the page and the order in which elements are laid out
+// within those stacking contexts, allowing us to assemble a sorted array of
+// elements such that for any two elements that overlap, the frontmost element
+// appears first in the array.
+//
+// References:
+//
+// https://www.w3.org/TR/CSS21/zindex.html
+//
+//   This reference talks about element kinds like floating and non-zindexed
+//   positioned descendants having a context that acts like a normal stacking
+//   context except for the treatment of descendants that actually create a
+//   normal stacking context. This language is confusing and the initial attempt
+//   to implement it gave poor results on pages so it is ignored here and these
+//   elements are treated as having a normal stacking context instead.
+//
+// https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Positioning/Understanding_z_index/The_stacking_context
+//
+//   This is helpful but the rules for when stacking contexts are created are
+//   quite baroque and don't seem to match up with the spec above, so they are
+//   mostly ignored here.
+
+// Information about an element needed to add it to a stacking context.
+function StackingContextElement(elem, left, top) {
+  assert(elem.nodeType == Node.ELEMENT_NODE);
+
+  // Underlying element.
+  this.raw = elem;
+
+  // Offset relative to the outer window of the window containing this context.
+  this.left = left;
+  this.top = top;
+
+  // Style information for the node.
+  this.style = getWindow().getComputedStyle(elem);
+
+  // Any stacking context at which this element is the root.
+  this.context = null;
+}
+
+StackingContextElement.prototype = {
+  toString() {
+    return getObjectIdRaw(this.raw);
+  },
+};
+
+let gNextStackingContextId = 1;
+
+// Information about all the nodes in the same stacking context.
+function StackingContext(root, left = 0, top = 0) {
+  this.id = gNextStackingContextId++;
+
+  // Offset relative to the outer window of the window containing this context.
+  this.left = left;
+  this.top = top;
+
+  // The arrays below are filled in tree order (preorder depth first traversal).
+
+  // All non-positioned, non-floating elements.
+  this.nonPositionedElements = [];
+
+  // All floating elements.
+  this.floatingElements = [];
+
+  // All positioned elements with an auto or zero z-index.
+  this.positionedElements = [];
+
+  // Arrays of elements with non-zero z-indexes, indexed by that z-index.
+  this.zIndexElements = new Map();
+
+  if (root) {
+    this.addNonPositionedElement(root);
+    this.addChildren(root.raw);
+  }
+}
+
+StackingContext.prototype = {
+  toString() {
+    return `StackingContext:${this.id}`;
+  },
+
+  // Add elem and its descendants to this stacking context.
+  add(elem) {
+    log(`${this} Add ${elem}`);
+
+    // Create a new stacking context for any iframes.
+    if (elem.raw.tagName == "IFRAME") {
+      const { left, top } = elem.raw.getBoundingClientRect();
+      this.addContext(elem, left, top);
+      elem.context.addChildren(elem.raw.contentWindow.document);
+    }
+
+    if (elem.style.getPropertyValue("position") != "static") {
+      const zIndex = elem.style.getPropertyValue("z-index");
+      this.addContext(elem);
+
+      if (zIndex != "auto") {
+        // Elements with a zero z-index have their own stacking context but are
+        // grouped with other positioned children with an auto z-index.
+        const index = +zIndex | 0;
+        if (index) {
+          this.addZIndexElement(elem, index);
+          return;
+        }
+      }
+
+      this.addPositionedElement(elem);
+      return;
+    }
+
+    if (elem.style.getPropertyValue("float") != "none") {
+      // Group the element and its descendants.
+      this.addContext(elem);
+      this.addFloatingElement(elem);
+      return;
+    }
+
+    const display = elem.style.getPropertyValue("display");
+    if (display == "inline-block" || display == "inline-table") {
+      // Group the element and its descendants.
+      this.addContext(elem);
+      this.addNonPositionedElement(elem);
+      return;
+    }
+
+    this.addNonPositionedElement(elem);
+    this.addChildren(elem.raw);
+  },
+
+  addContext(elem, left = 0, top = 0) {
+    if (elem.context) {
+      assert(!left && !top);
+      return;
+    }
+    elem.context = new StackingContext(elem, this.left + left, this.top + top);
+    log(`${this} NewContext ${elem} ${elem.context}`);
+  },
+
+  addZIndexElement(elem, index) {
+    log(`${this} ZIndex ${index} ${elem}`);
+    const existing = this.zIndexElements.get(index);
+    if (existing) {
+      existing.push(elem);
+    } else {
+      this.zIndexElements.set(index, [elem]);
+    }
+  },
+
+  addPositionedElement(elem) {
+    log(`${this} Positioned ${elem}`);
+    this.positionedElements.push(elem);
+  },
+
+  addFloatingElement(elem) {
+    log(`${this} Floating ${elem}`);
+    this.floatingElements.push(elem);
+  },
+
+  addNonPositionedElement(elem) {
+    log(`${this} NonPositioned ${elem}`);
+    this.nonPositionedElements.push(elem);
+  },
+
+  addChildren(parentNode) {
+    for (const child of parentNode.children) {
+      this.add(new StackingContextElement(child, this.left, this.top));
+    }
+  },
+
+  // Get the elements in this context ordered back-to-front.
+  flatten() {
+    const rv = [];
+
+    const pushElements = elems => {
+      for (const elem of elems) {
+        if (elem.context && elem.context != this) {
+          rv.push(...elem.context.flatten());
+        } else {
+          log(`${this} FlattenPush ${elem}`);
+          rv.push(elem);
+        }
+      }
+    };
+
+    const pushZIndexElements = filter => {
+      for (const z of zIndexes) {
+        if (filter(z)) {
+          log(`${this} PushZIndex ${z}`);
+          pushElements(this.zIndexElements.get(z));
+        }
+      }
+    };
+
+    const zIndexes = [...this.zIndexElements.keys()];
+    zIndexes.sort((a, b) => a - b);
+
+    log(`${this} FlattenStart`);
+
+    pushZIndexElements(z => z < 0);
+    pushElements(this.nonPositionedElements);
+    pushElements(this.floatingElements);
+    pushElements(this.positionedElements);
+    pushZIndexElements(z => z > 0);
+
+    log(`${this} FlattenEnd`);
+    return rv;
+  },
+};
+
+function DOM_getAllBoundingClientRects() {
+  const cx = new StackingContext();
+
+  const { document } = getWindow();
+  cx.addChildren(document);
+
+  const entries = cx.flatten();
+
+  // Get elements in front-to-back order.
+  entries.reverse();
+
+  const elements = entries.map(elem => {
+    const id = getObjectIdRaw(elem.raw);
+    const { left, top, right, bottom } = elem.raw.getBoundingClientRect(elem);
+    if (left >= right || top >= bottom) {
+      return null;
+    }
+    return {
+      node: id,
+      rect: [
+        elem.left + left,
+        elem.top + top,
+        elem.left + right,
+        elem.top + bottom,
+      ],
+    };
+  }).filter(v => !!v);
+
+  return { elements };
+}
 
 function DOM_getBoundingClientRect({ node }) {
   const nodeObj = getObjectFromId(node).unsafeDereference();
