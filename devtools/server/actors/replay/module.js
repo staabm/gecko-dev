@@ -376,6 +376,14 @@ const commands = {
   "Pause.getScope": Pause_getScope,
   "Debugger.getPossibleBreakpoints": Debugger_getPossibleBreakpoints,
   "Debugger.getScriptSource": Debugger_getScriptSource,
+  "CSS.getAppliedRules": CSS_getAppliedRules,
+  "CSS.getComputedStyle": CSS_getComputedStyle,
+  "DOM.getBoundingClientRect": DOM_getBoundingClientRect,
+  "DOM.getBoxModel": DOM_getBoxModel,
+  "DOM.getDocument": DOM_getDocument,
+  "DOM.getEventListeners": DOM_getEventListeners,
+  "DOM.performSearch": DOM_performSearch,
+  "DOM.querySelector": DOM_querySelector,
   "Host.convertFunctionOffsetToLocation": Host_convertFunctionOffsetToLocation,
   "Host.convertLocationToFunctionOffset": Host_convertLocationToFunctionOffset,
   "Host.countStackFrames": Host_countStackFrames,
@@ -1500,4 +1508,227 @@ function Pause_getObjectProperty({ object, name }) {
 function Pause_getScope({ scope }) {
   const scopeData = createProtocolScope(scope);
   return { data: { scopes: [scopeData] } };
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// CSS Commands
+///////////////////////////////////////////////////////////////////////////////
+
+// This set is the intersection of the elements described at [1] and the
+// elements which the firefox devtools server actually operates on [2].
+//
+// [1] https://developer.mozilla.org/en-US/docs/Web/CSS/Pseudo-elements
+// [2] PSEUDO_ELEMENTS in devtools/shared/css/generated/properties-db.js
+const PseudoElements = [
+  ":after",
+  ":backdrop",
+  ":before",
+  ":cue",
+  ":first-letter",
+  ":first-line",
+  ":marker",
+  ":placeholder",
+  ":selection",
+];
+
+function addRules(rules, node, pseudoElement) {
+  const baseRules = InspectorUtils.getCSSStyleRules(node, pseudoElement);
+
+  // getCSSStyleRules returns rules in increasing order of specificity.
+  // We need to return rules ordered in the opposite way.
+  baseRules.reverse();
+
+  for (const rule of baseRules) {
+    rules.push({ rule: getObjectIdRaw(rule), pseudoElement });
+  }
+}
+
+function CSS_getAppliedRules({ node }) {
+  const nodeObj = getObjectFromId(node).unsafeDereference();
+  if (nodeObj.nodeType != Node.ELEMENT_NODE) {
+    return { rules: [], data: {} };
+  }
+
+  if (getPseudoType(node)) {
+    // Don't return rules for the pseudo-element itself. These can be obtained
+    // from the parent node's applied rules.
+    return { rules: [], data: {} };
+  }
+
+  const rules = [];
+
+  addRules(rules, nodeObj);
+  for (const pseudoElement of PseudoElements) {
+    addRules(rules, nodeObj, pseudoElement);
+  }
+
+  return { rules, data: {} };
+}
+
+function CSS_getComputedStyle({ node }) {
+  const nodeObj = getObjectFromId(node).unsafeDereference();
+  if (nodeObj.nodeType != Node.ELEMENT_NODE) {
+    return { computedStyle: [] };
+  }
+
+  const pseudoType = getPseudoType(node);
+
+  let styleInfo;
+  if (pseudoType) {
+    styleInfo = nodeObj.ownerGlobal.getComputedStyle(nodeObj.parentNode, pseudoType);
+  } else {
+    styleInfo = nodeObj.ownerGlobal.getComputedStyle(nodeObj);
+  }
+
+  const computedStyle = [];
+  for (let i = 0; i < styleInfo.length; i++) {
+    computedStyle.push({
+      name: styleInfo.item(i),
+      value: styleInfo.getPropertyValue(styleInfo.item(i)),
+    });
+  }
+  return { computedStyle };
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DOM Commands
+///////////////////////////////////////////////////////////////////////////////
+
+function DOM_getBoundingClientRect({ node }) {
+  const nodeObj = getObjectFromId(node).unsafeDereference();
+  if (!nodeObj.getBoundingClientRect) {
+    return { rect: [0, 0, 0, 0] };
+  }
+
+  const { left, top, right, bottom } = nodeObj.getBoundingClientRect();
+  return { rect: [left, top, right, bottom] };
+}
+
+function DOM_getBoxModel({ node }) {
+  const nodeObj = getObjectFromId(node).unsafeDereference();
+
+  const model = { node };
+  for (const box of ["content", "padding", "border", "margin"]) {
+    const compactQuads = [];
+    if (nodeObj.getBoxQuads) {
+      const quads = nodeObj.getBoxQuads({ box, relativeTo: getWindow().document });
+      for (const { p1, p2, p3, p4 } of quads) {
+        compactQuads.push(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y);
+      }
+    }
+    model[box] = compactQuads;
+  }
+  return { model };
+}
+
+function DOM_getDocument() {
+  const document = getObjectIdRaw(getWindow().document);
+  return { document, data: {} };
+}
+
+function unwrapXray(obj) {
+  if (Cu.isXrayWrapper(obj)) {
+    return obj.wrappedJSObject;
+  }
+  return obj;
+}
+
+function DOM_getEventListeners({ node }) {
+  const listeners = [];
+
+  const nodeObj = getObjectFromId(node).unsafeDereference();
+  const listenerInfo = Services.els.getListenerInfoFor(nodeObj) || [];
+  if (nodeObj.nodeName && nodeObj.nodeName == "HTML") {
+    // Add event listeners for the document and window as well.
+    listenerInfo.push(
+      ...Services.els.getListenerInfoFor(nodeObj.parentNode),
+      ...Services.els.getListenerInfoFor(nodeObj.ownerGlobal)
+    );
+  }
+
+  for (const { type, listenerObject, capturing } of listenerInfo) {
+    const handler = unwrapXray(listenerObject);
+    if (!handler) {
+      continue;
+    }
+    listeners.push({
+      node,
+      handler: getObjectIdRaw(handler),
+      type,
+      capture: capturing,
+    });
+  }
+
+  return { listeners, data: {} };
+}
+
+function newTreeWalker() {
+  const walker = Cc["@mozilla.org/inspector/deep-tree-walker;1"].createInstance(
+    Ci.inIDeepTreeWalker
+  );
+  walker.showAnonymousContent = true;
+  walker.showSubDocuments = true;
+  walker.showDocumentsAsNodes = true;
+  walker.init(getWindow().document, 0xffffffff);
+  return walker;
+}
+
+function forAllNodes(callback) {
+  const walker = newTreeWalker();
+  for (let node = walker.currentNode; node; node = walker.nextNode()) {
+    callback(node);
+  }
+}
+
+// Get the raw DOM nodes containing a query string.
+function searchDOM(query) {
+  const rv = [];
+  forAllNodes(addEntries);
+  return rv;
+
+  function checkText(node, text) {
+    if (text.includes(query)) {
+      if (!rv.length || rv[rv.length - 1] != node) {
+        rv.push(node);
+      }
+    }
+  }
+
+  function addEntries(node) {
+    if (node.nodeType == Node.ELEMENT_NODE) {
+      checkText(node, convertNodeName(node.localName));
+      for (const { name, value } of node.attributes) {
+        checkText(node, name);
+        checkText(node, value);
+      }
+    } else {
+      checkText(node, node.textContent || "");
+    }
+  }
+
+  function convertNodeName(name) {
+    switch (name) {
+      case "_moz_generated_content_marker": return "::marker";
+      case "_moz_generated_content_before": return "::before";
+      case "_moz_generated_content_after": return "::after";
+    }
+    return name;
+  }
+}
+
+function DOM_performSearch({ query }) {
+  const rawNodes = searchDOM(query);
+  const nodes = rawNodes.map(getObjectIdRaw);
+  return { nodes, data: {} };
+}
+
+function DOM_querySelector({ node, selector }) {
+  const nodeObj = getObjectFromId(node).unsafeDereference();
+
+  const resultObj = nodeObj.querySelector(selector);
+  if (!resultObj) {
+    return { data: {} };
+  }
+  const result = getObjectIdRaw(resultObj);
+  return { result, data: {} };
 }
