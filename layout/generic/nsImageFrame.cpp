@@ -852,16 +852,21 @@ void nsImageFrame::NotifyNewCurrentRequest(imgIRequest* aRequest,
 }
 
 void nsImageFrame::MaybeDecodeForPredictedSize() {
+  recordreplay::RecordReplayAssert("nsImageFrame::MaybeDecodeForPredictedSize Start");
+
   // Check that we're ready to decode.
   if (!mImage) {
+    recordreplay::RecordReplayAssert("nsImageFrame::MaybeDecodeForPredictedSize #1");
     return;  // Nothing to do yet.
   }
 
   if (mComputedSize.IsEmpty()) {
+    recordreplay::RecordReplayAssert("nsImageFrame::MaybeDecodeForPredictedSize #2");
     return;  // We won't draw anything, so no point in decoding.
   }
 
   if (GetVisibility() != Visibility::ApproximatelyVisible) {
+    recordreplay::RecordReplayAssert("nsImageFrame::MaybeDecodeForPredictedSize #3");
     return;  // We're not visible, so don't decode.
   }
 
@@ -886,6 +891,7 @@ void nsImageFrame::MaybeDecodeForPredictedSize() {
   const ScreenIntSize predictedScreenIntSize =
       RoundedToInt(predictedScreenSize);
   if (predictedScreenIntSize.IsEmpty()) {
+    recordreplay::RecordReplayAssert("nsImageFrame::MaybeDecodeForPredictedSize #4");
     return;
   }
 
@@ -902,6 +908,8 @@ void nsImageFrame::MaybeDecodeForPredictedSize() {
 
   // Request a decode.
   mImage->RequestDecodeForSize(predictedImageSize, flags);
+
+  recordreplay::RecordReplayAssert("nsImageFrame::MaybeDecodeForPredictedSize End");
 }
 
 nsRect nsImageFrame::PredictedDestRect(const nsRect& aFrameContentBox) {

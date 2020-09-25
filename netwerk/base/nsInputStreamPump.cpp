@@ -107,6 +107,8 @@ nsresult nsInputStreamPump::PeekStream(PeekSegmentFun callback, void* closure) {
 }
 
 nsresult nsInputStreamPump::EnsureWaiting() {
+  recordreplay::RecordReplayAssert("nsInputStreamPump::EnsureWaiting Start");
+
   mMutex.AssertCurrentThreadIn();
 
   // no need to worry about multiple threads... an input stream pump lives
@@ -134,6 +136,9 @@ nsresult nsInputStreamPump::EnsureWaiting() {
     mRetargeting = false;
     mWaitingForInputStreamReady = true;
   }
+
+  recordreplay::RecordReplayAssert("nsInputStreamPump::EnsureWaiting End");
+
   return NS_OK;
 }
 
@@ -312,6 +317,8 @@ nsInputStreamPump::Init(nsIInputStream* stream, uint32_t segsize,
 
 NS_IMETHODIMP
 nsInputStreamPump::AsyncRead(nsIStreamListener* listener, nsISupports* ctxt) {
+  recordreplay::RecordReplayAssert("nsInputStreamPump::AsyncRead Start");
+
   RecursiveMutexAutoLock lock(mMutex);
 
   NS_ENSURE_TRUE(mState == STATE_IDLE, NS_ERROR_IN_PROGRESS);
@@ -384,6 +391,9 @@ nsInputStreamPump::AsyncRead(nsIStreamListener* listener, nsISupports* ctxt) {
 
   mState = STATE_START;
   mListener = listener;
+
+  recordreplay::RecordReplayAssert("nsInputStreamPump::AsyncRead End");
+
   return NS_OK;
 }
 

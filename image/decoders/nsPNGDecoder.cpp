@@ -361,6 +361,8 @@ LexerResult nsPNGDecoder::DoDecode(SourceBufferIterator& aIterator,
                                    IResumable* aOnResume) {
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
 
+  recordreplay::RecordReplayAssert("nsPNGDecoder::DoDecode");
+
   return mLexer.Lex(aIterator, aOnResume,
                     [=](State aState, const char* aData, size_t aLength) {
                       switch (aState) {

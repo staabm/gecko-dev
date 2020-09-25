@@ -217,6 +217,8 @@ nsresult nsBaseChannel::PushStreamConverter(const char* fromType,
 nsresult nsBaseChannel::BeginPumpingData() {
   nsresult rv;
 
+  recordreplay::RecordReplayAssert("nsBaseChannel::BeginPumpingData Start");
+
   rv = BeginAsyncRead(this, getter_AddRefs(mRequest));
   if (NS_SUCCEEDED(rv)) {
     mPumpingData = true;
@@ -253,12 +255,16 @@ nsresult nsBaseChannel::BeginPumpingData() {
     return rv;
   }
 
+  recordreplay::RecordReplayAssert("nsBaseChannel::BeginPumpingData #1");
+
   mPumpingData = true;
   mRequest = mPump;
   rv = mPump->AsyncRead(this, nullptr);
   if (NS_FAILED(rv)) {
     return rv;
   }
+
+  recordreplay::RecordReplayAssert("nsBaseChannel::BeginPumpingData #2");
 
   RefPtr<BlockingPromise> promise;
   rv = ListenerBlockingPromise(getter_AddRefs(promise));
@@ -267,6 +273,8 @@ nsresult nsBaseChannel::BeginPumpingData() {
   }
 
   if (promise) {
+    recordreplay::RecordReplayAssert("nsBaseChannel::BeginPumpingData #3");
+
     mPump->Suspend();
 
     RefPtr<nsBaseChannel> self(this);
@@ -287,6 +295,8 @@ nsresult nsBaseChannel::BeginPumpingData() {
           mPump->Resume();
         });
   }
+
+  recordreplay::RecordReplayAssert("nsBaseChannel::BeginPumpingData End");
 
   return NS_OK;
 }

@@ -480,7 +480,7 @@ class MOZ_STACK_CLASS AutoReadSegment final {
 nsPipe::nsPipe()
     : mOutput(this),
       mOriginalInput(new nsPipeInputStream(this)),
-      mReentrantMonitor("nsPipe.mReentrantMonitor"),
+      mReentrantMonitor("nsPipe.mReentrantMonitor", /* aOrdered */ true),
       mMaxAdvanceBufferSegmentCount(0),
       mWriteSegment(-1),
       mWriteCursor(nullptr),
@@ -1390,6 +1390,8 @@ nsPipeInputStream::AsyncWait(nsIInputStreamCallback* aCallback, uint32_t aFlags,
                              nsIEventTarget* aTarget) {
   LOG(("III AsyncWait [this=%p]\n", this));
 
+  recordreplay::RecordReplayAssert("nsPipeInputStream::AsyncWait Start %u", aFlags);
+  {
   nsPipeEvents pipeEvents;
   {
     ReentrantMonitorAutoEnter mon(mPipe->mReentrantMonitor);
@@ -1409,6 +1411,9 @@ nsPipeInputStream::AsyncWait(nsIInputStreamCallback* aCallback, uint32_t aFlags,
       aCallback = proxy;
     }
 
+    recordreplay::RecordReplayAssert("nsPipeInputStream::AsyncWait #1 %d",
+                                     mReadState.mAvailable);
+
     if (NS_FAILED(Status(mon)) ||
         (mReadState.mAvailable && !(aFlags & WAIT_CLOSURE_ONLY))) {
       // stream is already closed or readable; post event.
@@ -1419,6 +1424,9 @@ nsPipeInputStream::AsyncWait(nsIInputStreamCallback* aCallback, uint32_t aFlags,
       mCallbackFlags = aFlags;
     }
   }
+  }
+  recordreplay::RecordReplayAssert("nsPipeInputStream::AsyncWait End");
+
   return NS_OK;
 }
 
