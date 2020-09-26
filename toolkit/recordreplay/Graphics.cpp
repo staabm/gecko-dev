@@ -58,9 +58,6 @@ static void EnsureInitialized() {
 static void ReportPaint();
 
 void SendUpdate(const TransactionInfo& aInfo) {
-  // FIXME
-  return;
-
   EnsureInitialized();
 
   ipc::IPCResult rv = gLayerTransactionParent->RecvUpdate(aInfo);
