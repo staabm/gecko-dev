@@ -252,8 +252,7 @@ MOZ_EXPORT void RecordReplayInterface_ExecutionProgressHook(const char* aFilenam
 MOZ_EXPORT bool RecordReplayInterface_ShouldEmitRecordReplayAssert(const char* aFilename,
                                                                    unsigned aLineno,
                                                                    unsigned aColumn) {
-  return true;
-  //return FilterMatches(gJSAsserts, aFilename, aLineno);
+  return FilterMatches(gJSAsserts, aFilename, aLineno);
 }
 
 MOZ_EXPORT void RecordReplayInterface_InternalPrintLog(const char* aFormat,
