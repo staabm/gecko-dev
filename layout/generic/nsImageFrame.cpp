@@ -1325,6 +1325,7 @@ class nsDisplayAltFeedback final : public nsPaintedDisplayItem {
   }
 
   nsRect GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) const final {
+    recordreplay::RecordReplayAssert("nsDisplayAltFeedback::GetBounds");
     *aSnap = false;
     return mFrame->GetVisualOverflowRectRelativeToSelf() + ToReferenceFrame();
   }

@@ -1120,6 +1120,7 @@ void nsTableFrame::GetChildLists(nsTArray<ChildList>* aLists) const {
 
 nsRect nsDisplayTableItem::GetBounds(nsDisplayListBuilder* aBuilder,
                                      bool* aSnap) const {
+  recordreplay::RecordReplayAssert("nsDisplayTableItem::GetBounds");
   *aSnap = false;
   return mFrame->GetVisualOverflowRectRelativeToSelf() + ToReferenceFrame();
 }

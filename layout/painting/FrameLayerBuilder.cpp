@@ -2867,6 +2867,22 @@ void ContainerState::SetOuterVisibleRegionForLayer(
     Layer* aLayer, const nsIntRegion& aOuterVisibleRegion,
     const nsIntRect* aLayerContentsVisibleRect,
     bool aOuterUntransformed) const {
+  for (auto idx = aOuterVisibleRegion.RectIter(); !idx.Done(); idx.Next()) {
+    auto bounds = idx.Get();
+    recordreplay::RecordReplayAssert("ContainerState::SetOuterVisibleRegionForLayer %d Bounds %d %d %d %d",
+                                      recordreplay::ThingIndex(aLayer),
+                                      bounds.x, bounds.y, bounds.width, bounds.height);
+  }
+
+  if (aLayerContentsVisibleRect) {
+    recordreplay::RecordReplayAssert("ContainerState::SetOuterVisibleRegionForLayer RECT %d %d %d %d",
+                                      recordreplay::ThingIndex(aLayer),
+                                      aLayerContentsVisibleRect->x, aLayerContentsVisibleRect->y, aLayerContentsVisibleRect->width, aLayerContentsVisibleRect->height);
+  }
+
+  recordreplay::RecordReplayAssert("ContainerState::SetOuterVisibleRegionForLayer #1 %d %d %d",
+                                   aOuterUntransformed, mParameters.mOffset.x, mParameters.mOffset.y);
+
   nsIntRegion visRegion = aOuterVisibleRegion;
   if (!aOuterUntransformed) {
     visRegion.MoveBy(mParameters.mOffset);
@@ -3430,6 +3446,13 @@ void ContainerState::FinishPaintedLayerData(
     FindOpaqueBackgroundColorCallbackType aFindOpaqueBackgroundColor) {
   PaintedLayerData* data = &aData;
 
+  for (auto idx = data->mVisibleRegion.RectIter(); !idx.Done(); idx.Next()) {
+    auto bounds = idx.Get();
+    recordreplay::RecordReplayAssert("ContainerState::FinishPaintedLayerData %d Bounds %d %d %d %d",
+                                      recordreplay::ThingIndex(data->mLayer),
+                                      bounds.x, bounds.y, bounds.width, bounds.height);
+  }
+
   if (!data->mLayer) {
     // No layer was recycled, so we create a new one.
     RefPtr<PaintedLayer> paintedLayer = CreatePaintedLayer(data);
@@ -3811,6 +3834,10 @@ void PaintedLayerData::Accumulate(
     const DisplayItemClip& aClip, LayerState aLayerState, nsDisplayList* aList,
     DisplayItemEntryType aType, nsTArray<size_t>& aOpacityIndices,
     const RefPtr<TransformClipNode>& aTransform) {
+  recordreplay::RecordReplayAssert("PaintedLayerData::Accumulate Start %d Bounds %d %d %d %d",
+                                    recordreplay::ThingIndex(mLayer),
+                                    aVisibleRect.x, aVisibleRect.y, aVisibleRect.width, aVisibleRect.height);
+
   // If aItem is nullptr, the cast to nsPaintedDisplayItem failed.
   MOZ_ASSERT(aItem, "Can only accumulate display items that are painted!");
 
@@ -3969,6 +3996,13 @@ void PaintedLayerData::Accumulate(
 
     mVisibleRegion.Or(mVisibleRegion, aVisibleRect);
     mVisibleRegion.SimplifyOutward(4);
+
+    for (auto idx = mVisibleRegion.RectIter(); !idx.Done(); idx.Next()) {
+      auto bounds = idx.Get();
+      recordreplay::RecordReplayAssert("PaintedLayerData::Accumulate Visible %d Bounds %d %d %d %d",
+                                        recordreplay::ThingIndex(mLayer),
+                                        bounds.x, bounds.y, bounds.width, bounds.height);
+    }
   }
 
   if (!opaquePixels.IsEmpty()) {
@@ -4555,12 +4589,17 @@ void ContainerState::ProcessDisplayItems(nsDisplayList* aList) {
       itemClipChain = hitTestInfo.mClipChain;
       itemClipPtr = hitTestInfo.mClip;
       itemContent = hitTestInfo.mArea;
+      recordreplay::RecordReplayAssert("ProcessDisplayItems #8 %d %d %d %d",
+                                        itemContent.x, itemContent.y, itemContent.width, itemContent.height);
     } else {
       itemAGR = item->GetAnimatedGeometryRoot();
       itemASR = item->GetActiveScrolledRoot();
       itemClipChain = item->GetClipChain();
       itemClipPtr = &item->GetClip();
+      recordreplay::RecordReplayAssert("ProcessDisplayItems #7 PRE");
       itemContent = item->GetBounds(mBuilder, &snap);
+      recordreplay::RecordReplayAssert("ProcessDisplayItems #7 %d %d %d %d",
+                                        itemContent.x, itemContent.y, itemContent.width, itemContent.height);
     }
 
     if (mManager->IsWidgetLayerManager() && !inEffect) {
@@ -4633,7 +4672,13 @@ void ContainerState::ProcessDisplayItems(nsDisplayList* aList) {
         itemType == DisplayItemType::TYPE_TRANSFORM &&
         static_cast<nsDisplayTransform*>(item)->MayBeAnimated(mBuilder);
 
+    recordreplay::RecordReplayAssert("ProcessDisplayItems #6 %d %d %d %d",
+                                      itemContent.x, itemContent.y, itemContent.width, itemContent.height);
+
     nsIntRect itemDrawRect = ScaleToOutsidePixels(itemContent, snap);
+    recordreplay::RecordReplayAssert("ProcessDisplayItems #5 %d %d %d %d",
+                                      itemDrawRect.x, itemDrawRect.y, itemDrawRect.width, itemDrawRect.height);
+
     ParentLayerIntRect clipRect;
     if (itemClip.HasClip()) {
       const nsRect& itemClipRect = itemClip.GetClipRect();
@@ -4642,6 +4687,8 @@ void ContainerState::ProcessDisplayItems(nsDisplayList* aList) {
 
       if (!prerenderedTransform && !IsScrollThumbLayer(item)) {
         itemDrawRect.IntersectRect(itemDrawRect, clipRect.ToUnknownRect());
+        recordreplay::RecordReplayAssert("ProcessDisplayItems #4 %d %d %d %d",
+                                          itemDrawRect.x, itemDrawRect.y, itemDrawRect.width, itemDrawRect.height);
       }
 
       clipRect.MoveBy(ViewAs<ParentLayerPixel>(mParameters.mOffset));
@@ -4661,6 +4708,9 @@ void ContainerState::ProcessDisplayItems(nsDisplayList* aList) {
           transformNode->TransformRect(itemContent, mAppUnitsPerDevPixel);
 
       itemDrawRect = transformNode->TransformRect(itemDrawRect);
+
+      recordreplay::RecordReplayAssert("ProcessDisplayItems #3 %d %d %d %d",
+                                        itemDrawRect.x, itemDrawRect.y, itemDrawRect.width, itemDrawRect.height);
     }
 
 #ifdef DEBUG
@@ -4683,6 +4733,9 @@ void ContainerState::ProcessDisplayItems(nsDisplayList* aList) {
 
     nsIntRect itemVisibleRect = itemDrawRect;
 
+    recordreplay::RecordReplayAssert("ProcessDisplayItems #0 %d %d %d %d",
+                                      itemVisibleRect.x, itemVisibleRect.y, itemVisibleRect.width, itemVisibleRect.height);
+
     // We intersect the building rect with the clipped item bounds to get a
     // tighter visible rect.
     if (!prerenderedTransform) {
@@ -4695,6 +4748,8 @@ void ContainerState::ProcessDisplayItems(nsDisplayList* aList) {
 
       itemVisibleRect = itemVisibleRect.Intersect(
           ScaleToOutsidePixels(itemBuildingRect, false));
+      recordreplay::RecordReplayAssert("ProcessDisplayItems #0.2 %d %d %d %d",
+                                        itemVisibleRect.x, itemVisibleRect.y, itemVisibleRect.width, itemVisibleRect.height);
     }
 
     const bool forceInactive = maxLayers != -1 && layerCount >= maxLayers;
@@ -4809,6 +4864,8 @@ void ContainerState::ProcessDisplayItems(nsDisplayList* aList) {
         // something more sophisticated here.
         mPaintedLayerDataTree.AddingOwnLayer(itemAGR, &itemVisibleRect,
                                              uniformColorPtr);
+        recordreplay::RecordReplayAssert("ProcessDisplayItems #1 %d %d %d %d",
+                                          itemVisibleRect.x, itemVisibleRect.y, itemVisibleRect.width, itemVisibleRect.height);
       }
 
       ContainerLayerParameters params = mParameters;

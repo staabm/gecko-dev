@@ -286,6 +286,7 @@ class nsDisplaymtdBorder final : public nsDisplayBorder {
 
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
                            bool* aSnap) const override {
+    recordreplay::RecordReplayAssert("nsDisplaymtdBorder::GetBounds");
     *aSnap = true;
     nsStyleBorder styleBorder = *mFrame->StyleBorder();
     nsMathMLmtdFrame* frame = static_cast<nsMathMLmtdFrame*>(mFrame);

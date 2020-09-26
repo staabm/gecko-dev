@@ -95,6 +95,7 @@ class nsDisplayCanvas final : public nsPaintedDisplayItem {
 
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
                            bool* aSnap) const override {
+    recordreplay::RecordReplayAssert("nsDisplayCanvas::GetBounds");
     *aSnap = true;
     nsHTMLCanvasFrame* f = static_cast<nsHTMLCanvasFrame*>(Frame());
     return f->GetInnerArea() + ToReferenceFrame();

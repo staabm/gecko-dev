@@ -167,6 +167,7 @@ class nsDisplayXULImage final : public nsDisplayImageContainer {
   }
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
                            bool* aSnap) const override {
+    recordreplay::RecordReplayAssert("nsDisplayXULImage::GetBounds");
     *aSnap = true;
     return nsRect(ToReferenceFrame(), Frame()->GetSize());
   }

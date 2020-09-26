@@ -110,6 +110,7 @@ class nsDisplayListFocus : public nsPaintedDisplayItem {
 
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
                            bool* aSnap) const override {
+    recordreplay::RecordReplayAssert("nsDisplayListFocus::GetBounds");
     *aSnap = false;
     // override bounds because the list item focus ring may extend outside
     // the nsSelectsAreaFrame

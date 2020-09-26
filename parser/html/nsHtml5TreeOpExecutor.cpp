@@ -328,13 +328,17 @@ void nsHtml5TreeOpExecutor::FlushSpeculativeLoads() {
   mStage.MoveSpeculativeLoadsTo(speculativeLoadQueue);
   nsHtml5SpeculativeLoad* start = speculativeLoadQueue.Elements();
   nsHtml5SpeculativeLoad* end = start + speculativeLoadQueue.Length();
+  recordreplay::RecordReplayAssert("nsHtml5TreeOpExecutor::FlushSpeculativeLoads Start %d",
+                                   speculativeLoadQueue.Length());
   for (nsHtml5SpeculativeLoad* iter = start; iter < end; ++iter) {
     if (MOZ_UNLIKELY(!mParser)) {
       // An extension terminated the parser from a HTTP observer.
       return;
     }
+    recordreplay::RecordReplayAssert("nsHtml5TreeOpExecutor::FlushSpeculativeLoads Perform");
     iter->Perform(this);
   }
+  recordreplay::RecordReplayAssert("nsHtml5TreeOpExecutor::FlushSpeculativeLoads End");
 }
 
 class nsHtml5FlushLoopGuard {
@@ -374,6 +378,8 @@ class nsHtml5FlushLoopGuard {
  */
 void nsHtml5TreeOpExecutor::RunFlushLoop() {
   AUTO_PROFILER_LABEL("nsHtml5TreeOpExecutor::RunFlushLoop", OTHER);
+
+  recordreplay::RecordReplayAssert("RunFlushLoop Start");
 
   if (mRunFlushLoopOnStack) {
     // There's already a RunFlushLoop() on the call stack.
@@ -439,6 +445,8 @@ void nsHtml5TreeOpExecutor::RunFlushLoop() {
         }
       }
     } else {
+      recordreplay::RecordReplayAssert("RunFlushLoop #1");
+
       FlushSpeculativeLoads();  // Make sure speculative loads never start after
                                 // the corresponding normal loads for the same
                                 // URLs.
@@ -447,9 +455,14 @@ void nsHtml5TreeOpExecutor::RunFlushLoop() {
         ClearOpQueue();  // clear in order to be able to assert in destructor
         return;
       }
+
+      recordreplay::RecordReplayAssert("RunFlushLoop #2");
+
       // Now parse content left in the document.write() buffer queue if any.
       // This may generate tree ops on its own or dequeue a speculation.
       nsresult rv = GetParser()->ParseUntilBlocked();
+
+      recordreplay::RecordReplayAssert("RunFlushLoop #3");
 
       // ParseUntilBlocked flushes operations from the stage to the OpQueue.
       // Those operations may have accompanying speculative operations.
@@ -459,6 +472,8 @@ void nsHtml5TreeOpExecutor::RunFlushLoop() {
       // https://bugzilla.mozilla.org/show_bug.cgi?id=1513292#c80
       // for a more detailed explanation of why this is necessary.
       FlushSpeculativeLoads();
+
+      recordreplay::RecordReplayAssert("RunFlushLoop #4");
 
       if (NS_FAILED(rv)) {
         MarkAsBroken(rv);

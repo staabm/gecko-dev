@@ -99,6 +99,7 @@ FrozenImage::StartDecoding(uint32_t aFlags, uint32_t aWhichFrame) {
 
 bool FrozenImage::StartDecodingWithResult(uint32_t aFlags,
                                           uint32_t aWhichFrame) {
+  recordreplay::RecordReplayAssert("FrozenImage::StartDecodingWithResult");
   return InnerImage()->StartDecodingWithResult(aFlags, FRAME_FIRST);
 }
 

@@ -460,6 +460,7 @@ class nsDisplayCanvasFocus : public nsPaintedDisplayItem {
 
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
                            bool* aSnap) const override {
+    recordreplay::RecordReplayAssert("nsDisplayCanvasFocus::GetBounds");
     *aSnap = false;
     // This is an overestimate, but that's not a problem.
     nsCanvasFrame* frame = static_cast<nsCanvasFrame*>(mFrame);

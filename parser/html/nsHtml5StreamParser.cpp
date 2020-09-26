@@ -138,7 +138,9 @@ class nsHtml5LoadFlusher : public Runnable {
   explicit nsHtml5LoadFlusher(nsHtml5TreeOpExecutor* aExecutor)
       : Runnable("nsHtml5LoadFlusher"), mExecutor(aExecutor) {}
   NS_IMETHOD Run() override {
+    recordreplay::RecordReplayAssert("nsHtml5LoadFlusher Start");
     mExecutor->FlushSpeculativeLoads();
+    recordreplay::RecordReplayAssert("nsHtml5LoadFlusher End");
     return NS_OK;
   }
 };
@@ -168,7 +170,11 @@ nsHtml5StreamParser::nsHtml5StreamParser(nsHtml5TreeOpExecutor* aExecutor,
       mStreamState(eHtml5StreamState::STREAM_NOT_STARTED),
       mSpeculating(false),
       mAtEOF(false),
-      mSpeculationMutex("nsHtml5StreamParser mSpeculationMutex"),
+      // This mutex is ordered because while holding it we can dispatch events
+      // to threads, which will also be ordered. If this wasn't ordered and we
+      // acquired it in different orders when recording vs. replaying, we will
+      // deadlock.
+      mSpeculationMutex("nsHtml5StreamParser mSpeculationMutex", /* aOrdered */ true),
       mSpeculationFailureCount(0),
       mLocalFileBytesBuffered(0),
       mTerminated(false),

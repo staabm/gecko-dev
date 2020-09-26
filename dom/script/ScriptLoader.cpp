@@ -3730,6 +3730,8 @@ void ScriptLoader::PreloadURI(nsIURI* aURI, const nsAString& aCharset,
                               bool aAsync, bool aDefer, bool aNoModule,
                               bool aLinkPreload,
                               const ReferrerPolicy aReferrerPolicy) {
+  recordreplay::RecordReplayAssert("ScriptLoader::PreloadURI");
+
   NS_ENSURE_TRUE_VOID(mDocument);
   // Check to see if scripts has been turned off.
   if (!mEnabled || !mDocument->IsScriptEnabled()) {

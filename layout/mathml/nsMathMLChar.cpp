@@ -1724,6 +1724,7 @@ class nsDisplayMathMLCharForeground final : public nsPaintedDisplayItem {
 
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
                            bool* aSnap) const override {
+    recordreplay::RecordReplayAssert("nsDisplayMathMLCharForeground::GetBounds");
     *aSnap = false;
     nsRect rect;
     mChar->GetRect(rect);

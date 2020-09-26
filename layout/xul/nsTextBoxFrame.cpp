@@ -327,6 +327,7 @@ bool nsDisplayXULTextBox::CreateWebRenderCommands(
 
 nsRect nsDisplayXULTextBox::GetBounds(nsDisplayListBuilder* aBuilder,
                                       bool* aSnap) const {
+  recordreplay::RecordReplayAssert("nsDisplayXULTextBox::GetBounds");
   *aSnap = false;
   return mFrame->GetVisualOverflowRectRelativeToSelf() + ToReferenceFrame();
 }

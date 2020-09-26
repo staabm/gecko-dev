@@ -869,12 +869,14 @@ static nsRect GetDisplayItemBounds(nsDisplayListBuilder* aBuilder,
 
 nsRect nsDisplayPluginReadback::GetBounds(nsDisplayListBuilder* aBuilder,
                                           bool* aSnap) const {
+  recordreplay::RecordReplayAssert("nsDisplayPluginReadback::GetBounds");
   *aSnap = false;
   return GetDisplayItemBounds(aBuilder, this, mFrame);
 }
 
 nsRect nsDisplayPlugin::GetBounds(nsDisplayListBuilder* aBuilder,
                                   bool* aSnap) const {
+  recordreplay::RecordReplayAssert("nsDisplayPlugin::GetBounds");
   *aSnap = true;
   return GetDisplayItemBounds(aBuilder, this, mFrame);
 }

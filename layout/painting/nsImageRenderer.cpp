@@ -93,15 +93,20 @@ static bool ShouldTreatAsCompleteDueToSyncDecode(const StyleImage* aImage,
 }
 
 bool nsImageRenderer::PrepareImage() {
+  recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage Start");
+
   if (mImage->IsNone() ||
       (mImage->IsImageRequestType() && !mImage->GetImageRequest())) {
     // mImage->GetImageRequest() could be null here if the StyleImage refused
     // to load a same-document URL, or the url was invalid, for example.
+    recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #1");
     mPrepareResult = ImgDrawResult::BAD_IMAGE;
     return false;
   }
 
   if (!mImage->IsComplete()) {
+    recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #2");
+
     // Make sure the image is actually decoding.
     bool frameComplete = mImage->StartDecoding();
 
@@ -113,18 +118,26 @@ bool nsImageRenderer::PrepareImage() {
       mImage->GetImageRequest()->BoostPriority(imgIRequest::CATEGORY_DISPLAY);
     }
 
+    recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #2.1 %d %d",
+                                     frameComplete, mImage->IsComplete());
+
     // Check again to see if we finished.
     // We cannot prepare the image for rendering if it is not fully loaded.
     // Special case: If we requested a sync decode and the image has loaded,
     // push on through because the Draw() will do a sync decode then.
     if (!(frameComplete || mImage->IsComplete()) &&
         !ShouldTreatAsCompleteDueToSyncDecode(mImage, mFlags)) {
+      recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #3");
       mPrepareResult = ImgDrawResult::NOT_READY;
       return false;
     }
   }
 
+  recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #4");
+
   if (mImage->IsImageRequestType()) {
+    recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #5");
+
     MOZ_ASSERT(mImage->GetImageRequest(),
                "must have image data, since we checked above");
     nsCOMPtr<imgIContainer> srcImage;
@@ -140,6 +153,7 @@ bool nsImageRenderer::PrepareImage() {
       auto croprect = mImage->ComputeActualCropRect();
       if (!croprect || croprect->mRect.IsEmpty()) {
         // The cropped image has zero size
+        recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #6");
         mPrepareResult = ImgDrawResult::BAD_IMAGE;
         return false;
       }
@@ -174,6 +188,7 @@ bool nsImageRenderer::PrepareImage() {
            !paintServerFrame->IsFrameOfType(nsIFrame::eSVGPaintServer) &&
            !static_cast<nsSVGDisplayableFrame*>(
                do_QueryFrame(paintServerFrame)))) {
+        recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #7");
         mPrepareResult = ImgDrawResult::BAD_IMAGE;
         return false;
       }
@@ -184,6 +199,8 @@ bool nsImageRenderer::PrepareImage() {
   } else {
     MOZ_ASSERT(mImage->IsNone(), "Unknown image type?");
   }
+
+  recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #8 %d", IsReady());
 
   return IsReady();
 }

@@ -1212,6 +1212,7 @@ VectorImage::StartDecoding(uint32_t aFlags, uint32_t aWhichFrame) {
 bool VectorImage::StartDecodingWithResult(uint32_t aFlags,
                                           uint32_t aWhichFrame) {
   // SVG images are ready to draw when they are loaded
+  recordreplay::RecordReplayAssert("VectorImage::StartDecodingWithResult");
   return mIsFullyLoaded;
 }
 

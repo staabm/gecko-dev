@@ -155,6 +155,7 @@ nsRect nsDisplayFieldSetBorder::GetBounds(nsDisplayListBuilder* aBuilder,
   // outside the border rect.  We could try to duplicate all the complexity
   // nsDisplayBorder has here, but keeping things in sync would be a pain, and
   // this code is not typically performance-sensitive.
+  recordreplay::RecordReplayAssert("nsDisplayFieldSetBorder::GetBounds");
   *aSnap = false;
   return Frame()->GetVisualOverflowRectRelativeToSelf() + ToReferenceFrame();
 }
