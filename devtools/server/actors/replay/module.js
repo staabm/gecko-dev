@@ -378,6 +378,7 @@ const commands = {
   "DOM.getEventListeners": DOM_getEventListeners,
   "DOM.performSearch": DOM_performSearch,
   "DOM.querySelector": DOM_querySelector,
+  "Graphics.getDevicePixelRatio": Graphics_getDevicePixelRatio,
   "Host.convertFunctionOffsetToLocation": Host_convertFunctionOffsetToLocation,
   "Host.convertLocationToFunctionOffset": Host_convertLocationToFunctionOffset,
   "Host.countStackFrames": Host_countStackFrames,
@@ -717,6 +718,14 @@ function Debugger_getScriptSource({ scriptId }) {
     scriptSource,
     contentType: "text/javascript",
   };
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Graphics Commands
+///////////////////////////////////////////////////////////////////////////////
+
+function Graphics_getDevicePixelRatio() {
+  return { ratio: getWindow().devicePixelRatio };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
