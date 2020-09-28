@@ -604,7 +604,7 @@ void* SharedMemoryBasic::FindFreeAddressSpace(size_t size) {
 
 bool SharedMemoryBasic::ShareToProcess(base::ProcessId pid, Handle* aNewHandle) {
   // FIXME investigate why these pids can differ between recording/replaying.
-  pid = recordreplay::RecordReplayValue(pid);
+  pid = recordreplay::RecordReplayValue("SharedMemoryBasic::ShareToProcess", pid);
 
   recordreplay::RecordReplayAssert("SharedMemoryBasic::ShareToProcess #1 %d", pid);
 
