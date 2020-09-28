@@ -3226,6 +3226,10 @@ UpdateService.prototype = {
       return STATE_NONE;
     }
 
+    // For now, automatic updates are disabled in the V2 recording browser,
+    // so that we can run it in the cloud alongside the legacy browser.
+    return STATE_NONE;
+
     // If a download request is in progress vs. a download ready to resume
     if (this.isDownloading) {
       if (update.isCompleteUpdate == this._downloader.isCompleteUpdate) {
