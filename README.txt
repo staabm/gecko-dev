@@ -10,13 +10,7 @@ the Record Replay gecko based browser.
 3. run `./mach bootstrap` and select (2) Firefox Desktop
 4. run `./mach build`
 
-<<<<<<< HEAD
-mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/rr-opt
-mk_add_options MOZ_MAKE_FLAGS="-j12"
-mk_add_options AUTOCLOBBER=1
-=======
 **Other OS**
->>>>>>> webreplay-release
 
 1. `cp mozconfig.sample mozconfig` 
 2. run `./mach bootstrap` and select (2) Firefox Desktop

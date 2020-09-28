@@ -11,12 +11,11 @@ const sandbox = Cu.Sandbox(
     wantGlobalProperties: ["InspectorUtils", "CSSRule"],
   }
 );
-Cu.evalInSandbox(
-  "Components.utils.import('resource://gre/modules/jsdebugger.jsm');" +
-    "Components.utils.import('resource://gre/modules/Services.jsm');" +
-    "addDebuggerToGlobal(this);",
-  sandbox
-);
+Cu.evalInSandbox(`
+Components.utils.import('resource://gre/modules/jsdebugger.jsm');
+Components.utils.import('resource://gre/modules/Services.jsm');
+addDebuggerToGlobal(this);
+`, sandbox);
 const {
   Debugger,
   RecordReplayControl,
