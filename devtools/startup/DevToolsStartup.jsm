@@ -1677,6 +1677,14 @@ async function fetchURL(url) {
 }
 
 async function updateRecordingDriver() {
+  try {
+    fetch;
+  } catch (e) {
+    dump(`updateRecordingDriver: fetch() not in scope, waiting...\n`);
+    setTimeout(updateRecordingDriver, 100);
+    return;
+  }
+
   const downloadURL = Services.prefs.getStringPref(
     "devtools.recordreplay.driverDownloads"
   );
@@ -1731,7 +1739,7 @@ async function updateRecordingDriver() {
 
 // We check to see if there is a new recording driver every time the browser
 // starts up, and periodically after that.
-updateRecordingDriver();
+setTimeout(updateRecordingDriver, 0);
 setInterval(updateRecordingDriver, 1000 * 60 * 20);
 
 function reloadAndRecordTab(gBrowser) {
