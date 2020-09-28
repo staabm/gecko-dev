@@ -132,7 +132,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
              gRecordCommandLineArguments);
   LoadSymbol("RecordReplayValue", gRecordReplayValue);
   LoadSymbol("RecordReplayBytes", gRecordReplayBytes);
-  LoadSymbol("RecordReplayPrintVA", gPrintVA);
+  LoadSymbol("RecordReplayPrint", gPrintVA);
   LoadSymbol("RecordReplayFinishRecording", gFinishRecording);
   LoadSymbol("RecordReplayRegisterPointer", gRegisterPointer);
   LoadSymbol("RecordReplayUnregisterPointer", gUnregisterPointer);

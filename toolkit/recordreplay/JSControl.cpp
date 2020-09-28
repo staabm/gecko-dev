@@ -33,7 +33,7 @@ namespace js {
 static void (*gOnScriptParsed)(const char* aId, const char* aKind, const char* aUrl);
 static char* (*gGetRecordingId)();
 static void (*gSetDefaultCommandCallback)(char* (*aCallback)(const char*, const char*));
-static void (*gSetScanScriptsCallback)(void (*aCallback)(bool));
+static void (*gSetChangeInstrumentCallback)(void (*aCallback)(bool));
 static void (*gInstrument)(const char* aKind, const char* aFunctionId, int aOffset);
 static void (*gOnExceptionUnwind)();
 static void (*gOnDebuggerStatement)();
@@ -45,24 +45,25 @@ static size_t (*gNewTimeWarpTarget)();
 // some state.
 static char* CommandCallback(const char* aMethod, const char* aParams);
 
-// Callback used to change whether execution is being scanned.
-static void SetScanningScriptsCallback(bool aValue);
+// Callback used to change whether execution is being scanned and we should
+// call OnInstrument.
+static void SetChangeInstrumentCallback(bool aValue);
 
 // Handle initialization at process startup.
 void InitializeJS() {
   LoadSymbol("RecordReplayOnScriptParsed", gOnScriptParsed);
   LoadSymbol("RecordReplayGetRecordingId", gGetRecordingId);
   LoadSymbol("RecordReplaySetDefaultCommandCallback", gSetDefaultCommandCallback);
-  LoadSymbol("RecordReplaySetScanScriptsCallback", gSetScanScriptsCallback);
-  LoadSymbol("RecordReplayInstrument", gInstrument);
+  LoadSymbol("RecordReplaySetChangeInstrumentCallback", gSetChangeInstrumentCallback);
+  LoadSymbol("RecordReplayOnInstrument", gInstrument);
   LoadSymbol("RecordReplayOnExceptionUnwind", gOnExceptionUnwind);
   LoadSymbol("RecordReplayOnDebuggerStatement", gOnDebuggerStatement);
   LoadSymbol("RecordReplayOnEvent", gOnEvent);
   LoadSymbol("RecordReplayOnConsoleMessage", gOnConsoleMessage);
-  LoadSymbol("RecordReplayNewTimeWarpTarget", gNewTimeWarpTarget);
+  LoadSymbol("RecordReplayNewBookmark", gNewTimeWarpTarget);
 
   gSetDefaultCommandCallback(CommandCallback);
-  gSetScanScriptsCallback(SetScanningScriptsCallback);
+  gSetChangeInstrumentCallback(SetChangeInstrumentCallback);
 }
 
 // URL of the root module script.
@@ -331,7 +332,7 @@ static bool Method_ShouldUpdateProgressCounter(JSContext* aCx,
 static bool gScanningScripts;
 
 // This is called by the recording driver to notify us when to start/stop scanning.
-static void SetScanningScriptsCallback(bool aValue) {
+static void SetChangeInstrumentCallback(bool aValue) {
   MOZ_RELEASE_ASSERT(IsModuleInitialized());
 
   if (gScanningScripts == aValue) {

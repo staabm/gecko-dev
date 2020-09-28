@@ -22,7 +22,7 @@ using namespace mozilla::layers;
 
 namespace mozilla::recordreplay {
 
-static void (*gOnPaint)(const char* aMimeType, const char* aOptions, const char* aData);
+static void (*gOnPaint)(const char* aMimeType, const char* aData);
 
 void InitializeGraphics() {
   LoadSymbol("RecordReplayOnPaint", gOnPaint);
@@ -198,7 +198,7 @@ static void EncodeGraphics(const char* aMimeType,
     return;
   }
 
-  gOnPaint(aMimeType, aEncodeOptions, data.get());
+  gOnPaint(aMimeType, data.get());
 }
 
 static void ReportPaint() {
