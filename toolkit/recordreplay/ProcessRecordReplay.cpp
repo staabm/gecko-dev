@@ -115,16 +115,23 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   const char* driver = getenv("RECORD_REPLAY_DRIVER");
   if (!driver) {
     fprintf(stderr, "RECORD_REPLAY_DRIVER not set, crashing...\n");
-    MOZ_CRASH();
+    MOZ_CRASH("RECORD_REPLAY_DRIVER not set");
   }
 
   // Don't create a stylo thread pool when recording or replaying.
   putenv((char*)"STYLO_THREADS=1");
 
-  gDriverHandle = dlopen(driver, RTLD_LAZY);
+  for (size_t i = 0; i < 60; i++) {
+    gDriverHandle = dlopen(driver, RTLD_LAZY);
+    if (gDriverHandle) {
+      break;
+    }
+    fprintf(stderr, "Loading driver at %s failed, waiting...\n", driver);
+    sleep(1);
+  }
   if (!gDriverHandle) {
-    fprintf(stderr, "Loading Record Replay driver failed.\n");
-    return;
+    fprintf(stderr, "Loading driver at %s failed, crashing.\n", driver);
+    MOZ_CRASH("RECORD_REPLAY_DRIVER loading failed");
   }
 
   LoadSymbol("RecordReplayAttach", gAttach);
