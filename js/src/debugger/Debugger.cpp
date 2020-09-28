@@ -2490,6 +2490,10 @@ bool DebugAPI::onTrap(JSContext* cx) {
 
 /* static */
 bool DebugAPI::onSingleStep(JSContext* cx) {
+  if (mozilla::recordreplay::AreThreadEventsDisallowed()) {
+    return true;
+  }
+
   FrameIter iter(cx);
 
   // We may be stepping over a JSOp::Exception, that pushes the context's

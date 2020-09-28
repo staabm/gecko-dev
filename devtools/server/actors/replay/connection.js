@@ -6,12 +6,11 @@
 "use strict";
 
 const { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
-const { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const { XPCOMUtils } = ChromeUtils.import(
+  "resource://gre/modules/XPCOMUtils.jsm"
+);
 const { OS } = ChromeUtils.import("resource://gre/modules/osfile.jsm");
 const { setTimeout } = Components.utils.import('resource://gre/modules/Timer.jsm');
-const {
-  onFinishedRecording,
-} = ChromeUtils.import("resource:///modules/DevToolsStartup.jsm");
 
 XPCOMUtils.defineLazyModuleGetters(this, {
   AppUpdater: "resource:///modules/AppUpdater.jsm",
@@ -30,10 +29,19 @@ let gConfig;
 // When connecting we open an initial channel for commands not associated with a recording.
 let gMainChannelId;
 
+function getLoggedInUser() {
+  const userPref = Services.prefs.getStringPref("devtools.recordreplay.user");
+  if (userPref == "") {
+    return;
+  }
+  const user = JSON.parse(userPref);
+  return user == "" ? null : user;
+}
+
 // eslint-disable-next-line no-unused-vars
 function Initialize(callbacks) {
   gWorker = new Worker("connection-worker.js");
-  gWorker.addEventListener("message", evt => {
+  gWorker.addEventListener("message", (evt) => {
     try {
       onMessage(evt);
     } catch (e) {
@@ -42,7 +50,9 @@ function Initialize(callbacks) {
   });
   gCallbacks = callbacks;
 
-  let address = Services.prefs.getStringPref("devtools.recordreplay.cloudServer");
+  let address = Services.prefs.getStringPref(
+    "devtools.recordreplay.cloudServer"
+  );
 
   const override = getenv("RECORD_REPLAY_SERVER");
   if (override) {
@@ -84,26 +94,38 @@ function onMessage(evt) {
 }
 
 function getenv(name) {
-  const env = Cc["@mozilla.org/process/environment;1"].getService(Ci.nsIEnvironment);
+  const env = Cc["@mozilla.org/process/environment;1"].getService(
+    Ci.nsIEnvironment
+  );
   return env.get(name);
 }
 
 async function loadAssertionFilters() {
-  const env = Cc["@mozilla.org/process/environment;1"].getService(Ci.nsIEnvironment);
-  if (env.get("RECORD_REPLAY_RECORD_EXECUTION_ASSERTS") ||
-      env.get("RECORD_REPLAY_RECORD_JS_ASSERTS")) {
+  const env = Cc["@mozilla.org/process/environment;1"].getService(
+    Ci.nsIEnvironment
+  );
+  if (
+    env.get("RECORD_REPLAY_RECORD_EXECUTION_ASSERTS") ||
+    env.get("RECORD_REPLAY_RECORD_JS_ASSERTS")
+  ) {
     // Use the values from the current environment.
     return;
   }
 
-  const filters = await sendCommand(gMainChannelId, "Internal.getAssertionFilters");
+  const filters = await sendCommand(
+    gMainChannelId,
+    "Internal.getAssertionFilters"
+  );
   if (!filters) {
     return;
   }
 
   const { execution, values } = filters;
 
-  env.set("RECORD_REPLAY_RECORD_EXECUTION_ASSERTS", stringify([...execution, ...values]));
+  env.set(
+    "RECORD_REPLAY_RECORD_EXECUTION_ASSERTS",
+    stringify([...execution, ...values])
+  );
   env.set("RECORD_REPLAY_RECORD_JS_ASSERTS", stringify(values));
 
   function stringify(asserts) {
@@ -136,7 +158,7 @@ const gRecordingCreateWaiters = [];
 function hashString(str) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    hash = (((hash << 5) - hash) + str.charCodeAt(i)) | 0;
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
   }
   return hash;
 }
@@ -148,7 +170,7 @@ function getResourceInfo(url, text) {
   };
 }
 
-async function addRecordingResource(recordingId, url) {
+async function addRecordingResource(info, recordingId, url) {
   try {
     const response = await fetch(url);
     if (response.status < 200 || response.status >= 300) {
@@ -198,7 +220,9 @@ Services.ppmm.addMessageListener("RecordReplayGeneratedSourceWithSourceMap", {
     if (text) {
       // Look for sources which are not inlined into the map, and add them as
       // additional recording resources.
-      const { sources = [], sourcesContent = [], sourceRoot = "" } = JSON.parse(text);
+      const { sources = [], sourcesContent = [], sourceRoot = "" } = JSON.parse(
+        text
+      );
       for (let i = 0; i < sources.length; i++) {
         if (!sourcesContent[i]) {
           const sourceURL = computeSourceURL(url, sourceRoot, sources[i]);
@@ -206,7 +230,7 @@ Services.ppmm.addMessageListener("RecordReplayGeneratedSourceWithSourceMap", {
         }
       }
     }
-  }
+  },
 });
 
 function computeSourceURL(url, root, path) {
@@ -219,7 +243,7 @@ function computeSourceURL(url, root, path) {
 const gResultWaiters = new Map();
 
 function waitForCommandResult(id) {
-  return new Promise(resolve => gResultWaiters.set(id, resolve));
+  return new Promise((resolve) => gResultWaiters.set(id, resolve));
 }
 
 function onCommandResult(id, result) {

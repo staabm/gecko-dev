@@ -13,8 +13,8 @@ const sandbox = Cu.Sandbox(
 );
 Cu.evalInSandbox(
   "Components.utils.import('resource://gre/modules/jsdebugger.jsm');" +
-  "Components.utils.import('resource://gre/modules/Services.jsm');" +
-  "addDebuggerToGlobal(this);",
+    "Components.utils.import('resource://gre/modules/Services.jsm');" +
+    "addDebuggerToGlobal(this);",
   sandbox
 );
 const {
@@ -195,8 +195,11 @@ const gGeckoSources = new Map();
 // Map Debugger.Source to arrays of the top level scripts for that source.
 const gSourceRoots = new ArrayMap();
 
-gDebugger.onNewScript = script => {
-  if (!isRecordingOrReplaying || RecordReplayControl.areThreadEventsDisallowed()) {
+gDebugger.onNewScript = (script) => {
+  if (
+    !isRecordingOrReplaying ||
+    RecordReplayControl.areThreadEventsDisallowed()
+  ) {
     return;
   }
 
@@ -210,8 +213,10 @@ gDebugger.onNewScript = script => {
   gSourceRoots.add(script.source, script);
 
   if (!gSources.getId(script.source)) {
-    if (script.source.sourceMapURL &&
-        Services.prefs.getBoolPref("devtools.recordreplay.uploadSourceMaps")) {
+    if (
+      script.source.sourceMapURL &&
+      Services.prefs.getBoolPref("devtools.recordreplay.uploadSourceMaps")
+    ) {
       const recordingId = RecordReplayControl.recordingId();
       const { url, sourceMapURL } = script.source;
       Services.cpmm.sendAsyncMessage(
@@ -300,8 +305,10 @@ getWindow().docShell.chromeEventHandler.addEventListener(
 getWindow().docShell.chromeEventHandler.addEventListener(
   "StyleSheetApplicableStateChanged",
   ({ stylesheet }) => {
-    if (stylesheet.sourceMapURL &&
-        Services.prefs.getBoolPref("devtools.recordreplay.uploadSourceMaps")) {
+    if (
+      stylesheet.sourceMapURL &&
+      Services.prefs.getBoolPref("devtools.recordreplay.uploadSourceMaps")
+    ) {
       const recordingId = RecordReplayControl.recordingId();
       Services.cpmm.sendAsyncMessage(
         "RecordReplayGeneratedSourceWithSourceMap",
@@ -323,18 +330,22 @@ function advanceProgressCounter() {
 
 function OnMouseEvent(time, kind, x, y) {
   advanceProgressCounter();
-};
+}
 
-const { DebuggerNotificationObserver } = Cu.getGlobalForObject(require("resource://devtools/shared/Loader.jsm"));
+const { DebuggerNotificationObserver } = Cu.getGlobalForObject(
+  require("resource://devtools/shared/Loader.jsm")
+);
 const gNotificationObserver = new DebuggerNotificationObserver();
 gNotificationObserver.addListener(eventListener);
-gNewGlobalHooks.push(global => {
+gNewGlobalHooks.push((global) => {
   try {
     gNotificationObserver.connect(global.unsafeDereference());
   } catch (e) {}
 });
 
-const { eventBreakpointForNotification } = require("devtools/server/actors/utils/event-breakpoints");
+const {
+  eventBreakpointForNotification,
+} = require("devtools/server/actors/utils/event-breakpoints");
 
 function eventListener(info) {
   const event = eventBreakpointForNotification(gDebugger, info);
