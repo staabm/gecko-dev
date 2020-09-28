@@ -348,7 +348,7 @@ const {
 
 function eventListener(info) {
   const event = eventBreakpointForNotification(gDebugger, info);
-  if (event && info.phase == "pre" || info.phase == "post") {
+  if (event && (info.phase == "pre" || info.phase == "post")) {
     RecordReplayControl.onEvent(event, info.phase == "pre");
   }
 }
