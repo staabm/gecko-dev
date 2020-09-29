@@ -207,11 +207,20 @@ MOZ_EXPORT void RecordReplayInterface_EndContentParse(const void* aToken) {
 
 }  // extern "C"
 
-static char* gRecordingId;
+// Recording IDs are UUIDs, and have a fixed length.
+static char gRecordingId[40];
 
 static const char* GetRecordingId() {
-  if (!gRecordingId) {
-    gRecordingId = gGetRecordingId();
+  if (!gRecordingId[0]) {
+    // RecordReplayGetRecordingId() is not currently supported while replaying,
+    // so we embed the recording ID in the recording itself.
+    if (IsRecording()) {
+      char* recordingId = gGetRecordingId();
+      MOZ_RELEASE_ASSERT(*recordingId != 0);
+      MOZ_RELEASE_ASSERT(strlen(recordingId) + 1 <= sizeof(gRecordingId));
+      strcpy(gRecordingId, recordingId);
+    }
+    RecordReplayBytes("RecordingId", gRecordingId, sizeof(gRecordingId));
   }
   return gRecordingId;
 }
