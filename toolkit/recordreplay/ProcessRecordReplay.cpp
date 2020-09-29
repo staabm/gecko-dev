@@ -405,6 +405,7 @@ void FinishRecording() {
   // RecordReplayFinishRecording() does not return until the recording has been
   // fully uploaded. The ContentParent will not kill this process after
   // finishing the recording, so we have to it ourselves.
+  PrintLog("Recording finished, exiting.");
   exit(0);
 }
 

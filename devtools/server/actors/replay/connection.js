@@ -170,7 +170,7 @@ function getResourceInfo(url, text) {
   };
 }
 
-async function addRecordingResource(info, recordingId, url) {
+async function addRecordingResource(recordingId, url) {
   try {
     const response = await fetch(url);
     if (response.status < 200 || response.status >= 300) {
