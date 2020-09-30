@@ -403,7 +403,6 @@ const commands = {
 };
 
 function OnProtocolCommand(method, params) {
-  log(`OnProtocolCommand ${method} ${JSON.stringify(params)}`);
   if (commands[method]) {
     try {
       return commands[method](params);
