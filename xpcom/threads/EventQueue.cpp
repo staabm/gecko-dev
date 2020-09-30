@@ -11,20 +11,8 @@ using namespace mozilla;
 using namespace mozilla::detail;
 
 template <size_t ItemsPerPage>
-EventQueueInternal<ItemsPerPage>::EventQueueInternal() {
-  recordreplay::RegisterThing(this);
-}
-
-template <size_t ItemsPerPage>
 EventQueueInternal<ItemsPerPage>::EventQueueInternal(
-    EventQueuePriority aPriority) {
-  recordreplay::RegisterThing(this);
-}
-
-template <size_t ItemsPerPage>
-EventQueueInternal<ItemsPerPage>::~EventQueueInternal() {
-  recordreplay::UnregisterThing(this);
-}
+    EventQueuePriority aPriority) {}
 
 template <size_t ItemsPerPage>
 void EventQueueInternal<ItemsPerPage>::PutEvent(
@@ -42,27 +30,13 @@ void EventQueueInternal<ItemsPerPage>::PutEvent(
 #endif
 
   nsCOMPtr<nsIRunnable> event(aEvent);
-
-  MOZ_RELEASE_ASSERT(!recordreplay::AreThreadEventsPassedThrough());
-  recordreplay::RecordReplayAssert("EventQueueInternal::PutEvent %d %d %d %d",
-                                   recordreplay::ThingIndex(this),
-                                   recordreplay::ThingIndex(event),
-                                   mQueue.Count(),
-                                   mNumOperations);
-
   mQueue.Push(std::move(event));
-
-  mNumOperations++;
 }
 
 template <size_t ItemsPerPage>
 already_AddRefed<nsIRunnable> EventQueueInternal<ItemsPerPage>::GetEvent(
     EventQueuePriority* aPriority, const MutexAutoLock& aProofOfLock,
     mozilla::TimeDuration* aLastEventDelay) {
-  recordreplay::RecordReplayAssert("EventQueueInternal::GetEvent %d %d",
-                                   recordreplay::ThingIndex(this),
-                                   mQueue.Count());
-
   if (mQueue.IsEmpty()) {
     if (aLastEventDelay) {
       *aLastEventDelay = TimeDuration();
@@ -98,24 +72,12 @@ already_AddRefed<nsIRunnable> EventQueueInternal<ItemsPerPage>::GetEvent(
 #endif
 
   nsCOMPtr<nsIRunnable> result = mQueue.Pop();
-
-  MOZ_RELEASE_ASSERT(!recordreplay::AreThreadEventsPassedThrough());
-  recordreplay::RecordReplayAssert("EventQueueInternal::GetEvent RETURN %d %d %d %d",
-                                   recordreplay::ThingIndex(this),
-                                   recordreplay::ThingIndex(result),
-                                   mQueue.Count(),
-                                   mNumOperations);
-  mNumOperations++;
-
   return result.forget();
 }
 
 template <size_t ItemsPerPage>
 bool EventQueueInternal<ItemsPerPage>::IsEmpty(
     const MutexAutoLock& aProofOfLock) {
-  recordreplay::RecordReplayAssert("EventQueueInternal::IsEmpty %d %d %d",
-                                   recordreplay::ThingIndex(this), mQueue.Count(),
-                                   mNumOperations);
   return mQueue.IsEmpty();
 }
 
@@ -129,11 +91,4 @@ template <size_t ItemsPerPage>
 size_t EventQueueInternal<ItemsPerPage>::Count(
     const MutexAutoLock& aProofOfLock) const {
   return mQueue.Count();
-}
-
-namespace mozilla::detail {
-
-template class EventQueueInternal<16>;
-template class EventQueueInternal<64>;
-
 }

@@ -214,8 +214,6 @@ inline void ChannelEventQueue::RunOrEnqueue(ChannelEvent* aCallback,
                                             bool aAssertionWhenNotQueued) {
   MOZ_ASSERT(aCallback);
 
-  recordreplay::RecordReplayAssert("ChannelEventQueue::RunOrEnqueue Start");
-
   // Events execution could be a destruction of the channel (and our own
   // destructor) unless we make sure its refcount doesn't drop to 0 while this
   // method is running.
@@ -236,8 +234,6 @@ inline void ChannelEventQueue::RunOrEnqueue(ChannelEvent* aCallback,
                    !mEventQueue.IsEmpty() ||
                    MaybeSuspendIfEventsAreSuppressed();
 
-    recordreplay::RecordReplayAssert("ChannelEventQueue::RunOrEnqueue #1 %d", enqueue);
-
     if (enqueue) {
       mEventQueue.AppendElement(std::move(event));
       return;
@@ -251,8 +247,6 @@ inline void ChannelEventQueue::RunOrEnqueue(ChannelEvent* aCallback,
     MOZ_ASSERT(NS_SUCCEEDED(rv));
 
     if (!isCurrentThread) {
-      recordreplay::RecordReplayAssert("ChannelEventQueue::RunOrEnqueue #2");
-
       // Leverage Suspend/Resume mechanism to trigger flush procedure without
       // creating a new one.
       SuspendInternal();
@@ -264,8 +258,6 @@ inline void ChannelEventQueue::RunOrEnqueue(ChannelEvent* aCallback,
 
   MOZ_RELEASE_ASSERT(!aAssertionWhenNotQueued);
   event->Run();
-
-  recordreplay::RecordReplayAssert("ChannelEventQueue::RunOrEnqueue End");
 }
 
 inline void ChannelEventQueue::StartForcedQueueing() {

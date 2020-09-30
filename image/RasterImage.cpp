@@ -314,8 +314,6 @@ LookupResult RasterImage::LookupFrame(const IntSize& aSize, uint32_t aFlags,
                                       bool aMarkUsed) {
   MOZ_ASSERT(NS_IsMainThread());
 
-  recordreplay::RecordReplayAssert("RasterImage::LookupFrame Start");
-
   // If we're opaque, we don't need to care about premultiplied alpha, because
   // that can only matter for frames with transparency.
   if (IsOpaque()) {
@@ -326,7 +324,6 @@ LookupResult RasterImage::LookupFrame(const IntSize& aSize, uint32_t aFlags,
       CanDownscaleDuringDecode(aSize, aFlags) ? aSize : mSize;
   if (requestedSize.IsEmpty()) {
     // Can't decode to a surface of zero size.
-    recordreplay::RecordReplayAssert("RasterImage::LookupFrame #1");
     return LookupResult(MatchType::NOT_FOUND);
   }
 
@@ -335,7 +332,6 @@ LookupResult RasterImage::LookupFrame(const IntSize& aSize, uint32_t aFlags,
 
   if (!result && !mHasSize) {
     // We can't request a decode without knowing our intrinsic size. Give up.
-    recordreplay::RecordReplayAssert("RasterImage::LookupFrame #2");
     return LookupResult(MatchType::NOT_FOUND);
   }
 
@@ -366,13 +362,11 @@ LookupResult RasterImage::LookupFrame(const IntSize& aSize, uint32_t aFlags,
     if (ranSync || syncDecode) {
       result =
           LookupFrameInternal(requestedSize, aFlags, aPlaybackType, aMarkUsed);
-      recordreplay::RecordReplayAssert("RasterImage::LookupFrame #3 %d", !!result);
     }
   }
 
   if (!result) {
     // We still weren't able to get a frame. Give up.
-    recordreplay::RecordReplayAssert("RasterImage::LookupFrame #4");
     return result;
   }
 
@@ -390,11 +384,9 @@ LookupResult RasterImage::LookupFrame(const IntSize& aSize, uint32_t aFlags,
   if (aFlags & (FLAG_SYNC_DECODE | FLAG_SYNC_DECODE_IF_FAST) &&
       result.Surface()->IsAborted()) {
     DrawableSurface tmp = std::move(result.Surface());
-    recordreplay::RecordReplayAssert("RasterImage::LookupFrame #5");
     return result;
   }
 
-  recordreplay::RecordReplayAssert("RasterImage::LookupFrame #6 %d", !!result);
   return result;
 }
 
@@ -1071,15 +1063,11 @@ RasterImage::StartDecoding(uint32_t aFlags, uint32_t aWhichFrame) {
 
 bool RasterImage::StartDecodingWithResult(uint32_t aFlags,
                                           uint32_t aWhichFrame) {
-  recordreplay::RecordReplayAssert("RasterImage::StartDecodingWithResult");
-
   if (mError) {
-    recordreplay::RecordReplayAssert("RasterImage::StartDecodingWithResult #1");
     return false;
   }
 
   if (!mHasSize) {
-    recordreplay::RecordReplayAssert("RasterImage::StartDecodingWithResult #2");
     mWantFullDecode = true;
     return false;
   }
@@ -1088,11 +1076,6 @@ bool RasterImage::StartDecodingWithResult(uint32_t aFlags,
                    FLAG_HIGH_QUALITY_SCALING;
   DrawableSurface surface =
       RequestDecodeForSizeInternal(mSize, flags, aWhichFrame);
-
-  recordreplay::RecordReplayAssert("RasterImage::StartDecodingWithResult #3 %d %d",
-                                   !!surface,
-                                   surface && surface->IsFinished());
-
   return surface && surface->IsFinished();
 }
 

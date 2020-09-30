@@ -99,10 +99,6 @@ class PrioritizedEventQueue final : public AbstractEventQueue {
     return n;
   }
 
-  size_t NumOperations() {
-    return 0;
-  }
-
  private:
   EventQueuePriority SelectQueue(bool aUpdateState,
                                  const MutexAutoLock& aProofOfLock);

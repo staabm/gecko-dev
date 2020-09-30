@@ -507,26 +507,20 @@ imgRequestProxy::StartDecoding(uint32_t aFlags) {
 }
 
 bool imgRequestProxy::StartDecodingWithResult(uint32_t aFlags) {
-  recordreplay::RecordReplayAssert("imgRequestProxy::StartDecodingWithResult Start");
-
   // Flag this, so we know to request after validation if pending.
   if (IsValidating()) {
-    recordreplay::RecordReplayAssert("imgRequestProxy::StartDecodingWithResult #1");
     mDecodeRequested = true;
     return false;
   }
 
   RefPtr<Image> image = GetImage();
   if (image) {
-    recordreplay::RecordReplayAssert("imgRequestProxy::StartDecodingWithResult #2");
     return image->StartDecodingWithResult(aFlags);
   }
 
   if (GetOwner()) {
     GetOwner()->StartDecoding();
   }
-
-  recordreplay::RecordReplayAssert("imgRequestProxy::StartDecodingWithResult #3");
 
   return false;
 }

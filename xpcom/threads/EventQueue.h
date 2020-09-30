@@ -24,9 +24,8 @@ class EventQueueInternal : public AbstractEventQueue {
  public:
   static const bool SupportsPrioritization = false;
 
-  EventQueueInternal();
+  EventQueueInternal() {}
   explicit EventQueueInternal(EventQueuePriority aPriority);
-  ~EventQueueInternal();
 
   void PutEvent(already_AddRefed<nsIRunnable>&& aEvent,
                 EventQueuePriority aPriority, const MutexAutoLock& aProofOfLock,
@@ -85,10 +84,6 @@ class EventQueueInternal : public AbstractEventQueue {
     return size;
   }
 
-  size_t NumOperations() {
-    return mNumOperations;
-  }
-
  private:
   mozilla::Queue<nsCOMPtr<nsIRunnable>, ItemsPerPage> mQueue;
 #ifdef MOZ_GECKO_PROFILER
@@ -96,7 +91,6 @@ class EventQueueInternal : public AbstractEventQueue {
   mozilla::Queue<mozilla::TimeStamp, ItemsPerPage> mDispatchTimes;
   TimeDuration mLastEventDelay;
 #endif
-  int mNumOperations = 0;
 };
 
 }  // namespace detail

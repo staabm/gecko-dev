@@ -1224,7 +1224,6 @@ void nsSocketTransportService::Reset(bool aGuardLocals) {
 nsresult nsSocketTransportService::DoPollIteration(TimeDuration* pollDuration) {
   SOCKET_LOG(("STS poll iter\n"));
 
-  recordreplay::RecordReplayAssert("nsSocketTransportService::DoPollIteration");
   PRIntervalTime now = PR_IntervalNow();
 
   int32_t i, count;
@@ -1312,7 +1311,6 @@ nsresult nsSocketTransportService::DoPollIteration(TimeDuration* pollDuration) {
 #endif
   }
 
-  recordreplay::RecordReplayAssert("nsSocketTransportService::DoPollIteration #1");
   now = PR_IntervalNow();
 
   if (n < 0) {

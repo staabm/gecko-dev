@@ -5463,9 +5463,6 @@ class nsDisplayWrapList : public nsDisplayHitTestInfoBase {
     nsRect buildingRect;
     mBounds = mListPtr->GetClippedBoundsWithRespectToASR(
         aBuilder, mActiveScrolledRoot, &buildingRect);
-    mozilla::recordreplay::RecordReplayAssert("nsDisplayWrapList::UpdateBounds %d %d %d %d",
-                                              mBounds.x, mBounds.y, mBounds.width, mBounds.height);
-
     // The display list may contain content that's visible outside the visible
     // rect (i.e. the current dirty rect) passed in when the item was created.
     // This happens when the dirty rect has been restricted to the visual
@@ -5598,8 +5595,6 @@ class nsDisplayWrapList : public nsDisplayHitTestInfoBase {
  protected:
   void MergeFromTrackingMergedFrames(const nsDisplayWrapList* aOther) {
     mBounds.UnionRect(mBounds, aOther->mBounds);
-    mozilla::recordreplay::RecordReplayAssert("nsDisplayWrapList::MergeFromTrackingMergedFrames %d %d %d %d",
-                                              mBounds.x, mBounds.y, mBounds.width, mBounds.height);
     nsRect buildingRect;
     buildingRect.UnionRect(GetBuildingRect(), aOther->GetBuildingRect());
     SetBuildingRect(buildingRect);

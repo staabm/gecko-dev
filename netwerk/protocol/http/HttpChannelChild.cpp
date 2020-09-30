@@ -189,8 +189,6 @@ HttpChannelChild::HttpChannelChild()
       mSuspendParentAfterSynthesizeResponse(false) {
   LOG(("Creating HttpChannelChild @%p\n", this));
 
-  recordreplay::RecordReplayAssert("HttpChannelChild::HttpChannelChild");
-
   mChannelCreationTime = PR_Now();
   mChannelCreationTimestamp = TimeStamp::Now();
   mLastStatusReported =
@@ -242,8 +240,6 @@ void HttpChannelChild::ReleaseMainThreadOnlyReferences() {
 NS_IMPL_ADDREF(HttpChannelChild)
 
 NS_IMETHODIMP_(MozExternalRefCountType) HttpChannelChild::Release() {
-  recordreplay::RecordReplayAssert("HttpChannelChild::Release");
-
   if (!NS_IsMainThread()) {
     nsrefcnt count = mRefCnt;
     nsresult rv = NS_DispatchToMainThread(NewNonOwningRunnableMethod(

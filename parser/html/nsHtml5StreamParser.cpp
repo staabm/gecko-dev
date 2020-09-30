@@ -138,9 +138,7 @@ class nsHtml5LoadFlusher : public Runnable {
   explicit nsHtml5LoadFlusher(nsHtml5TreeOpExecutor* aExecutor)
       : Runnable("nsHtml5LoadFlusher"), mExecutor(aExecutor) {}
   NS_IMETHOD Run() override {
-    recordreplay::RecordReplayAssert("nsHtml5LoadFlusher Start");
     mExecutor->FlushSpeculativeLoads();
-    recordreplay::RecordReplayAssert("nsHtml5LoadFlusher End");
     return NS_OK;
   }
 };

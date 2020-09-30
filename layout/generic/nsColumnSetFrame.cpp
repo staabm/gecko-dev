@@ -35,7 +35,6 @@ class nsDisplayColumnRule : public nsPaintedDisplayItem {
    * Returns the frame's visual overflow rect instead of the frame's bounds.
    */
   nsRect GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) const override {
-    recordreplay::RecordReplayAssert("nsDisplayColumnRule::GetBounds");
     *aSnap = false;
     return static_cast<nsColumnSetFrame*>(mFrame)->CalculateColumnRuleBounds(
         ToReferenceFrame());

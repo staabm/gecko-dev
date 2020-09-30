@@ -385,7 +385,6 @@ nsRect nsDisplayTableCellBackground::GetBounds(nsDisplayListBuilder* aBuilder,
                                                bool* aSnap) const {
   // revert from nsDisplayTableItem's implementation ... cell backgrounds
   // don't overflow the cell
-  recordreplay::RecordReplayAssert("nsDisplayTableCellBackground::GetBounds");
   return nsDisplayItem::GetBounds(aBuilder, aSnap);
 }
 

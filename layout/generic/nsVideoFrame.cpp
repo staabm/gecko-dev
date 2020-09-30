@@ -486,7 +486,6 @@ class nsDisplayVideo : public nsPaintedDisplayItem {
 
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
                            bool* aSnap) const override {
-    recordreplay::RecordReplayAssert("nsDisplayVideo::GetBounds");
     *aSnap = true;
     nsIFrame* f = Frame();
     return f->GetContentRectRelativeToSelf() + ToReferenceFrame();

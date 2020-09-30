@@ -249,8 +249,6 @@ PollableEvent::~PollableEvent() {
 bool PollableEvent::Signal() {
   SOCKET_LOG(("PollableEvent::Signal\n"));
 
-  recordreplay::RecordReplayAssert("PollableEvent::Signal");
-
   if (!mWriteFD) {
     SOCKET_LOG(("PollableEvent::Signal Failed on no FD\n"));
     return false;

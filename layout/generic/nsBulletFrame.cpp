@@ -550,7 +550,6 @@ class nsDisplayBullet final : public nsPaintedDisplayItem {
 
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
                            bool* aSnap) const override {
-    recordreplay::RecordReplayAssert("nsDisplayBullet::GetBounds");
     *aSnap = false;
     return mFrame->GetVisualOverflowRectRelativeToSelf() + ToReferenceFrame();
   }

@@ -3023,12 +3023,7 @@ nsBackgroundLayerState nsCSSRendering::PrepareImageLayer(
   }
 
   nsBackgroundLayerState state(aForFrame, &aLayer.mImage, irFlags);
-
-  mozilla::recordreplay::RecordReplayAssert("nsCSSRendering::PrepareImageLayer #4");
-
   if (!state.mImageRenderer.PrepareImage()) {
-    mozilla::recordreplay::RecordReplayAssert("nsCSSRendering::PrepareImageLayer #2");
-
     // There's no image or it's not ready to be painted.
     if (aOutIsTransformedFixed &&
         StyleImageLayerAttachment::Fixed == aLayer.mAttachment) {
@@ -3049,8 +3044,6 @@ nsBackgroundLayerState nsCSSRendering::PrepareImageLayer(
     }
     return state;
   }
-
-  mozilla::recordreplay::RecordReplayAssert("nsCSSRendering::PrepareImageLayer #3");
 
   // The frame to which the background is attached
   nsIFrame* attachedToFrame = aForFrame;
@@ -3158,12 +3151,6 @@ nsBackgroundLayerState nsCSSRendering::PrepareImageLayer(
   state.mImageRenderer.SetExtendMode(repeatMode);
   state.mImageRenderer.SetMaskOp(aLayer.mMaskMode);
 
-  mozilla::recordreplay::RecordReplayAssert("nsCSSRendering::PrepareImageLayer #0 %d %d %d %d",
-                                            state.mFillArea.x, state.mFillArea.y, state.mFillArea.width, state.mFillArea.height);
-
-  mozilla::recordreplay::RecordReplayAssert("nsCSSRendering::PrepareImageLayer #1 %d %d %d %d",
-                                            bgClipRect.x, bgClipRect.y, bgClipRect.width, bgClipRect.height);
-
   state.mFillArea.IntersectRect(state.mFillArea, bgClipRect);
 
   return state;
@@ -3176,16 +3163,8 @@ nsRect nsCSSRendering::GetBackgroundLayerRect(
   Sides skipSides = aForFrame->GetSkipSides();
   nsRect borderArea =
       BoxDecorationRectForBackground(aForFrame, aBorderArea, skipSides);
-
-  mozilla::recordreplay::RecordReplayAssert("nsCSSRendering::GetBackgroundLayerRect #0 %d %d %d %d",
-                                            borderArea.x, borderArea.y, borderArea.width, borderArea.height);
-
   nsBackgroundLayerState state = PrepareImageLayer(
       aPresContext, aForFrame, aFlags, borderArea, aClipRect, aLayer);
-
-  mozilla::recordreplay::RecordReplayAssert("nsCSSRendering::GetBackgroundLayerRect #1 %d %d %d %d",
-                                            state.mFillArea.x, state.mFillArea.y, state.mFillArea.width, state.mFillArea.height);
-
   return state.mFillArea;
 }
 

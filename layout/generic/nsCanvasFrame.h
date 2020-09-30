@@ -148,7 +148,6 @@ class nsDisplayCanvasBackgroundColor final : public nsDisplaySolidColorBase {
   }
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder,
                            bool* aSnap) const override {
-    mozilla::recordreplay::RecordReplayAssert("nsDisplayCanvasBackgroundColor::GetBounds");
     nsCanvasFrame* frame = static_cast<nsCanvasFrame*>(mFrame);
     *aSnap = true;
     return frame->CanvasArea() + ToReferenceFrame();

@@ -199,7 +199,6 @@ ImageWrapper::StartDecoding(uint32_t aFlags, uint32_t aWhichFrame) {
 
 bool ImageWrapper::StartDecodingWithResult(uint32_t aFlags,
                                            uint32_t aWhichFrame) {
-  recordreplay::RecordReplayAssert("ImageWrapper::StartDecodingWithResult");
   return mInnerImage->StartDecodingWithResult(aFlags, aWhichFrame);
 }
 

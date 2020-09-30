@@ -404,9 +404,6 @@ void MessageLoop::PostTask_Helper(already_AddRefed<nsIRunnable> task,
     mozilla::MutexAutoLock locked(incoming_queue_lock_);
     incoming_queue_.push(std::move(pending_task));
     pump = pump_;
-
-    mozilla::recordreplay::RecordReplayAssert("MessageLoop::PostTask_Helper %d",
-                                              incoming_queue_.size());
   }
   // Since the incoming_queue_ may contain a task that destroys this message
   // loop, we cannot exit incoming_queue_lock_ until we are done with |this|.
@@ -473,9 +470,6 @@ void MessageLoop::AddToDelayedWorkQueue(const PendingTask& pending_task) {
 }
 
 void MessageLoop::ReloadWorkQueue() {
-  mozilla::recordreplay::RecordReplayAssert("MessageLoop::ReloadWorkQueue %d",
-                                            work_queue_.size());
-
   // We can improve performance of our loading tasks from incoming_queue_ to
   // work_queue_ by waiting until the last minute (work_queue_ is empty) to
   // load.  That reduces the number of locks-per-task significantly when our
@@ -486,10 +480,6 @@ void MessageLoop::ReloadWorkQueue() {
   // Acquire all we can from the inter-thread queue with one lock acquisition.
   {
     mozilla::MutexAutoLock lock(incoming_queue_lock_);
-
-    mozilla::recordreplay::RecordReplayAssert("MessageLoop::ReloadWorkQueue #1 %d",
-                                              incoming_queue_.size());
-
     if (incoming_queue_.empty()) return;
     std::swap(incoming_queue_, work_queue_);
     DCHECK(incoming_queue_.empty());
@@ -510,22 +500,14 @@ bool MessageLoop::DeletePendingTasks() {
 }
 
 bool MessageLoop::DoWork() {
-  mozilla::recordreplay::RecordReplayAssert("MessageLoop::DoWork START");
-
   if (!nestable_tasks_allowed_) {
     // Task can't be executed right now.
-    mozilla::recordreplay::RecordReplayAssert("MessageLoop::DoWork #1");
     return false;
   }
 
   for (;;) {
-    mozilla::recordreplay::RecordReplayAssert("MessageLoop::DoWork LOOP");
-
     ReloadWorkQueue();
-    if (work_queue_.empty()) {
-      mozilla::recordreplay::RecordReplayAssert("MessageLoop::DoWork NO_WORK");
-      break;
-    }
+    if (work_queue_.empty()) break;
 
     // Execute oldest task.
     do {
@@ -538,17 +520,10 @@ bool MessageLoop::DoWork() {
         if (delayed_work_queue_.top().task == pending_task.task)
           pump_->ScheduleDelayedWork(pending_task.delayed_run_time);
       } else {
-        mozilla::recordreplay::RecordReplayAssert("MessageLoop::DoWork #2");
-        if (DeferOrRunPendingTask(std::move(pending_task))) {
-          mozilla::recordreplay::RecordReplayAssert("MessageLoop::DoWork #3");
-          return true;
-        }
-        mozilla::recordreplay::RecordReplayAssert("MessageLoop::DoWork #4");
+        if (DeferOrRunPendingTask(std::move(pending_task))) return true;
       }
     } while (!work_queue_.empty());
   }
-
-  mozilla::recordreplay::RecordReplayAssert("MessageLoop::DoWork END");
 
   // Nothing happened.
   return false;

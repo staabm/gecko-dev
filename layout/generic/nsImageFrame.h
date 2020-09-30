@@ -465,7 +465,6 @@ class nsDisplayImage final : public nsDisplayImageContainer {
   LayerState GetLayerState(nsDisplayListBuilder*, LayerManager*,
                            const ContainerLayerParameters&) final;
   nsRect GetBounds(bool* aSnap) const {
-    mozilla::recordreplay::RecordReplayAssert("nsDisplayImage::GetBounds");
     *aSnap = true;
 
     nsImageFrame* imageFrame = static_cast<nsImageFrame*>(mFrame);

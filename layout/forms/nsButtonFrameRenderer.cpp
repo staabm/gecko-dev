@@ -86,7 +86,6 @@ class nsDisplayButtonBoxShadowOuter : public nsPaintedDisplayItem {
 
 nsRect nsDisplayButtonBoxShadowOuter::GetBounds(nsDisplayListBuilder* aBuilder,
                                                 bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayButtonBoxShadowOuter::GetBounds");
   *aSnap = false;
   return mFrame->GetVisualOverflowRectRelativeToSelf() + ToReferenceFrame();
 }
@@ -283,7 +282,6 @@ void nsDisplayButtonBorder::Paint(nsDisplayListBuilder* aBuilder,
 
 nsRect nsDisplayButtonBorder::GetBounds(nsDisplayListBuilder* aBuilder,
                                         bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayButtonBorder::GetBounds");
   *aSnap = false;
   return aBuilder->IsForEventDelivery()
              ? nsRect(ToReferenceFrame(), mFrame->GetSize())

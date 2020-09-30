@@ -302,8 +302,6 @@ bool ClientTiledPaintedLayer::UseProgressiveDraw() {
 bool ClientTiledPaintedLayer::RenderHighPrecision(
     const nsIntRegion& aInvalidRegion, const nsIntRegion& aVisibleRegion,
     LayerManager::DrawPaintedLayerCallback aCallback, void* aCallbackData) {
-  recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderHighPrecision");
-
   // If we have started drawing low-precision already, then we
   // shouldn't do anything there.
   if (mPaintData.mLowPrecisionPaintCount != 0) {
@@ -445,9 +443,6 @@ void ClientTiledPaintedLayer::EndPaint() {
 }
 
 void ClientTiledPaintedLayer::RenderLayer() {
-  recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer Start %d",
-                                   recordreplay::ThingIndex(this));
-
   if (!ClientManager()->IsRepeatTransaction()) {
     // Only paint the mask layers on the first transaction.
     RenderMaskLayers(this);
@@ -523,32 +518,14 @@ void ClientTiledPaintedLayer::RenderLayer() {
   }
 #endif
 
-  {
-    for (nsIntRegion::RectIterator idx(neededRegion); !idx.Done(); idx.Next()) {
-      auto bounds = idx.Get();
-      recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer #1 %d %d %d %d",
-                                       bounds.x, bounds.y, bounds.width, bounds.height);
-    }
-  }
-
-  {
-    for (nsIntRegion::RectIterator idx(GetValidRegion()); !idx.Done(); idx.Next()) {
-      auto bounds = idx.Get();
-      recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer #1.1 %d %d %d %d",
-                                       bounds.x, bounds.y, bounds.width, bounds.height);
-    }
-  }
-
   nsIntRegion invalidRegion;
   invalidRegion.Sub(neededRegion, GetValidRegion());
   if (invalidRegion.IsEmpty()) {
-    recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer #2");
     EndPaint();
     return;
   }
 
   if (!callback) {
-    recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer #3");
     ClientManager()->SetTransactionIncomplete();
     return;
   }
@@ -558,7 +535,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
     // can do the paint.
     BeginPaint();
     if (mPaintData.mPaintFinished) {
-      recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer #4");
       return;
     }
 
@@ -598,8 +574,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
   TILING_LOG("TILING %p: Low-precision invalid region %s\n", this,
              Stringify(lowPrecisionInvalidRegion).c_str());
 
-  recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer #4.1");
-
   bool updatedHighPrecision =
       RenderHighPrecision(invalidRegion, neededRegion, callback, data);
   if (updatedHighPrecision) {
@@ -610,14 +584,12 @@ void ClientTiledPaintedLayer::RenderLayer() {
       // There is still more high-res stuff to paint, so we're not
       // done yet. A subsequent transaction will take care of this.
       ClientManager()->SetRepeatTransaction();
-      recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer #5");
       return;
     }
   }
 
   // If there is nothing to draw in low-precision, then we're done.
   if (lowPrecisionInvalidRegion.IsEmpty()) {
-    recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer #6");
     EndPaint();
     return;
   }
@@ -627,7 +599,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
     // updates, then mark the paint as unfinished and request a repeat
     // transaction. This is so that we don't perform low-precision updates in
     // the same transaction as high-precision updates.
-    recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer #7");
     TILING_LOG(
         "TILING %p: Scheduling repeat transaction for low-precision painting\n",
         this);
@@ -647,7 +618,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
     if (!mPaintData.mPaintFinished) {
       // There is still more low-res stuff to paint, so we're not
       // done yet. A subsequent transaction will take care of this.
-      recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer #8");
       ClientManager()->SetRepeatTransaction();
       return;
     }
@@ -656,8 +626,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
   // If we get here, we've done all the high- and low-precision
   // paints we wanted to do, so we can finish the paint and chill.
   EndPaint();
-
-  recordreplay::RecordReplayAssert("ClientTiledPaintedLayer::RenderLayer Done");
 }
 
 bool ClientTiledPaintedLayer::IsOptimizedFor(

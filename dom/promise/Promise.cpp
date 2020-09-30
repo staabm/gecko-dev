@@ -548,7 +548,6 @@ void Promise::ReportRejectedPromise(JSContext* aCx, JS::HandleObject aPromise) {
 
   // Now post an event to do the real reporting async
   RefPtr<nsIRunnable> event = new AsyncErrorReporter(xpcReport);
-  recordreplay::RecordReplayAssert("Promise::ReportRejectedPromise Dispatch");
   if (win) {
     win->Dispatch(mozilla::TaskCategory::Other, event.forget());
   } else {

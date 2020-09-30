@@ -930,15 +930,6 @@ class Layer {
    * of its visible region, it needs to ensure that what it draws is valid.
    */
   virtual void SetVisibleRegion(const LayerIntRegion& aRegion) {
-    {
-      for (auto idx = aRegion.RectIter(); !idx.Done(); idx.Next()) {
-        auto bounds = idx.Get();
-        recordreplay::RecordReplayAssert("Layer::SetVisibleRegion %d Bounds %d %d %d %d",
-                                         recordreplay::ThingIndex(this),
-                                         bounds.x, bounds.y, bounds.width, bounds.height);
-      }
-    }
-
     // IsEmpty is required otherwise we get invalidation glitches.
     // See bug 1288464 for investigating why.
     if (!mVisibleRegion.IsEqual(aRegion) || aRegion.IsEmpty()) {

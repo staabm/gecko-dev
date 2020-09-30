@@ -2684,14 +2684,9 @@ nsRect nsDisplayList::GetClippedBoundsWithRespectToASR(
   nsRect bounds;
   for (nsDisplayItem* i : *this) {
     nsRect r = i->GetClippedBounds(aBuilder);
-    mozilla::recordreplay::RecordReplayAssert("nsDisplayList::GetClippedBoundsWithRespectToASR %d %d %d %d",
-                                              r.x, r.y, r.width, r.height);
-
     if (aASR != i->GetActiveScrolledRoot() && !r.IsEmpty()) {
       if (Maybe<nsRect> clip = i->GetClipWithRespectToASR(aBuilder, aASR)) {
         r = clip.ref();
-        mozilla::recordreplay::RecordReplayAssert("nsDisplayList::GetClippedBoundsWithRespectToASR #1 %d %d %d %d",
-                                                  r.x, r.y, r.width, r.height);
       }
     }
     if (aBuildingRect) {
@@ -3640,10 +3635,7 @@ void nsDisplayItem::IntersectClip(nsDisplayListBuilder* aBuilder,
 
 nsRect nsDisplayItem::GetClippedBounds(nsDisplayListBuilder* aBuilder) const {
   bool snap;
-  mozilla::recordreplay::RecordReplayAssert("nsDisplayItem::GetClippedBounds PRE");
   nsRect r = GetBounds(aBuilder, &snap);
-  mozilla::recordreplay::RecordReplayAssert("nsDisplayItem::GetClippedBounds %d %d %d %d",
-                                            r.x, r.y, r.width, r.height);
   return GetClip().ApplyNonRoundedIntersection(r);
 }
 
@@ -3702,7 +3694,6 @@ bool nsDisplayContainer::ComputeVisibility(nsDisplayListBuilder* aBuilder,
 
 nsRect nsDisplayContainer::GetBounds(nsDisplayListBuilder* aBuilder,
                                      bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayContainer::GetBounds");
   *aSnap = false;
   return mBounds;
 }
@@ -3759,7 +3750,6 @@ void nsDisplayContainer::UpdateBounds(nsDisplayListBuilder* aBuilder) {
 
 nsRect nsDisplaySolidColor::GetBounds(nsDisplayListBuilder* aBuilder,
                                       bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplaySolidColor::GetBounds");
   *aSnap = true;
   return mBounds;
 }
@@ -3851,7 +3841,6 @@ bool nsDisplaySolidColor::CreateWebRenderCommands(
 
 nsRect nsDisplaySolidColorRegion::GetBounds(nsDisplayListBuilder* aBuilder,
                                             bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplaySolidColorRegion::GetBounds");
   *aSnap = true;
   return mRegion.GetBounds();
 }
@@ -3981,10 +3970,6 @@ nsDisplayBackgroundImage::nsDisplayBackgroundImage(
       !(mBackgroundStyle && mBackgroundStyle != mFrame->Style());
 
   mBounds = GetBoundsInternal(aInitData.builder, aFrameForBounds);
-
-  mozilla::recordreplay::RecordReplayAssert("nsDisplayBackgroundImage::nsDisplayBackgroundImage %d %d %d %d",
-                                            mBounds.x, mBounds.y, mBounds.width, mBounds.height);
-
   if (mShouldFixToViewport) {
     mAnimatedGeometryRoot =
         aInitData.builder->FindAnimatedGeometryRootFor(this);
@@ -4802,7 +4787,6 @@ void nsDisplayBackgroundImage::ComputeInvalidationRegion(
 
 nsRect nsDisplayBackgroundImage::GetBounds(nsDisplayListBuilder* aBuilder,
                                            bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayBackgroundImage::GetBounds");
   *aSnap = true;
   return mBounds;
 }
@@ -4826,13 +4810,6 @@ nsRect nsDisplayBackgroundImage::GetBoundsInternal(
   }
   const nsStyleImageLayers::Layer& layer =
       mBackgroundStyle->StyleBackground()->mImage.mLayers[mLayer];
-
-  mozilla::recordreplay::RecordReplayAssert("nsDisplayBackgroundImage::GetBoundsInternal %d %d %d %d",
-                                            mBackgroundRect.x, mBackgroundRect.y, mBackgroundRect.width, mBackgroundRect.height);
-
-  mozilla::recordreplay::RecordReplayAssert("nsDisplayBackgroundImage::GetBoundsInternal #1 %d %d %d %d",
-                                            clipRect.x, clipRect.y, clipRect.width, clipRect.height);
-
   return nsCSSRendering::GetBackgroundLayerRect(
       presContext, frame, mBackgroundRect, clipRect, layer,
       aBuilder->GetBackgroundPaintFlags());
@@ -4993,7 +4970,6 @@ void nsDisplayThemedBackground::ComputeInvalidationRegion(
 
 nsRect nsDisplayThemedBackground::GetBounds(nsDisplayListBuilder* aBuilder,
                                             bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayThemedBackground::GetBounds");
   *aSnap = true;
   return mBounds;
 }
@@ -5408,7 +5384,6 @@ bool nsDisplayClearBackground::CreateWebRenderCommands(
 
 nsRect nsDisplayOutline::GetBounds(nsDisplayListBuilder* aBuilder,
                                    bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayOutline::GetBounds");
   *aSnap = false;
   return mFrame->GetVisualOverflowRectRelativeToSelf() + ToReferenceFrame();
 }
@@ -5606,7 +5581,6 @@ nsDisplayCaret::~nsDisplayCaret() { MOZ_COUNT_DTOR(nsDisplayCaret); }
 
 nsRect nsDisplayCaret::GetBounds(nsDisplayListBuilder* aBuilder,
                                  bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayCaret::GetBounds");
   *aSnap = true;
   // The caret returns a rect in the coordinates of mFrame.
   return mBounds;
@@ -5749,7 +5723,6 @@ void nsDisplayBorder::Paint(nsDisplayListBuilder* aBuilder, gfxContext* aCtx) {
 
 nsRect nsDisplayBorder::GetBounds(nsDisplayListBuilder* aBuilder,
                                   bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayBorder::GetBounds");
   *aSnap = true;
   return mBounds;
 }
@@ -5803,7 +5776,6 @@ void nsDisplayBoxShadowOuter::Paint(nsDisplayListBuilder* aBuilder,
 
 nsRect nsDisplayBoxShadowOuter::GetBounds(nsDisplayListBuilder* aBuilder,
                                           bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayBoxShadowOuter::GetBounds");
   *aSnap = false;
   return mBounds;
 }
@@ -6221,7 +6193,6 @@ void nsDisplayWrapList::HitTest(nsDisplayListBuilder* aBuilder,
 
 nsRect nsDisplayWrapList::GetBounds(nsDisplayListBuilder* aBuilder,
                                     bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayWrapList::GetBounds");
   *aSnap = false;
   return mBounds;
 }
@@ -7301,7 +7272,6 @@ static bool UseDisplayPortForViewport(nsDisplayListBuilder* aBuilder,
 
 nsRect nsDisplaySubDocument::GetBounds(nsDisplayListBuilder* aBuilder,
                                        bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplaySubDocument::GetBounds");
   bool usingDisplayPort = UseDisplayPortForViewport(aBuilder, mFrame);
 
   if ((mFlags & nsDisplayOwnLayerFlags::GenerateScrollableLayer) &&
@@ -7950,7 +7920,6 @@ nsDisplayZoom::nsDisplayZoom(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
 
 nsRect nsDisplayZoom::GetBounds(nsDisplayListBuilder* aBuilder,
                                 bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayZoom::GetBounds");
   nsRect bounds = nsDisplaySubDocument::GetBounds(aBuilder, aSnap);
   *aSnap = false;
   return bounds.ScaleToOtherAppUnitsRoundOut(mAPD, mParentAPD);
@@ -8950,7 +8919,6 @@ nsRect nsDisplayTransform::TransformUntransformedBounds(
  */
 nsRect nsDisplayTransform::GetBounds(nsDisplayListBuilder* aBuilder,
                                      bool* aSnap) const {
-  recordreplay::RecordReplayAssert("nsDisplayTransform::GetBounds");
   *aSnap = false;
   return mBounds;
 }
