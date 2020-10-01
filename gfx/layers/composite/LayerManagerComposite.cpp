@@ -578,7 +578,9 @@ void LayerManagerComposite::EndTransaction(const TimeStamp& aTimeStamp,
 }
 
 void LayerManagerComposite::UpdateAndRender() {
-  if (gfxEnv::SkipComposition()) {
+  // Avoid accessing environment when recording/replaying, as this code does
+  // not consistently run.
+  if (!recordreplay::IsRecordingOrReplaying() && gfxEnv::SkipComposition()) {
     mInvalidRegion.SetEmpty();
     return;
   }

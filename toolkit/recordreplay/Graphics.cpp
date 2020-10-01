@@ -22,9 +22,11 @@ using namespace mozilla::layers;
 
 namespace mozilla::recordreplay {
 
+static bool (*gShouldPaint)();
 static void (*gOnPaint)(const char* aMimeType, const char* aData);
 
 void InitializeGraphics() {
+  LoadSymbol("RecordReplayShouldPaint", gShouldPaint);
   LoadSymbol("RecordReplayOnPaint", gOnPaint);
 }
 
@@ -60,12 +62,24 @@ static void ReportPaint();
 void SendUpdate(const TransactionInfo& aInfo) {
   EnsureInitialized();
 
+  // We never need to update the compositor state in the recording process,
+  // because we send updates to the UI process which will composite in the
+  // regular way.
+  if (IsRecording()) {
+    return;
+  }
+
+  // Make sure the compositor does not interact with the recording.
+  recordreplay::AutoDisallowThreadEvents disallow;
+
+  // Even if we won't be painting, we need to continue updating the layer state
+  // in case we end up wanting to paint later.
   ipc::IPCResult rv = gLayerTransactionParent->RecvUpdate(aInfo);
   MOZ_RELEASE_ASSERT(rv == ipc::IPCResult::Ok());
 
-  gCompositorBridge->CompositeToTarget(VsyncId(), nullptr, nullptr);
-
-  if (IsReplaying()) {
+  // Only composite if the driver wants to know about the painted data.
+  if (gShouldPaint()) {
+    gCompositorBridge->CompositeToTarget(VsyncId(), nullptr, nullptr);
     ReportPaint();
   }
 }

@@ -183,12 +183,9 @@ Layer::Layer(LayerManager* aManager, void* aImplData)
       mDebugColorIndex(0)
 #endif
 {
-  recordreplay::RegisterThing(this);
 }
 
-Layer::~Layer() {
-  recordreplay::UnregisterThing(this);
-}
+Layer::~Layer() = default;
 
 void Layer::SetCompositorAnimations(
     const CompositorAnimations& aCompositorAnimations) {
