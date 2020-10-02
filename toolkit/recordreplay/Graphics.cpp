@@ -216,7 +216,10 @@ static void EncodeGraphics(const char* aMimeType,
 }
 
 static void ReportPaint() {
-  EncodeGraphics("image/png", "");
+  // For now we only supply JPEG graphics, which is all that the devtools
+  // client uses. This API needs to be redesigned to decouple these things
+  // and allow the driver to fetch whatever graphics it wants...
+  //EncodeGraphics("image/png", "");
   EncodeGraphics("image/jpeg", "quality=50");
 }
 
