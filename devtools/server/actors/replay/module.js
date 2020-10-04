@@ -211,24 +211,26 @@ gDebugger.onNewScript = (script) => {
 
   gSourceRoots.add(script.source, script);
 
-  if (!gSources.getId(script.source)) {
-    if (
-      script.source.sourceMapURL &&
-      Services.prefs.getBoolPref("devtools.recordreplay.uploadSourceMaps")
-    ) {
-      const recordingId = RecordReplayControl.recordingId();
-      const { url, sourceMapURL } = script.source;
-      Services.cpmm.sendAsyncMessage(
-        "RecordReplayGeneratedSourceWithSourceMap",
-        { recordingId, url, sourceMapURL }
-      );
-    }
-
-    gGeckoSources.set(script.source.id, script.source);
+  if (gSources.getId(script.source)) {
+    return;
   }
 
   gSources.add(script.source);
   const id = sourceToProtocolScriptId(script.source);
+
+  gGeckoSources.set(script.source.id, script.source);
+
+  if (
+    script.source.sourceMapURL &&
+    Services.prefs.getBoolPref("devtools.recordreplay.uploadSourceMaps")
+  ) {
+    const recordingId = RecordReplayControl.recordingId();
+    const { url, sourceMapURL } = script.source;
+    Services.cpmm.sendAsyncMessage(
+      "RecordReplayGeneratedSourceWithSourceMap",
+      { recordingId, url, sourceMapURL }
+    );
+  }
 
   let kind = "scriptSource";
 
