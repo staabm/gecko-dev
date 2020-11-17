@@ -1432,46 +1432,6 @@ function getLoggedInUser() {
   return user == "" ? null : user;
 }
 
-function saveRecordingInDB(description) {
-  let user;
-
-  if (isRunningTest()) {
-    user = {id: "77c6dc81-280d-4f28-971b-9915ab00f0f7"}
-  } else {
-    user = getLoggedInUser();
-  }
-
-  if (!user) {
-    return;
-  }
-
-  const pageUrl = Services.prefs.getStringPref(
-    "devtools.recordreplay.saveRecordingsUrl"
-  );
-
-  const body = {
-    user_id: user.id,
-    recording_id: description.recordingId,
-    id: description.recordingId,
-    url: description.url,
-    title: description.title,
-    duration: description.duration,
-    last_screen_data: description.lastScreenData || "",
-    last_screen_mime_type: description.lastScreenMimeType || "image/jpeg",
-  };
-
-  console.log(`>>> saving recording`, description.recordingId);
-  return fetch(`${pageUrl}/api/create-recording`, {
-    method: "post",
-    body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" },
-  })
-    .then(async (r) =>
-      console.log(`succeeded in creating recording`, await r.json())
-    )
-    .catch((err) => console.error(err));
-}
-
 async function saveRecordingUser(user) {
   if (!user) {
     // TODO maybe change this pref name
@@ -1876,9 +1836,6 @@ async function reloadAndStopRecordingTab(gBrowser) {
   }
 
   recordReplayLog(`FinishedRecording ${recordingId}`);
-  if (isAuthenticationEnabled()) {
-    await saveRecordingInDB(data);
-  }
 
   let viewHost = "https://replay.io";
 
