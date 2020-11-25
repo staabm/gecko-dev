@@ -133,6 +133,7 @@ const gRecordings = new Map();
 let gNextMessageId = 1;
 
 function sendCommand(method, params = {}) {
+  params["authId"] = getLoggedInUserAuthId();
   const id = gNextMessageId++;
   gWorker.postMessage({
     kind: "sendCommand",
