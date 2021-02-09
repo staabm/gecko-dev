@@ -3355,7 +3355,9 @@ UpdateService.prototype = {
     }
 
     const env = Cc["@mozilla.org/process/environment;1"].getService(Ci.nsIEnvironment);
-    if (env.get("RECORD_REPLAY_NO_UPDATE") || env.get("RECORD_REPLAY_OFFLINE")) {
+
+    // Playwright builds have automatic updates permanently disabled.
+    if (true) {
       cleanupActiveUpdate();
       return STATE_NONE;
     }
