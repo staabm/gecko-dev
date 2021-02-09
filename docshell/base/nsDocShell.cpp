@@ -3232,7 +3232,7 @@ nsDocShell::GetForceActiveState(bool* aEnabled) {
 NS_IMETHODIMP
 nsDocShell::SetForceActiveState(bool aEnabled) {
   mForceActiveState = aEnabled;
-  ActivenessMaybeChanged();
+  //ActivenessMaybeChanged();
   return NS_OK;
 }
 

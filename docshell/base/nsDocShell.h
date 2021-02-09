@@ -96,6 +96,7 @@ class nsDocShellEditorData;
 class nsDOMNavigationTiming;
 class nsDSURIContentListener;
 class nsGlobalWindowInner;
+class nsGeolocationService;
 class nsGlobalWindowOuter;
 
 class FramingChecker;
