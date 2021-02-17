@@ -191,9 +191,8 @@ static nsPIDOMWindowInner* ConvertWeakReferenceToWindow(
 nsGeolocationRequest::nsGeolocationRequest(
     Geolocation* aLocator, GeoPositionCallback aCallback,
     GeoPositionErrorCallback aErrorCallback,
-    UniquePtr<PositionOptions>&& aOptions,
-    nsIEventTarget* aMainThreadTarget, bool aWatchPositionRequest,
-    int32_t aWatchId)
+    UniquePtr<PositionOptions>&& aOptions, nsIEventTarget* aMainThreadTarget,
+    bool aWatchPositionRequest, int32_t aWatchId)
     : ContentPermissionRequestBase(
           aLocator->GetPrincipal(),
           ConvertWeakReferenceToWindow(aLocator->GetOwner()), "geo"_ns,
@@ -612,8 +611,7 @@ nsresult nsGeolocationService::StartDevice(nsIPrincipal* aPrincipal) {
 
   if (XRE_IsContentProcess()) {
     ContentChild* cpc = ContentChild::GetSingleton();
-    cpc->SendAddGeolocationListener(IPC::Principal(aPrincipal),
-                                    HighAccuracyRequested());
+    cpc->SendAddGeolocationListener(HighAccuracyRequested());
     return NS_OK;
   }
 
