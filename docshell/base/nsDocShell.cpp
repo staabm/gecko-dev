@@ -3305,7 +3305,7 @@ nsDocShell::GetForceActiveState(bool* aEnabled) {
 NS_IMETHODIMP
 nsDocShell::SetForceActiveState(bool aEnabled) {
   mForceActiveState = aEnabled;
-  //ActivenessMaybeChanged();
+  ActivenessMaybeChanged();
   return NS_OK;
 }
 
@@ -5079,7 +5079,7 @@ nsDocShell::GetIsOffScreenBrowser(bool* aIsOffScreen) {
 }
 
 void nsDocShell::ActivenessMaybeChanged() {
-  bool isActive = mBrowsingContext->IsActive();
+  bool isActive = mForceActiveState || mBrowsingContext->IsActive();
   if (RefPtr<PresShell> presShell = GetPresShell()) {
     presShell->SetIsActive(isActive);
   }

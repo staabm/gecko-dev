@@ -14,6 +14,7 @@
 #include "mozilla/UniquePtr.h"
 #include "mozilla/WeakPtr.h"
 #include "mozilla/dom/BrowsingContext.h"
+#include "mozilla/dom/Element.h"
 #include "mozilla/dom/WindowProxyHolder.h"
 #include "nsCOMPtr.h"
 #include "nsCharsetSource.h"
@@ -75,13 +76,7 @@ class nsCommandManager;
 class nsDocShellEditorData;
 class nsDOMNavigationTiming;
 class nsDSURIContentListener;
-<<<<<<< HEAD
-class nsGlobalWindowInner;
 class nsGeolocationService;
-||||||| 5be2b27ed194
-class nsGlobalWindowInner;
-=======
->>>>>>> webreplay-release
 class nsGlobalWindowOuter;
 
 class FramingChecker;
