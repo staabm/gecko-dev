@@ -40,6 +40,10 @@ const { require } = ChromeUtils.import("resource://devtools/shared/Loader.jsm");
 const { getCurrentZoom } = require("devtools/shared/layout/utils");
 const { getDebuggerSourceURL } = require("devtools/server/actors/utils/source-url");
 
+const {
+  initialize: initReactDevtools,
+} = require("devtools/server/actors/replay/react-devtools/contentScript");
+
 let gWindow;
 function getWindow() {
   if (!gWindow) {
@@ -195,7 +199,13 @@ class ArrayMap {
 
 const gSourceMapData = new WeakMap();
 
-function setSourceMap(window, object, objectURL, objectText, url) {
+function setSourceMap({
+  window,
+  object,
+  objectURL,
+  objectText,
+  objectMapURL: url
+}) {
   if (!Services.prefs.getBoolPref("devtools.recordreplay.uploadSourceMaps")) {
     return;
   }
@@ -314,27 +324,7 @@ gDebugger.onNewScript = (script) => {
 
   gSourceRoots.add(script.source, script);
 
-  if (gSources.getId(script.source)) {
-    return;
-  }
-
-  gSources.add(script.source);
-  const id = sourceToProtocolSourceId(script.source);
-
-  gGeckoSources.set(script.source.id, script.source);
-
-  const sourceURL = getDebuggerSourceURL(script.source);
-
-  if (script.source.text !== "[wasm]") {
-    setSourceMap(getWindow(), script.source, sourceURL, script.source.text, script.source.sourceMapURL);
-  }
-
-  let kind = "scriptSource";
-  if (script.source.introductionType === "inlineScript") {
-    kind = "inlineScript";
-  }
-
-  RecordReplayControl.onNewSource(id, kind, sourceURL);
+  registerSource(script.source);
 
   function addScript(script) {
     const id = gScripts.add(script);
@@ -347,6 +337,42 @@ gDebugger.onNewScript = (script) => {
     script.getChildScripts().forEach(ignoreScript);
   }
 };
+
+function registerSource(source) {
+  if (gSources.getId(source)) {
+    return;
+  }
+  gSources.add(source);
+
+  const id = sourceToProtocolSourceId(source);
+
+  gGeckoSources.set(source.id, source);
+
+  const window = getWindow();
+  let sourceURL = getDebuggerSourceURL(source);
+  if (!sourceURL && source.displayURL) {
+    try {
+      sourceURL = new URL(source.displayURL, window?.location?.href).toString();
+    } catch {}
+  }
+
+  if (source.text !== "[wasm]") {
+    setSourceMap({
+      window,
+      object: source,
+      objectURL: sourceURL,
+      objectText: source.text,
+      objectMapURL: source.sourceMapURL,
+    });
+  }
+
+  let kind = "scriptSource";
+  if (source.introductionType === "inlineScript") {
+    kind = "inlineScript";
+  }
+
+  RecordReplayControl.onNewSource(id, kind, sourceURL);
+}
 
 const gHtmlContent = new Map();
 
@@ -388,10 +414,25 @@ getWindow().docShell.chromeEventHandler.addEventListener(
 getWindow().docShell.chromeEventHandler.addEventListener(
   "StyleSheetApplicableStateChanged",
   ({ stylesheet }) => {
-    setSourceMap(getStylesheetWindow(stylesheet), stylesheet, stylesheet.href, undefined, stylesheet.sourceMapURL);
+    setSourceMap({
+      window: getStylesheetWindow(stylesheet),
+      object: stylesheet,
+      objectURL: stylesheet.href,
+      objectText: undefined,
+      objectMapURL: stylesheet.sourceMapURL,
+    });
   },
   true
 );
+
+let gReactDevtoolsInitialized = false;
+
+gNewGlobalHooks.push(dbgWindow => {
+  if (!gReactDevtoolsInitialized) {
+    gReactDevtoolsInitialized = true;
+    initReactDevtools(dbgWindow, RecordReplayControl);
+  }
+});
 
 // This logic is mostly copied from actors/style-sheet.js
 function getStylesheetWindow(stylesheet) {
@@ -1133,7 +1174,6 @@ function createProtocolObject(objectId, level) {
   }
 
   const className = obj.class;
-  RecordReplayControl.annotate(`CreateProtocolObject ${objectId} ${className} ${level}`);
   let preview;
   if (level != "none") {
     preview = new ProtocolObjectPreview(obj, level).fill();
@@ -1252,11 +1292,9 @@ ProtocolObjectPreview.prototype = {
       return;
     }
     try {
-      RecordReplayControl.annotate(`PreviewCallGetter ${name} ${this.numItems}`);
       const value = createProtocolValueRaw(this.raw[name]);
       this.getterValues.set(name, { name, ...value });
     } catch (e) {
-      RecordReplayControl.annotate(`PreviewCallGetter Exception ${e}`);
       this.numItems--;
     }
   },
@@ -1301,9 +1339,7 @@ ProtocolObjectPreview.prototype = {
 
     if (this.level != "noProperties") {
       // Add "own" properties of the object.
-      RecordReplayControl.annotate(`PreviewStartGetNames`);
       const names = propertyNames(this.obj);
-      RecordReplayControl.annotate(`PreviewGetNames ${names.length}`);
       for (const name of names) {
         try {
           const desc = this.obj.getOwnPropertyDescriptor(name);
@@ -1378,8 +1414,6 @@ ProtocolObjectPreview.prototype = {
 
 function previewMap() {
   const entries = Cu.waiveXrays(Map.prototype.entries.call(this.raw));
-  RecordReplayControl.annotate(`PreviewMapEntries ${entries}.length`);
-
   for (const [k, v] of entries) {
     this.addContainerEntryRaw(v, k, true);
     if (this.overflow) {
@@ -1392,8 +1426,6 @@ function previewMap() {
 
 function previewWeakMap() {
   const keys = ChromeUtils.nondeterministicGetWeakMapKeys(this.raw);
-  RecordReplayControl.annotate(`PreviewWeakMapEntries ${keys}.length`);
-
   this.extra.containerEntryCount = keys.length;
 
   for (const k of keys) {
@@ -1407,8 +1439,6 @@ function previewWeakMap() {
 
 function previewSet() {
   const values = Cu.waiveXrays(Set.prototype.values.call(this.raw));
-  RecordReplayControl.annotate(`PreviewSetEntries ${values}.length`);
-
   for (const v of values) {
     this.addContainerEntryRaw(v);
     if (this.overflow) {
@@ -1421,8 +1451,6 @@ function previewSet() {
 
 function previewWeakSet() {
   const keys = ChromeUtils.nondeterministicGetWeakSetKeys(this.raw);
-  RecordReplayControl.annotate(`PreviewWeakSetEntries ${keys}.length`);
-
   this.extra.containerEntryCount = keys.length;
 
   for (const k of keys) {

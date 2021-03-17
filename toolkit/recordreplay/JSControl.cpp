@@ -40,9 +40,9 @@ static void (*gOnExceptionUnwind)();
 static void (*gOnDebuggerStatement)();
 static void (*gOnEvent)(const char* aEvent, bool aBefore);
 static void (*gOnConsoleMessage)(int aTimeWarpTarget);
+static void (*gOnAnnotation)(const char* aKind, const char* aContents);
 static size_t (*gNewTimeWarpTarget)();
 static size_t (*gElapsedTimeMs)();
-static void (*gAddAnnotation)(const char* aText);
 static char* (*gGetUnusableRecordingReason)();
 
 // Callback used when the recording driver is sending us a command to look up
@@ -68,9 +68,9 @@ void InitializeJS() {
   LoadSymbol("RecordReplayOnDebuggerStatement", gOnDebuggerStatement);
   LoadSymbol("RecordReplayOnEvent", gOnEvent);
   LoadSymbol("RecordReplayOnConsoleMessage", gOnConsoleMessage);
+  LoadSymbol("RecordReplayOnAnnotation", gOnAnnotation);
   LoadSymbol("RecordReplayNewBookmark", gNewTimeWarpTarget);
   LoadSymbol("RecordReplayElapsedTimeMs", gElapsedTimeMs);
-  LoadSymbol("RecordReplayAddAnnotation", gAddAnnotation);
   LoadSymbol("RecordReplayGetUnusableRecordingReason", gGetUnusableRecordingReason);
 
   gSetDefaultCommandCallback(CommandCallback);
@@ -151,7 +151,10 @@ MOZ_EXPORT bool RecordReplayInterface_ShouldUpdateProgressCounter(
     const char* aURL) {
   // Progress counters are only updated for scripts which are exposed to the
   // debugger.
-  return aURL && strncmp(aURL, "resource:", 9) && strncmp(aURL, "chrome:", 7);
+  return aURL
+      && strncmp(aURL, "resource:", 9)
+      && strncmp(aURL, "chrome:", 7)
+      && strcmp(aURL, "debugger eval code");
 }
 
 }  // extern "C"
@@ -333,25 +336,6 @@ static bool Method_Log(JSContext* aCx, unsigned aArgc, Value* aVp) {
   }
 
   PrintLog("%s", cstr.get());
-
-  args.rval().setUndefined();
-  return true;
-}
-
-static bool Method_Annotate(JSContext* aCx, unsigned aArgc, Value* aVp) {
-  CallArgs args = CallArgsFromVp(aArgc, aVp);
-
-  RootedString str(aCx, ToString(aCx, args.get(0)));
-  if (!str) {
-    return false;
-  }
-
-  JS::UniqueChars cstr = JS_EncodeStringToLatin1(aCx, str);
-  if (!cstr) {
-    return false;
-  }
-
-  gAddAnnotation(cstr.get());
 
   args.rval().setUndefined();
   return true;
@@ -594,9 +578,26 @@ static bool Method_OnConsoleMessage(JSContext* aCx, unsigned aArgc, Value* aVp) 
   return true;
 }
 
+static bool Method_OnAnnotation(JSContext* aCx, unsigned aArgc, Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  if (!args.get(0).isString() || !args.get(1).isString()) {
+    JS_ReportErrorASCII(aCx, "Bad parameters");
+    return false;
+  }
+
+  nsAutoCString kind, contents;
+  ConvertJSStringToCString(aCx, args.get(0).toString(), kind);
+  ConvertJSStringToCString(aCx, args.get(1).toString(), contents);
+
+  gOnAnnotation(kind.get(), contents.get());
+
+  args.rval().setUndefined();
+  return true;
+}
+
 static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("log", Method_Log, 1, 0),
-  JS_FN("annotate", Method_Annotate, 1, 0),
   JS_FN("onNewSource", Method_OnNewSource, 3, 0),
   JS_FN("areThreadEventsDisallowed", Method_AreThreadEventsDisallowed, 0, 0),
   JS_FN("shouldUpdateProgressCounter", Method_ShouldUpdateProgressCounter, 1, 0),
@@ -606,6 +607,7 @@ static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("onDebuggerStatement", Method_OnDebuggerStatement, 0, 0),
   JS_FN("onEvent", Method_OnEvent, 2, 0),
   JS_FN("onConsoleMessage", Method_OnConsoleMessage, 1, 0),
+  JS_FN("onAnnotation", Method_OnAnnotation, 2, 0),
   JS_FN("recordingId", Method_RecordingId, 0, 0),
   JS_FS_END
 };
