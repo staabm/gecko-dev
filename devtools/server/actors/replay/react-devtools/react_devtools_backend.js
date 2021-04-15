@@ -1,3 +1,4 @@
+function reactDevtoolsBackend(window) {
 /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -9817,6 +9818,17 @@
       bridge.send('isSynchronousXHRSupported', Object(utils["h" /* isSynchronousXHRSupported */])());
       setupHighlighter(bridge, this);
       TraceUpdates_initialize(this);
+    // Hook for sending messages via record/replay evaluations.
+    window.__RECORD_REPLAY_REACT_DEVTOOLS_SEND_MESSAGE__ = (inEvent, inData) => {
+      let rv;
+      this._bridge = {
+        send(event, data) {
+          rv = { event, data };
+        }
+      };
+      this[inEvent](inData);
+      return rv;
+    };
     }
   
     get rendererInterfaces() {
@@ -10549,7 +10561,7 @@
   
   
   function welcome(event) {
-    if (event.source !== window || event.data.source !== 'react-devtools-content-script') {
+    if (event.data.source !== 'react-devtools-content-script') {
       return;
     }
   
@@ -10592,13 +10604,8 @@
       },
   
       send(event, payload, transferable) {
-        window.postMessage({
-          source: 'react-devtools-bridge',
-          payload: {
-            event,
-            payload
-          }
-        }, '*', transferable);
+        // Synchronously notify the record/replay driver.
+        window.__RECORD_REPLAY_REACT_DEVTOOLS_SEND_BRIDGE__(event, payload);
       }
   
     });
@@ -14522,3 +14529,5 @@
   
   /***/ })
   /******/ ]);
+}
+exports.reactDevtoolsBackend = reactDevtoolsBackend;
