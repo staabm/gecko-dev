@@ -1467,6 +1467,27 @@ function previewWeakSet() {
   }
 }
 
+function previewPromise() {
+  let state;
+  let value;
+
+  switch (this.obj.promiseState) {
+    case "fulfilled":
+      state = "fulfilled";
+      value = createProtocolValue(this.obj.promiseValue);
+      break;
+    case "rejected":
+      state = "rejected";
+      value = createProtocolValue(this.obj.promiseReason);
+      break;
+    default:
+      state = "pending";
+      break;
+  }
+
+  this.extra.promiseState = { state, value };
+}
+
 function previewRegExp() {
   this.extra.regexpString = this.raw.toString();
 }
@@ -1515,6 +1536,7 @@ const CustomPreviewers = {
   WeakMap: [previewWeakMap],
   Set: ["size", previewSet],
   WeakSet: [previewWeakSet],
+  Promise: [previewPromise],
   RegExp: ["global", "source", previewRegExp],
   Date: [previewDate],
   Error: ErrorProperties,
@@ -1714,51 +1736,20 @@ function completionToProtocolResult(completion) {
   return { returned, exception, data: {} };
 }
 
-function convertValueFromParent(value) {
-  if ("value" in value) {
-    return value.value;
-  }
-  if ("object" in value) {
-    return getObjectFromId(value.object);
-  }
-  if ("unserializableNumber" in value) {
-    return Number(value.unserializableNumber);
-  }
-  if ("bigint" in value) {
-    return BigInt(value.bigint);
-  }
-  return undefined;
-}
-
-function convertBindings(bindings) {
-  const newBindings = {};
-  if (bindings) {
-    for (const binding of bindings) {
-      newBindings[binding.name] = convertValueFromParent(binding);
-    }
-  }
-  return newBindings;
-}
-
-function Pause_evaluateInFrame({ frameId, expression, bindings }) {
+function Pause_evaluateInFrame({ frameId, expression }) {
   const frameIndexNum = Number(frameId);
   const frame = findScriptFrame((_, i) => i === frameIndexNum);
   if (!frame) {
     throw new Error("Can't find frame");
   }
 
-  const newBindings = convertBindings(bindings);
-  const completion = frame.evalWithBindings(expression, newBindings);
+  const completion = frame.eval(expression);
   return { result: completionToProtocolResult(completion) };
 }
 
-function Pause_evaluateInGlobal({ expression, bindings }) {
-  const newBindings = convertBindings(bindings);
+function Pause_evaluateInGlobal({ expression }) {
   const dbgWindow = gDebugger.makeGlobalObjectReference(getWindow());
-  const completion = dbgWindow.executeInGlobalWithBindings(
-    expression,
-    newBindings
-  );
+  const completion = dbgWindow.executeInGlobal(expression);
   return { result: completionToProtocolResult(completion) };
 }
 

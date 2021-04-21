@@ -23,6 +23,8 @@
 
 using namespace mozilla::layers;
 
+namespace mozilla { extern void RecordReplayTickRefreshDriver(); }
+
 namespace mozilla::recordreplay {
 
 static void (*gOnPaint)();
@@ -103,7 +105,7 @@ TimeStamp CompositeTime() {
 }
 
 void OnPaint() {
-  if (!HasCheckpoint()) {
+  if (!HasCheckpoint() || HasDivergedFromRecording()) {
     return;
   }
 
@@ -202,6 +204,7 @@ void RegisterTextureChild(PTextureChild* aChild, TextureData* aData,
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
 
   if (aDesc.type() != SurfaceDescriptor::TSurfaceDescriptorBuffer) {
+    PrintLog("RegisterTextureChild %p unknown descriptor type %d", aChild, aDesc.type());
     return;
   }
 
@@ -227,8 +230,8 @@ TextureHost* CreateTextureHost(PTextureChild* aChild) {
 
   auto iter = gTextureInfo.find(aChild);
   if (iter == gTextureInfo.end()) {
-    PrintLog("Error: CreateTextureHost unknown TextureChild %p", aChild);
-    return nullptr;
+    PrintLog("Error: CreateTextureHost unknown TextureChild %p, crashing...", aChild);
+    MOZ_CRASH("CreateTextureHost");
   }
   const TextureInfo& info = iter->second;
   MemoryTextureHost* rv = new MemoryTextureHost(info.mBuffer, info.mDesc, info.mFlags);
@@ -246,12 +249,19 @@ static char* PaintCallback(const char* aMimeType, int aJPEGQuality) {
     return nullptr;
   }
 
+  // When diverged from the recording we need to generate graphics reflecting
+  // the current DOM. Tick the refresh drivers to update layers to reflect
+  // that current state.
+  if (recordreplay::HasDivergedFromRecording()) {
+    RecordReplayTickRefreshDriver();
+  }
+
   MOZ_RELEASE_ASSERT(!gFetchedDrawTarget);
 
   AutoDisallowThreadEvents disallow;
   gCompositorBridge->CompositeToTarget(VsyncId(), nullptr, nullptr);
 
-  if (!gFetchedDrawTarget) {
+  if (!gFetchedDrawTarget && !recordreplay::HasDivergedFromRecording()) {
     return nullptr;
   }
   gFetchedDrawTarget = false;
