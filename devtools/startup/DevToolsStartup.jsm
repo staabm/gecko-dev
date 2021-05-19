@@ -1442,7 +1442,8 @@ function createRecordingButton() {
         return;
       }
 
-      const { gBrowser } = evt.target.ownerDocument.defaultView;
+      const { target: node } = evt;
+      const { gBrowser } = node.ownerDocument.defaultView;
       const recording = gBrowser.selectedBrowser.hasAttribute(
         "recordExecution"
       );
@@ -1452,6 +1453,7 @@ function createRecordingButton() {
       } else {
         reloadAndRecordTab(gBrowser);
       }
+      node.refreshStatus();
     },
     onCreated(node) {
       function selectedBrowserHasAttribute(attr) {
