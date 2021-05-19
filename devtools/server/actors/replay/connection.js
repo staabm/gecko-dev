@@ -194,6 +194,11 @@ class Recording extends EventEmitter {
 
       await sendCommand("Internal.setRecordingMetadata", {
         authId: getLoggedInUserAuthId(),
+        recordingData: {...data, lastScreenData: "", lastScreenMimeType: ""},
+      });
+
+      await sendCommand("Internal.setRecordingMetadata", {
+        authId: getLoggedInUserAuthId(),
         recordingData: data,
       });
     } catch (err) {
