@@ -1575,7 +1575,7 @@ async function runTestScript() {
   eval(text);
 }
 
-// See also ContentParent::ContentParent
+// See also GetRecordReplayDispatchServer in ContentParent.cpp
 function getDispatchServer(url) {
   const address = env.get("RECORD_REPLAY_SERVER");
   if (address) {
@@ -1603,7 +1603,7 @@ function DriverJSON() {
   return `${getRecordReplayPlatform()}-recordreplay.json`;
 }
 
-// See also ContentParent::ContentParent
+// See also SetupRecordReplayDriver in ContentParent.cpp
 function driverFile() {
   const file = Services.dirsvc.get("UAppData", Ci.nsIFile);
   file.append(DriverName());
