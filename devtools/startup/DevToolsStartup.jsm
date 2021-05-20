@@ -1438,7 +1438,7 @@ function createRecordingButton() {
     type: "button",
     tooltiptext: "record-button.tooltiptext2",
     onClick(evt) {
-      if (getConnectionStatus() || !gHasRecordingDriver || isRecordingAllTabs()) {
+      if (getConnectionStatus() || !gHasRecordingDriver) {
         return;
       }
 
@@ -1446,7 +1446,7 @@ function createRecordingButton() {
       const { gBrowser } = node.ownerDocument.defaultView;
       const recording = gBrowser.selectedBrowser.hasAttribute(
         "recordExecution"
-      );
+      ) || isRecordingAllTabs();
 
       if (recording) {
         reloadAndStopRecordingTab(gBrowser);
@@ -1470,7 +1470,7 @@ function createRecordingButton() {
         const recording = selectedBrowserHasAttribute("recordExecution") || isRecordingAllTabs();
 
         node.classList.toggle("recording", recording);
-        node.classList.toggle("hidden", isAuthenticationEnabled() && !isLoggedIn() && !isRunningTest() && !isRecordingAllTabs());
+        node.classList.toggle("hidden", isAuthenticationEnabled() && !isLoggedIn() && !isRunningTest());
 
         const status = getConnectionStatus();
         let tooltip = status;
@@ -1480,7 +1480,7 @@ function createRecordingButton() {
           node.disabled = true;
           tooltip = "missingDriver.label";
         } else if (recording) {
-          node.disabled = isRecordingAllTabs();
+          node.disabled = false;
           tooltip = "stopRecording.label";
         } else {
           node.disabled = false;
@@ -1520,7 +1520,7 @@ function createRecordingButton() {
     },
     onCreated(node) {
       node.refreshStatus = () => {
-        node.classList.toggle("hidden", !isAuthenticationEnabled() || isLoggedIn() || isRunningTest() || isRecordingAllTabs());
+        node.classList.toggle("hidden", !isAuthenticationEnabled() || isLoggedIn() || isRunningTest());
       };
       node.refreshStatus();
 
@@ -1775,7 +1775,8 @@ function reloadAndRecordTab(gBrowser) {
 
 // Return whether all tabs are automatically being recorded.
 function isRecordingAllTabs() {
-  return env.get("RECORD_ALL_CONTENT");
+  return env.get("RECORD_ALL_CONTENT")
+      || Services.prefs.getBoolPref("devtools.recordreplay.alwaysRecord");
 }
 
 function reloadAndStopRecordingTab(gBrowser) {
@@ -1817,6 +1818,9 @@ function onRecordingStarted(recording) {
   let urlLoadOpts;
 
   function clearRecordingState() {
+    if (isRecordingAllTabs()) {
+      return;
+    }
     getBrowser().getTabBrowser().updateBrowserRemoteness(getBrowser(), {
       recordExecution: undefined,
       newFrameloader: true,
