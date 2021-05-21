@@ -2764,6 +2764,59 @@ ContentParent::ContentParent(const nsACString& aRemoteType,
   : ContentParent(aRemoteType, nsFakePluginTag::NOT_JSPLUGIN,
                   aRecordingDispatchAddress) {}
 
+static nsString GetRecordReplayDriverName() {
+#ifdef XP_MACOSX
+  return u"macOS-recordreplay.so"_ns;
+#elif defined(XP_LINUX)
+  return u"linux-recordreplay.so"_ns;
+#else
+  MOZ_CRASH("GetRecordReplayDriverName unknown platform");
+#endif
+}
+
+// Get the dispatch address to use when recording/replaying.
+// See also getDispatchServer in DevToolsStartup.jsm
+static nsString GetRecordReplayDispatchServer() {
+  char* server = getenv("RECORD_REPLAY_SERVER");
+  if (server) {
+    return NS_ConvertUTF8toUTF16(nsCString(server));
+  }
+
+  nsString pref;
+  nsresult rv = Preferences::GetString("devtools.recordreplay.cloudServer", pref);
+  if (NS_FAILED(rv)) {
+    fprintf(stderr, "Warning: Can't determine record/replay server, can't record.\n");
+  }
+  return pref;
+}
+
+// Ensure the driver environment variable needed when recording is set.
+static bool SetupRecordReplayDriver() {
+  char* driver = getenv("RECORD_REPLAY_DRIVER");
+  if (driver) {
+    return true;
+  }
+
+  // See also driverFile in DevToolsStartup.jsm
+  nsCOMPtr<nsIFile> driverFile;
+  nsAutoString driverPath;
+  bool driverExists = false;
+  if (NS_SUCCEEDED(NS_GetSpecialDirectory(XRE_USER_APP_DATA_DIR,
+                                          getter_AddRefs(driverFile))) &&
+      NS_SUCCEEDED(driverFile->Append(GetRecordReplayDriverName())) &&
+      NS_SUCCEEDED(driverFile->Exists(&driverExists)) &&
+      driverExists &&
+      NS_SUCCEEDED(driverFile->GetPath(driverPath))) {
+    setenv("RECORD_REPLAY_DRIVER",
+            NS_ConvertUTF16toUTF8(driverPath).get(),
+            /* overwrite */ false);
+    return true;
+  }
+
+  fprintf(stderr, "Warning: Can't find record/replay driver, can't record.\n");
+  return false;
+}
+
 ContentParent::ContentParent(const nsACString& aRemoteType, int32_t aJSPluginID,
                              const nsAString& aRecordingDispatchAddress)
     : mSelfRef(nullptr),
@@ -2795,11 +2848,14 @@ ContentParent::ContentParent(const nsACString& aRemoteType, int32_t aJSPluginID,
                         "XXX(nika): How are we creating a JSPlugin?");
 
   if (RecordAllContentProcesses()) {
-    char* server = getenv("RECORD_REPLAY_SERVER");
-    if (server) {
-      mRecordingDispatchAddress = NS_ConvertUTF8toUTF16(nsCString(server));
-    } else {
-      fprintf(stderr, "Warning: RECORD_REPLAY_SERVER not set, can't record.\n");
+    // When recording all processes we won't be supplied with the dispatch
+    // address to use. Figure it out ourselves.
+    mRecordingDispatchAddress = GetRecordReplayDispatchServer();
+
+    // When recording all content processes the devtools code might not have
+    // updated the driver and set the corresponding env var yet.
+    if (!SetupRecordReplayDriver()) {
+      mRecordingDispatchAddress.SetLength(0);
     }
   }
 
