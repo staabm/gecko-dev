@@ -26,7 +26,11 @@ const { Debugger, RecordReplayControl, Services, InspectorUtils } = sandbox;
 const isRecordingOrReplaying = !!RecordReplayControl.onNewSource;
 
 if (isRecordingOrReplaying) {
-  Services.cpmm.sendAsyncMessage("RecordingStarting");
+  const recordingId = RecordReplayControl.recordingId();
+
+  Services.cpmm.sendAsyncMessage("RecordingStarting", {
+    recordingId
+  });
 }
 
 const log = RecordReplayControl.log;

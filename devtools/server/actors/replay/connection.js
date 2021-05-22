@@ -111,7 +111,7 @@ function isRunningTest() {
 
 const SEEN_MANAGERS = new WeakSet();
 class Recording extends EventEmitter {
-  constructor(pmm) {
+  constructor(pmm, data) {
     super();
     if (SEEN_MANAGERS.has(pmm)) {
       console.error("Duplicate recording for same child process manager");
@@ -120,6 +120,7 @@ class Recording extends EventEmitter {
 
     this._pmm = pmm;
     this._resourceUploads = [];
+    this._data = data;
 
     this._recordingResourcesUpload = null;
 
@@ -136,6 +137,10 @@ class Recording extends EventEmitter {
 
   get osPid() {
     return this._pmm.osPid;
+  }
+
+  get recordingId() {
+    return this._data.recordingId;
   }
 
   _lockRecording(recordingId) {
@@ -173,6 +178,22 @@ class Recording extends EventEmitter {
       .catch(err => {
         console.error("Exception while unlocking", err);
       });
+  }
+
+  _onStart() {
+    const authId = getLoggedInUserAuthId();
+
+    await sendCommand("Internal.setRecordingMetadata", {
+      authId,
+      recordingData: {
+        id: this.recordingId,
+        url: "",
+        title: "",
+        duration: 0,
+        lastScreenData: "",
+        lastScreenMimeType: "",
+       },
+    });
   }
 
   _onNewSourcemap(params) {
@@ -489,7 +510,7 @@ class CommandError extends Error {
 
 Services.ppmm.addMessageListener("RecordingStarting", {
   receiveMessage(msg) {
-    Services.obs.notifyObservers(new Recording(msg.target), "recordreplay-recording-started");
+    Services.obs.notifyObservers(new Recording(msg.target, msg.data), "recordreplay-recording-started");
   },
 });
 

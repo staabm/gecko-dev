@@ -108,6 +108,8 @@ const env = Cc["@mozilla.org/process/environment;1"].getService(
   Ci.nsIEnvironment
 );
 
+const gBrowserRecordingMap = new WeakMap();
+
 /**
  * Safely retrieve a localized DevTools key shortcut from KeyShortcutsBundle.
  * If the shortcut is not available, this will return null. Consumer code
@@ -1444,12 +1446,14 @@ function createRecordingButton() {
 
       const { target: node } = evt;
       const { gBrowser } = node.ownerDocument.defaultView;
-      const recording = gBrowser.selectedBrowser.hasAttribute(
+      const isRecording = gBrowser.selectedBrowser.hasAttribute(
         "recordExecution"
       ) || isRecordingAllTabs();
 
-      if (recording) {
+      if (isRecording) {
+        const recording = gBrowserRecordingMap.get(gBrowser.selectedBrowser)
         reloadAndStopRecordingTab(gBrowser);
+        openNewReplayTab(recording.recordingId)
       } else {
         reloadAndRecordTab(gBrowser);
       }
@@ -1819,6 +1823,8 @@ function onRecordingStarted(recording) {
   let oldURL;
   let urlLoadOpts;
 
+  gBrowserRecordingMap.set(getBrowser().selectedBrowser, recording)
+
   function clearRecordingState() {
     if (isRecordingAllTabs()) {
       return;
@@ -1836,6 +1842,8 @@ function onRecordingStarted(recording) {
     getBrowser().loadURI(`about:replay?error=${why}`, { triggeringPrincipal });
   });
   recording.on("finished", function(name, data) {
+    recordReplayLog(`FinishedRecording ${recordingId}`);
+
     oldURL = getBrowser().currentURI.spec;
     urlLoadOpts = { triggeringPrincipal, oldRecordedURL: oldURL };
 
@@ -1857,39 +1865,44 @@ function onRecordingStarted(recording) {
     }
 
     recordReplayLog(`FinishedRecording ${recordingId}`);
-
-    // Find the dispatcher to connect to.
-    const dispatchAddress = getDispatchServer();
-
-    let extra = "";
-
-    // Specify the dispatch address if it is not the default.
-    if (dispatchAddress != "wss://dispatch.replay.io") {
-      extra += `&dispatch=${dispatchAddress}`;
-    }
-
-    // For testing, allow specifying a test script to load in the tab.
-    const localTest = env.get("RECORD_REPLAY_LOCAL_TEST");
-    if (localTest) {
-      extra += `&test=${localTest}`;
-    } else if (!isAuthenticationEnabled()) {
-      // Adding this urlparam disables checks in the devtools that the user has
-      // permission to view the recording.
-      extra += `&test=1`;
-    }
-
-    const tabbrowser = getBrowser().getTabBrowser();
-    const currentTabIndex = tabbrowser.visibleTabs.indexOf(tabbrowser.selectedTab);
-    const tab = tabbrowser.addTab(
-      `${getViewURL()}?id=${recordingId}${extra}`,
-      { triggeringPrincipal, index: currentTabIndex === -1 ? undefined : currentTabIndex + 1}
-    );
-    tabbrowser.selectedTab = tab;
   });
 }
 
+function openNewReplayTab(recordingId) {
+  recordReplayLog(`OpenNewReplayTab ${recordingId}`);
+
+  // Find the dispatcher to connect to.
+  const dispatchAddress = getDispatchServer();
+
+  let extra = "";
+
+  // Specify the dispatch address if it is not the default.
+  if (dispatchAddress != "wss://dispatch.replay.io") {
+    extra += `&dispatch=${dispatchAddress}`;
+  }
+
+  // For testing, allow specifying a test script to load in the tab.
+  const localTest = env.get("RECORD_REPLAY_LOCAL_TEST");
+  if (localTest) {
+    extra += `&test=${localTest}`;
+  } else if (!isAuthenticationEnabled()) {
+    // Adding this urlparam disables checks in the devtools that the user has
+    // permission to view the recording.
+    extra += `&test=1`;
+  }
+
+  const tabbrowser = getBrowser().getTabBrowser();
+  const currentTabIndex = tabbrowser.visibleTabs.indexOf(tabbrowser.selectedTab);
+  const tab = tabbrowser.addTab(
+    `${getViewURL()}?id=${recordingId}${extra}`,
+    { triggeringPrincipal, index: currentTabIndex === -1 ? undefined : currentTabIndex + 1}
+  );
+  tabbrowser.selectedTab = tab;
+  recordReplayLog(`OpenNewReplayTab finished ${recordingId} `);
+}
+
 Services.obs.addObserver(
-  subject => onRecordingStarted(subject.wrappedJSObject),
+  subject => onRecordingStarted(subject.wrappedJSObject, data),
   "recordreplay-recording-started"
 );
 
