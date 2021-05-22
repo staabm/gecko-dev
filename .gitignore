@@ -166,6 +166,7 @@ lextab.py
 
 MacOSX10.11.sdk
 MacOSX10.12.sdk
+MacOSX10.12.sdk.tar.xz
 wr-opt/
 
 # Ignore various raptor performance framework files
