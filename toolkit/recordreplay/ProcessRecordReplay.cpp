@@ -169,7 +169,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
     int rv = stat(driver, &s);
     fprintf(stderr,
             "RecordReplayInterface_Initialize DriverStats %s Error %d %s Size %lu Mode %d\n",
-            driver, rv, strerror(errno), s.st_size, s.st_mode);
+            driver, rv, strerror(errno), (size_t)s.st_size, s.st_mode);
 
     fprintf(stderr, "Loading driver at %s failed [%s], waiting...\n", driver, dlerror());
     sleep(1);
