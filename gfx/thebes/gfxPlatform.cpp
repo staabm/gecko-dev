@@ -3295,6 +3295,9 @@ bool gfxPlatform::UseDesktopZoomingScrollbars() {
 
 /*static*/
 bool gfxPlatform::AsyncPanZoomEnabled() {
+  // Recording/replaying rendering depends on APZ being disabled.
+  return false;
+  /*
 #if !defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_WIDGET_UIKIT)
   // For XUL applications (everything but Firefox on Android)
   // we only want to use APZ when E10S is enabled. If
@@ -3315,6 +3318,7 @@ bool gfxPlatform::AsyncPanZoomEnabled() {
   return StaticPrefs::
       layers_async_pan_zoom_enabled_AtStartup_DoNotUseDirectly();
 #endif
+  */
 }
 
 /*static*/
