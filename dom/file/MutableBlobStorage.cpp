@@ -276,7 +276,7 @@ class LastRunnable final : public Runnable {
 MutableBlobStorage::MutableBlobStorage(MutableBlobStorageType aType,
                                        nsIEventTarget* aEventTarget,
                                        uint32_t aMaxMemory)
-    : mMutex("MutableBlobStorage::mMutex"),
+    : mMutex("MutableBlobStorage::mMutex", /* aOrdered */ true),
       mData(nullptr),
       mDataLen(0),
       mDataBufferLen(0),
