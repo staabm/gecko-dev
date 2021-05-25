@@ -630,6 +630,18 @@ Object.defineProperty(this, "gFindBarPromise", {
   },
 });
 
+// [Replay] Call from _loadURI to hook new loads
+function hookLoadUri (browser, uri, loadURIOptions) {
+  if (uri) {
+    const url = new URL(uri);
+    if (url.host.match(/replay\.io$/i)) {
+      // Some combination of the following might allow popups from replay.io
+      Services.perms.addFromPrincipal(loadURIOptions.triggeringPrincipal, "popup", Services.perms.ALLOW_ACTION);
+      browser.popupBlocker.unblockAllPopups();
+    }
+  }
+}
+
 async function gLazyFindCommand(cmd, ...args) {
   let fb = await gFindBarPromise;
   // We could be closed by now, or the tab with XBL binding could have gone away:
@@ -1623,6 +1635,7 @@ function _loadURI(browser, uri, params = {}) {
   };
   try {
     browser.webNavigation.loadURI(uri, loadURIOptions);
+    hookLoadUri(browser, uri, loadURIOptions);
   } finally {
     browser.isNavigating = false;
   }
