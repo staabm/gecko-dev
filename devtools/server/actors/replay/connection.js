@@ -187,14 +187,14 @@ class Recording extends EventEmitter {
     try {
       const authId = getLoggedInUserAuthId();
 
-      this.emit("finished", data);
-
       // Upload the metadata without the screenshot earlier to unblock the
       // upload screen
       await sendCommand("Internal.setRecordingMetadata", {
         authId,
         recordingData: {...data, lastScreenData: "", lastScreenMimeType: ""},
       });
+
+      this.emit("finished", data);
 
       // If we locked the recording because of sourcemaps, we should wait
       // that the lock to be initialized before emitting the event so that
