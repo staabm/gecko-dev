@@ -1889,7 +1889,7 @@ function onRecordingStarted(recording) {
   recording.on("unusable", function(name, data) {
     const browser = getBrowser();
 
-    reloadAndClearRecordingState(browser, `about:replay?error=${data.why}`);
+    reloadAndClearRecordingState(browser, `https://replay.io/browser/error?message=${data.why}`);
   });
   recording.on("finished", function(name, data) {
     browser = getBrowser();
