@@ -84,6 +84,11 @@ ChromeUtils.defineModuleGetter(
   "SessionStore",
   "resource:///modules/sessionstore/SessionStore.jsm"
 );
+ChromeUtils.defineModuleGetter(
+  this,
+  "TabStateFlusher",
+  "resource:///modules/sessionstore/TabStateFlusher.jsm"
+);
 
 const { AboutNewTab } = ChromeUtils.import("resource:///modules/AboutNewTab.jsm");
 const { require } = ChromeUtils.import("resource://devtools/shared/Loader.jsm");
@@ -1747,7 +1752,7 @@ async function updateRecordingDriver() {
 setTimeout(updateRecordingDriver, 0);
 setInterval(updateRecordingDriver, 1000 * 60 * 20);
 
-function reloadAndRecordTab(tabbrowser) {
+async function reloadAndRecordTab(tabbrowser) {
   const tab = tabbrowser.selectedTab;
   const browser = tabbrowser.selectedBrowser;
   let url = browser.currentURI.spec;
@@ -1778,6 +1783,12 @@ function reloadAndRecordTab(tabbrowser) {
     url = "about:blank";
     remoteType = E10SUtils.WEB_REMOTE_TYPE;
   }
+
+  // Before reading the tab state, we need to be sure that the parent process
+  // has full session state. The user (or more likely automated tests), could
+  // easily have begin recording while the initial page was still loading,
+  // in which case the parent may not have initialized the session fully yet.
+  await TabStateFlusher.flush(browser);
 
   const state = SessionStore.getTabState(tab);
   tabbrowser.updateBrowserRemoteness(browser, {
