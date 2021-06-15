@@ -188,6 +188,8 @@ static void PopulateReportBlame(JSContext* cx, JSErrorReport* report) {
     return;
   }
 
+  mozilla::recordreplay::AssertScriptedCaller("PopulateReportBlame");
+
   report->filename = iter.filename();
   if (iter.hasScript()) {
     report->sourceId = iter.script()->scriptSource()->id();
