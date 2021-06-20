@@ -49,6 +49,9 @@ static LayerManagerComposite* gLayerManager;
 static CompositorBridgeParent* gCompositorBridge;
 static LayerTransactionParent* gLayerTransactionParent;
 
+// Directory to write paints to when recording, for use in debugging.
+static const char* gPaintsDirectory;
+
 static void EnsureInitialized(LayerTransactionChild* aChild) {
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
 
@@ -72,18 +75,16 @@ static void EnsureInitialized(LayerTransactionChild* aChild) {
   gLayerTransactionParent = new LayerTransactionParent(gLayerManager,
                                                        gCompositorBridge, nullptr,
                                                        LayersId(), TimeDuration());
-}
 
-// This can be enabled to do in process compositing while recording, for easier
-// debugging.
-static bool gPaintWhileRecording;
+  gPaintsDirectory = getenv("RECORD_REPLAY_PAINTS_DIRECTORY");
+}
 
 static bool ShouldUpdateCompositor(LayerTransactionChild* aChild) {
   // We never need to update the compositor state in the recording process,
   // because we send updates to the UI process which will composite in the
   // regular way.
   EnsureInitialized(aChild);
-  return (IsReplaying() || gPaintWhileRecording) && gLayerTransactionChild == aChild;
+  return (IsReplaying() || gPaintsDirectory) && gLayerTransactionChild == aChild;
 }
 
 void SendUpdate(LayerTransactionChild* aChild, const TransactionInfo& aInfo) {
@@ -104,6 +105,8 @@ TimeStamp CompositeTime() {
   return gCompositeTime;
 }
 
+static void MaybeCreatePaintFile();
+
 void OnPaint() {
   if (!HasCheckpoint() || HasDivergedFromRecording()) {
     return;
@@ -112,9 +115,7 @@ void OnPaint() {
   gCompositeTime = TimeStamp::Now();
   recordreplay::RecordReplayBytes("CompositeTime", &gCompositeTime, sizeof(gCompositeTime));
 
-  if (IsRecording() && gPaintWhileRecording) {
-    PaintCallback("image/jpeg", 50);
-  }
+  MaybeCreatePaintFile();
 
   gOnPaint();
 }
@@ -244,28 +245,8 @@ TextureHost* CreateTextureHost(PTextureChild* aChild) {
   return rv;
 }
 
-static char* PaintCallback(const char* aMimeType, int aJPEGQuality) {
-  if (!gCompositorBridge) {
-    return nullptr;
-  }
-
-  // When diverged from the recording we need to generate graphics reflecting
-  // the current DOM. Tick the refresh drivers to update layers to reflect
-  // that current state.
-  if (recordreplay::HasDivergedFromRecording()) {
-    RecordReplayTickRefreshDriver();
-  }
-
-  MOZ_RELEASE_ASSERT(!gFetchedDrawTarget);
-
-  AutoDisallowThreadEvents disallow;
-  gCompositorBridge->CompositeToTarget(VsyncId(), nullptr, nullptr);
-
-  if (!gFetchedDrawTarget && !recordreplay::HasDivergedFromRecording()) {
-    return nullptr;
-  }
-  gFetchedDrawTarget = false;
-
+// Encode the contents of gDrawTargetBuffer as a base64 image.
+static char* EncodeGraphicsAsBase64(const char* aMimeType, int aJPEGQuality) {
   // Get an image encoder for the media type.
   nsPrintfCString encoderCID("@mozilla.org/image/encoder;2?type=%s",
                              nsCString(aMimeType).get());
@@ -303,6 +284,107 @@ static char* PaintCallback(const char* aMimeType, int aJPEGQuality) {
   }
 
   return strdup(data.get());
+}
+
+static char* PaintCallback(const char* aMimeType, int aJPEGQuality) {
+  if (!gCompositorBridge) {
+    return nullptr;
+  }
+
+  // When diverged from the recording we need to generate graphics reflecting
+  // the current DOM. Tick the refresh drivers to update layers to reflect
+  // that current state.
+  if (recordreplay::HasDivergedFromRecording()) {
+    RecordReplayTickRefreshDriver();
+  }
+
+  MOZ_RELEASE_ASSERT(!gFetchedDrawTarget);
+
+  AutoDisallowThreadEvents disallow;
+  gCompositorBridge->CompositeToTarget(VsyncId(), nullptr, nullptr);
+
+  if (!gFetchedDrawTarget && !recordreplay::HasDivergedFromRecording()) {
+    return nullptr;
+  }
+  gFetchedDrawTarget = false;
+
+  return EncodeGraphicsAsBase64(aMimeType, aJPEGQuality);
+}
+
+// Write a JPEG file from a base64 encoded image.
+static void WriteJPEGFromBase64(const char* aPath, const char* aBuf) {
+  FILE* f = fopen(aPath, "w");
+  if (!f) {
+    fprintf(stderr, "Opening paint file %s failed, crashing.\n", aPath);
+    MOZ_CRASH("WriteJPEGFromBase64");
+  }
+
+  nsAutoCString jpegBuf;
+  nsresult rv = Base64Decode(nsCString(aBuf), jpegBuf);
+  if (NS_FAILED(rv)) {
+    MOZ_CRASH("WriteJPEGFromBase64 Base64Decode failed");
+  }
+
+  size_t count = fwrite(jpegBuf.get(), 1, jpegBuf.Length(), f);
+  if (count != jpegBuf.Length()) {
+    MOZ_CRASH("WriteJPEGFromBase64 incomplete write");
+  }
+
+  fclose(f);
+}
+
+static size_t gPaintIndex = 0;
+static size_t gPaintSubindex = 0;
+static bool gCreatingPaintFile;
+
+static void MaybeCreatePaintFile() {
+  if (!IsRecording() || !gPaintsDirectory) {
+    return;
+  }
+
+  AutoPassThroughThreadEvents pt;
+
+  ++gPaintIndex;
+  gPaintSubindex = 0;
+
+  gCreatingPaintFile = true;
+  char* buf = PaintCallback("image/jpeg", 50);
+  gCreatingPaintFile = false;
+
+  if (!buf) {
+    return;
+  }
+
+  recordreplay::PrintLog("CreatePaintFile %lu", gPaintIndex);
+
+  nsPrintfCString path("%s/paint-%lu.jpg", gPaintsDirectory, gPaintIndex);
+  WriteJPEGFromBase64(path.get(), buf);
+
+  free(buf);
+}
+
+// This method is helpful in tracking down rendering problems.
+// See https://github.com/RecordReplay/gecko-dev/issues/292
+void MaybeCreateCurrentPaintFile(const char* why) {
+  if (!gCreatingPaintFile) {
+    return;
+  }
+
+  AutoPassThroughThreadEvents pt;
+
+  ++gPaintSubindex;
+
+  char* buf = EncodeGraphicsAsBase64("image/jpeg", 50);
+  if (!buf) {
+    return;
+  }
+
+  recordreplay::PrintLog("CreateCurrentPaintFile %lu %lu %s", gPaintIndex, gPaintSubindex, why);
+
+  nsPrintfCString path("%s/paint-%lu-%lu-%s.jpg", gPaintsDirectory, gPaintIndex, gPaintSubindex, why);
+  WriteJPEGFromBase64(path.get(), buf);
+
+  free(buf);
 }
 
 } // namespace mozilla::recordreplay

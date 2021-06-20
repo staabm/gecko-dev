@@ -79,7 +79,18 @@ ChromeUtils.defineModuleGetter(
   "PanelMultiView",
   "resource:///modules/PanelMultiView.jsm"
 );
+ChromeUtils.defineModuleGetter(
+  this,
+  "SessionStore",
+  "resource:///modules/sessionstore/SessionStore.jsm"
+);
+ChromeUtils.defineModuleGetter(
+  this,
+  "TabStateFlusher",
+  "resource:///modules/sessionstore/TabStateFlusher.jsm"
+);
 
+const { AboutNewTab } = ChromeUtils.import("resource:///modules/AboutNewTab.jsm");
 const { require } = ChromeUtils.import("resource://devtools/shared/Loader.jsm");
 const {
   ContentProcessListener,
@@ -1438,20 +1449,29 @@ function createRecordingButton() {
     type: "button",
     tooltiptext: "record-button.tooltiptext2",
     onClick(evt) {
-      if (getConnectionStatus() || !gHasRecordingDriver || isRecordingAllTabs()) {
+      const { target: node } = evt;
+      if (getConnectionStatus() || !gHasRecordingDriver || node.classList.contains('waiting')) {
         return;
       }
 
-      const { gBrowser } = evt.target.ownerDocument.defaultView;
+      const { gBrowser } = node.ownerDocument.defaultView;
       const recording = gBrowser.selectedBrowser.hasAttribute(
         "recordExecution"
-      );
+      ) || isRecordingAllTabs();
 
-      if (recording) {
-        reloadAndStopRecordingTab(gBrowser);
-      } else {
-        reloadAndRecordTab(gBrowser);
-      }
+      node.classList.add('waiting');
+      // Some sort of delay seems required to allow the chrome to update the
+      // button to show the spinner. It might be possible to lower the timeout
+      // but < 50ms was never enough but 100ms seems to be always enough.
+      setTimeout(() => {
+        if (recording) {
+          reloadAndStopRecordingTab(gBrowser);
+        } else {
+          reloadAndRecordTab(gBrowser);
+          node.classList.remove('waiting');
+        }
+        node.refreshStatus();
+      }, 100);
     },
     onCreated(node) {
       function selectedBrowserHasAttribute(attr) {
@@ -1468,7 +1488,7 @@ function createRecordingButton() {
         const recording = selectedBrowserHasAttribute("recordExecution") || isRecordingAllTabs();
 
         node.classList.toggle("recording", recording);
-        node.classList.toggle("hidden", isAuthenticationEnabled() && !isLoggedIn() && !isRunningTest() && !isRecordingAllTabs());
+        node.classList.toggle("hidden", isAuthenticationEnabled() && !isLoggedIn() && !isRunningTest());
 
         const status = getConnectionStatus();
         let tooltip = status;
@@ -1478,7 +1498,7 @@ function createRecordingButton() {
           node.disabled = true;
           tooltip = "missingDriver.label";
         } else if (recording) {
-          node.disabled = isRecordingAllTabs();
+          node.disabled = false;
           tooltip = "stopRecording.label";
         } else {
           node.disabled = false;
@@ -1518,7 +1538,7 @@ function createRecordingButton() {
     },
     onCreated(node) {
       node.refreshStatus = () => {
-        node.classList.toggle("hidden", !isAuthenticationEnabled() || isLoggedIn() || isRunningTest() || isRecordingAllTabs());
+        node.classList.toggle("hidden", !isAuthenticationEnabled() || isLoggedIn() || isRunningTest());
       };
       node.refreshStatus();
 
@@ -1573,6 +1593,7 @@ async function runTestScript() {
   eval(text);
 }
 
+// See also GetRecordReplayDispatchServer in ContentParent.cpp
 function getDispatchServer(url) {
   const address = env.get("RECORD_REPLAY_SERVER");
   if (address) {
@@ -1600,6 +1621,7 @@ function DriverJSON() {
   return `${getRecordReplayPlatform()}-recordreplay.json`;
 }
 
+// See also SetupRecordReplayDriver in ContentParent.cpp
 function driverFile() {
   const file = Services.dirsvc.get("UAppData", Ci.nsIFile);
   file.append(DriverName());
@@ -1730,8 +1752,10 @@ async function updateRecordingDriver() {
 setTimeout(updateRecordingDriver, 0);
 setInterval(updateRecordingDriver, 1000 * 60 * 20);
 
-function reloadAndRecordTab(gBrowser) {
-  let url = gBrowser.currentURI.spec;
+async function reloadAndRecordTab(tabbrowser) {
+  const tab = tabbrowser.selectedTab;
+  const browser = tabbrowser.selectedBrowser;
+  let url = browser.currentURI.spec;
 
   // Don't preprocess recordings if we will be submitting them for testing.
   try {
@@ -1760,20 +1784,71 @@ function reloadAndRecordTab(gBrowser) {
     remoteType = E10SUtils.WEB_REMOTE_TYPE;
   }
 
-  gBrowser.updateBrowserRemoteness(gBrowser.selectedBrowser, {
+  // Before reading the tab state, we need to be sure that the parent process
+  // has full session state. The user (or more likely automated tests), could
+  // easily have begin recording while the initial page was still loading,
+  // in which case the parent may not have initialized the session fully yet.
+  await TabStateFlusher.flush(browser);
+
+  const state = SessionStore.getTabState(tab);
+  tabbrowser.updateBrowserRemoteness(browser, {
     recordExecution: getDispatchServer(url),
     newFrameloader: true,
     remoteType,
   });
 
-  gBrowser.loadURI(url, {
-    triggeringPrincipal: gBrowser.selectedBrowser.contentPrincipal,
+  browser.loadURI(url, {
+    triggeringPrincipal: browser.contentPrincipal,
   });
+
+  // Creating a new frameloader will destroy the tab's session history so we
+  // need to restore it, and we need to do this _after_ `loadURI` so that
+  // it doesn't add a new entry to the history.
+  SessionStore.setTabState(tab, state);
+}
+
+function reloadAndClearRecordingState(browser, aboutURL = null) {
+  const recordButton = browser.ownerDocument.querySelector('#record-button');
+  if (recordButton) {
+    recordButton.classList.remove('waiting');
+  }
+
+  if (isRecordingAllTabs()) {
+    return;
+  }
+
+  const tabbrowser = browser.getTabBrowser();
+  const tab = tabbrowser.getTabForBrowser(browser);
+
+  const contentPrincipal = browser.contentPrincipal;
+  const contentUrl = browser.currentURI.spec;
+
+  const state = SessionStore.getTabState(tab);
+  tabbrowser.updateBrowserRemoteness(browser, {
+    recordExecution: undefined,
+    newFrameloader: true,
+    remoteType: E10SUtils.WEB_REMOTE_TYPE,
+  });
+
+  if (!aboutURL) {
+    browser.loadURI(contentUrl, { triggeringPrincipal: contentPrincipal });
+  }
+
+  // Creating a new frameloader will destroy the tab's session history so we
+  // need to restore it.
+  SessionStore.setTabState(tab, state);
+
+  if (aboutURL) {
+    browser.loadURI(aboutURL, {
+      triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
+    });
+  }
 }
 
 // Return whether all tabs are automatically being recorded.
 function isRecordingAllTabs() {
-  return env.get("RECORD_ALL_CONTENT");
+  return env.get("RECORD_ALL_CONTENT")
+      || Services.prefs.getBoolPref("devtools.recordreplay.alwaysRecord");
 }
 
 function reloadAndStopRecordingTab(gBrowser) {
@@ -1811,36 +1886,15 @@ function onRecordingStarted(recording) {
     return browser;
   }
 
-  let oldURL;
-  let urlLoadOpts;
-
-  function clearRecordingState() {
-    getBrowser().getTabBrowser().updateBrowserRemoteness(getBrowser(), {
-      recordExecution: undefined,
-      newFrameloader: true,
-      remoteType: E10SUtils.WEB_REMOTE_TYPE,
-    });
-  }
   recording.on("unusable", function(name, data) {
-    clearRecordingState();
+    // Log the reason so we can see in our CI logs when something went wrong.
+    console.error("Unstable recording: " + data.why);
+    const browser = getBrowser();
 
-    const { why } = data;
-    getBrowser().loadURI(`about:replay?error=${why}`, { triggeringPrincipal });
+    reloadAndClearRecordingState(browser, `https://replay.io/browser/error?message=${data.why}`);
   });
-  recording.on("finished", function() {
-    oldURL = getBrowser().currentURI.spec;
-    urlLoadOpts = { triggeringPrincipal, oldRecordedURL: oldURL };
-
-    clearRecordingState();
-
-    // The recording has finished, so we need to navigate somewhere or else
-    // the user will be shown the tab-crash page while we wait for the recording
-    // to finish saving.
-    getBrowser().loadURI(`${getViewURL()}?loading=true`, urlLoadOpts);
-
-    recordReplayLog(`WaitForSavedRecording`);
-  });
-  recording.on("saved", function(name, data) {
+  recording.on("finished", function(name, data) {
+    browser = getBrowser();
     const recordingId = data.id;
 
     // When the submitTestRecordings pref is set we don't load the viewer,
@@ -1849,13 +1903,24 @@ function onRecordingStarted(recording) {
     if (
       Services.prefs.getBoolPref("devtools.recordreplay.submitTestRecordings")
     ) {
-      fetch(`https://test-inbox.replay.io/${recordingId}:${oldURL}`);
+      fetch(`https://test-inbox.replay.io/${recordingId}:${browser.currentURI.spec}`);
       const why = `Test recording added: ${recordingId}`;
-      getBrowser().loadURI(`about:replay?submitted=${why}`, urlLoadOpts);
+      reloadAndClearRecordingState(browser, `about:replay?submitted=${why}`);
       return;
     }
 
+    reloadAndClearRecordingState(browser);
+
     recordReplayLog(`FinishedRecording ${recordingId}`);
+  });
+
+  recording.on("saved", function(name, data) {
+    const recordingId = data.id;
+
+    // suppress launching new tab for test recordings
+    if (Services.prefs.getBoolPref("devtools.recordreplay.submitTestRecordings")) {
+      return;
+    }
 
     // Find the dispatcher to connect to.
     const dispatchAddress = getDispatchServer();
@@ -1877,7 +1942,15 @@ function onRecordingStarted(recording) {
       extra += `&test=1`;
     }
 
-    getBrowser().loadURI(`${getViewURL()}?id=${recordingId}${extra}`, urlLoadOpts);
+    const tabbrowser = browser.getTabBrowser();
+    const currentTabIndex = tabbrowser.visibleTabs.indexOf(tabbrowser.selectedTab);
+    const tab = tabbrowser.addTab(
+      `${getViewURL()}?id=${recordingId}${extra}`,
+      { triggeringPrincipal, index: currentTabIndex === -1 ? undefined : currentTabIndex + 1}
+    );
+    tabbrowser.selectedTab = tab;
+
+    recordReplayLog(`SavedRecording ${recordingId}`);
   });
 }
 
@@ -1885,6 +1958,9 @@ Services.obs.addObserver(
   subject => onRecordingStarted(subject.wrappedJSObject),
   "recordreplay-recording-started"
 );
+
+AboutNewTab.newTabURL = "https://replay.io/new-tab";
+Services.ppmm.loadProcessScript("resource://devtools/server/actors/replay/globals.js", true);
 
 function getViewURL() {
   let viewHost = "https://replay.io";

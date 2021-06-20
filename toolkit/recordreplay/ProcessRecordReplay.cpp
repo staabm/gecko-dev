@@ -75,6 +75,8 @@ static void (*gAssert)(const char* format, va_list);
 static void (*gAssertBytes)(const char* why, const void*, size_t);
 static void (*gFinishRecording)();
 static uint64_t* (*gProgressCounter)();
+static void (*gSetProgressCallback)(void (*aCallback)(uint64_t));
+static void (*gProgressReached)();
 static void (*gBeginPassThroughEvents)();
 static void (*gEndPassThroughEvents)();
 static bool (*gAreEventsPassedThrough)();
@@ -169,7 +171,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
     int rv = stat(driver, &s);
     fprintf(stderr,
             "RecordReplayInterface_Initialize DriverStats %s Error %d %s Size %lu Mode %d\n",
-            driver, rv, strerror(errno), s.st_size, s.st_mode);
+            driver, rv, strerror(errno), (size_t)s.st_size, s.st_mode);
 
     fprintf(stderr, "Loading driver at %s failed [%s], waiting...\n", driver, dlerror());
     sleep(1);
@@ -192,6 +194,8 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol("RecordReplayAssert", gAssert);
   LoadSymbol("RecordReplayAssertBytes", gAssertBytes);
   LoadSymbol("RecordReplayProgressCounter", gProgressCounter);
+  LoadSymbol("RecordReplaySetProgressCallback", gSetProgressCallback, /* aOptional */ true);
+  LoadSymbol("RecordReplayProgressReached", gProgressReached, /* aOptional */ true);
   LoadSymbol("RecordReplayBeginPassThroughEvents", gBeginPassThroughEvents);
   LoadSymbol("RecordReplayEndPassThroughEvents", gEndPassThroughEvents);
   LoadSymbol("RecordReplayAreEventsPassedThrough", gAreEventsPassedThrough);
@@ -346,6 +350,16 @@ MOZ_EXPORT ProgressCounter* RecordReplayInterface_ExecutionProgressCounter() {
 
 MOZ_EXPORT void RecordReplayInterface_AdvanceExecutionProgressCounter() {
   ++*gProgressCounter();
+}
+
+MOZ_EXPORT void RecordReplayInterface_SetExecutionProgressCallback(void (*aCallback)(uint64_t)) {
+  if (gSetProgressCallback) {
+    gSetProgressCallback(aCallback);
+  }
+}
+
+MOZ_EXPORT void RecordReplayInterface_ExecutionProgressReached() {
+  gProgressReached();
 }
 
 MOZ_EXPORT void RecordReplayInterface_InternalBeginPassThroughThreadEvents() {

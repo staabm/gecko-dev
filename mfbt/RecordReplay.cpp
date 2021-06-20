@@ -78,6 +78,8 @@ namespace recordreplay {
         (aToken, aBuffer, aLength))                                            \
   Macro(EndContentParse, (const void* aToken), (aToken))                       \
   Macro(AdvanceExecutionProgressCounter, (), ())                               \
+  Macro(SetExecutionProgressCallback, (void (*aCallback)(uint64_t)), (aCallback)) \
+  Macro(ExecutionProgressReached, (), ())                                      \
   Macro(InternalAssertScriptedCaller, (const char* aWhy), (aWhy))
 // clang-format on
 

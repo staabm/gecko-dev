@@ -50,6 +50,11 @@ const NEWINSTALL_PAGE = "about:newinstall";
 const ONCE_DOMAINS = ["mozilla.org", "firefox.com"];
 const ONCE_PREF = "browser.startup.homepage_override.once";
 
+// [Replay] Override new install page with replay's welcome page
+function getNewInstallPage() {
+  return Services.prefs.getCharPref('startup.homepage_welcome_url', NEWINSTALL_PAGE);
+}
+
 function shouldLoadURI(aURI) {
   if (aURI && !aURI.schemeIs("chrome")) {
     return true;
@@ -238,7 +243,7 @@ function openBrowserWindow(
       Ci.nsIToolkitProfileService
     );
     if (isStartup && pService.createdAlternateProfile) {
-      let url = NEWINSTALL_PAGE;
+      let url = getNewInstallPage();
       if (Array.isArray(urlOrUrlList)) {
         urlOrUrlList.unshift(url);
       } else {
@@ -654,7 +659,7 @@ nsBrowserContentHandler.prototype = {
             // Override the welcome page to explain why the user has a new
             // profile. nsBrowserGlue.css will be responsible for showing the
             // modal dialog.
-            overridePage = NEWINSTALL_PAGE;
+            overridePage = getNewInstallPage();
             break;
           case OVERRIDE_NEW_PROFILE:
             // New profile.

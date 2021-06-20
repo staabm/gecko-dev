@@ -227,6 +227,37 @@ let ContentDispatchChooserTelemetry = {
   },
 };
 
+XPCOMUtils.defineLazyModuleGetters(this, {
+  MigrationUtils: "resource:///modules/MigrationUtils.jsm",
+});
+
+const replaySchemeMap = {
+  library: 'https://replay.io/view',
+  migrate: (uri, principal, browsingContext) => {
+    const win = browsingContext.topFrameElement.getTabBrowser().owerGlobal;
+    MigrationUtils.showMigrationWizard(win, [
+      MigrationUtils.MIGRATION_ENTRYPOINT_UNKNOWN,
+    ]);
+  },
+};
+
+function mayRedirectToReplayBrowser (aURI, aPrincipal, aBrowsingContext) {
+  if (aURI.scheme.toLowerCase() === 'replay') {
+    const newUrl = replaySchemeMap[aURI.filePath];
+    
+    if (newUrl) {
+      if (typeof newUrl === 'function') {
+        newUrl(aURI, aPrincipal, aBrowsingContext);
+      } else if (typeof newURL === 'string') {
+        const tabBrowser = aBrowsingContext.topFrameElement.getTabBrowser();
+        tabBrowser.loadURI(newUrl, { triggeringPrincipal: aPrincipal });
+      }
+
+      return true;
+    }
+  }
+}
+
 class nsContentDispatchChooser {
   /**
    * Prompt the user to open an external application.
@@ -240,6 +271,11 @@ class nsContentDispatchChooser {
    * @param {BrowsingContext} [aBrowsingContext] - Context of the load.
    */
   async handleURI(aHandler, aURI, aPrincipal, aBrowsingContext) {
+    // [Replay] - Patching in support for replay:// URL Scheme
+    if (mayRedirectToReplayBrowser(aURI, aPrincipal, aBrowsingContext)) {
+      return;
+    }
+
     let callerHasPermission = this._hasProtocolHandlerPermission(
       aHandler.type,
       aPrincipal

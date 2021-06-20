@@ -537,6 +537,7 @@ const commands = {
   "Target.getCurrentMessageContents": Target_getCurrentMessageContents,
   "Target.getFunctionsInRange": Target_getFunctionsInRange,
   "Target.getHTMLSource": Target_getHTMLSource,
+  "Target.getStackFunctionIDs": Target_getStackFunctionIDs,
   "Target.getStepOffsets": Target_getStepOffsets,
   "Target.getSourceMapURL": Target_getSourceMapURL,
   "Target.getSheetSourceMapURL": Target_getSheetSourceMapURL,
@@ -897,6 +898,14 @@ function Target_getFunctionsInRange({ sourceId, begin, end }) {
   return { functions };
 }
 
+function Target_getStackFunctionIDs() {
+  const rv = [];
+  forEachScriptFrame(frame => {
+    rv.push(scriptToFunctionId(frame.script));
+  });
+  return { frameFunctions: rv.reverse() };
+}
+
 function Target_getStepOffsets({ functionId }) {
   const script = functionIdToScript(functionId);
   const offsets = script
@@ -1012,6 +1021,9 @@ function maybeUnserializableNumber(v) {
   }
 }
 
+// Strings longer than this will be truncated when creating protocol values.
+const MaxStringLength = 10000;
+
 function createProtocolValue(v) {
   if (isNonNullObject(v)) {
     if (v.optimizedOut || v.missingArguments) {
@@ -1031,6 +1043,9 @@ function createProtocolValue(v) {
   }
   if (typeof v == "bigint") {
     return { bigint: v.toString() };
+  }
+  if (typeof v == "string" && v.length > MaxStringLength) {
+    return { value: v.substring(0, MaxStringLength) + "…" };
   }
   return { value: v };
 }
@@ -1237,7 +1252,11 @@ function safeGetter(getter) {
 
 // Target limit for the number of items (properties etc.) to include in object
 // previews before overflowing.
-const NumItemsBeforeOverflow = 10;
+const MaxItems = {
+  "noProperties": 0,
+  "canOverflow": 10,
+  "full": 1000,
+};
 
 // Structure for managing construction of protocol ObjectPreview objects.
 function ProtocolObjectPreview(obj, level) {
@@ -1262,11 +1281,7 @@ function ProtocolObjectPreview(obj, level) {
 
 ProtocolObjectPreview.prototype = {
   canAddItem(force) {
-    if (this.level == "noProperties") {
-      this.overflow = true;
-      return false;
-    }
-    if (!force && this.level == "canOverflow" && this.numItems >= NumItemsBeforeOverflow) {
+    if (!force && this.numItems >= MaxItems[this.level]) {
       this.overflow = true;
       return false;
     }
@@ -1381,7 +1396,7 @@ ProtocolObjectPreview.prototype = {
 
     return {
       prototypeId,
-      overflow: this.overflow ? true : undefined,
+      overflow: (this.overflow && this.level != "full") ? true : undefined,
       properties: this.properties,
       containerEntries: this.containerEntries,
       getterValues,

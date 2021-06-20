@@ -916,10 +916,29 @@ uint64_t* js::ExecutionProgressCounter() {
     : mozilla::recordreplay::ExecutionProgressCounter();
 }
 
+static uint64_t gExecutionProgressTarget;
+
 void js::AdvanceExecutionProgressCounter() {
   if (!gForceEmitExecutionProgress) {
     mozilla::recordreplay::AdvanceExecutionProgressCounter();
+    if (*ExecutionProgressCounter() == gExecutionProgressTarget) {
+      mozilla::recordreplay::ExecutionProgressReached();
+    }
   }
+}
+
+uint64_t* js::ExecutionProgressTarget() {
+  return &gExecutionProgressTarget;
+}
+
+void js::SetExecutionProgressTargetCallback(uint64_t aProgress) {
+  MOZ_RELEASE_ASSERT(mozilla::recordreplay::IsReplaying());
+  gExecutionProgressTarget = aProgress;
+}
+
+bool js::RecordReplayProgressReached(JSContext* cx) {
+  mozilla::recordreplay::ExecutionProgressReached();
+  return true;
 }
 
 bool js::RecordReplayAssertValue(JSContext* cx, HandlePropertyName name, HandleValue value) {

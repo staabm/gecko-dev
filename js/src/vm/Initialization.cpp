@@ -249,6 +249,9 @@ JS_PUBLIC_API const char* JS::detail::InitWithFailureDiagnostic(
   if (getenv("RECORD_REPLAY_FORCE_RECORD_JS_ASSERTS")) {
     gForceEmitRecordReplayAsserts = true;
   }
+  if (mozilla::recordreplay::IsReplaying()) {
+    mozilla::recordreplay::SetExecutionProgressCallback(SetExecutionProgressTargetCallback);
+  }
 #endif
 
   libraryInitState = InitState::Running;
