@@ -2637,7 +2637,7 @@ void LIRGenerator::visitInterruptCheck(MInterruptCheck* ins) {
 }
 
 void LIRGenerator::visitExecutionProgress(MExecutionProgress* ins) {
-  LInstruction* lir = new (alloc()) LExecutionProgress();
+  LInstruction* lir = new (alloc()) LExecutionProgress(temp());
   add(lir, ins);
   assignSafepoint(lir, ins);
 }
