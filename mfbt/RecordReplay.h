@@ -246,6 +246,12 @@ MFBT_API ProgressCounter* ExecutionProgressCounter();
 // Advance the execution progress counter.
 MFBT_API void AdvanceExecutionProgressCounter();
 
+// Set a callback the driver can use to set a destination progress value.
+MFBT_API void SetExecutionProgressCallback(void (*aCallback)(uint64_t));
+
+// Called when the last destination progress value which was set has been reached.
+MFBT_API void ExecutionProgressReached();
+
 // Get an identifier for the current execution point which can be used to warp
 // here later.
 MFBT_API ProgressCounter NewTimeWarpTarget();

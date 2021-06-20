@@ -144,6 +144,7 @@ namespace jit {
   _(Int32ToString, js::Int32ToString<CanGC>)                                   \
   _(InterpretResume, js::jit::InterpretResume)                                 \
   _(InterruptCheck, js::jit::InterruptCheck)                                   \
+  _(RecordReplayProgressReached, js::RecordReplayProgressReached)              \
   _(InvokeFunction, js::jit::InvokeFunction)                                   \
   _(IonBinaryArithICUpdate, js::jit::IonBinaryArithIC::update)                 \
   _(IonBindNameICUpdate, js::jit::IonBindNameIC::update)                       \

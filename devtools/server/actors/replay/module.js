@@ -537,6 +537,7 @@ const commands = {
   "Target.getCurrentMessageContents": Target_getCurrentMessageContents,
   "Target.getFunctionsInRange": Target_getFunctionsInRange,
   "Target.getHTMLSource": Target_getHTMLSource,
+  "Target.getStackFunctionIDs": Target_getStackFunctionIDs,
   "Target.getStepOffsets": Target_getStepOffsets,
   "Target.getSourceMapURL": Target_getSourceMapURL,
   "Target.getSheetSourceMapURL": Target_getSheetSourceMapURL,
@@ -895,6 +896,14 @@ function Target_getFunctionsInRange({ sourceId, begin, end }) {
     functions.push(scriptToFunctionId(script));
   });
   return { functions };
+}
+
+function Target_getStackFunctionIDs() {
+  const rv = [];
+  forEachScriptFrame(frame => {
+    rv.push(scriptToFunctionId(frame.script));
+  });
+  return { frameFunctions: rv.reverse() };
 }
 
 function Target_getStepOffsets({ functionId }) {

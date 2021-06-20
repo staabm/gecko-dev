@@ -13868,6 +13868,19 @@ void CodeGenerator::visitInterruptCheck(LInterruptCheck* lir) {
 void CodeGenerator::visitExecutionProgress(LExecutionProgress* lir) {
   masm.maybeCallExecutionProgressHook(lir->mir()->script());
   masm.inc64(AbsoluteAddress(ExecutionProgressCounter()));
+
+  if (mozilla::recordreplay::IsReplaying()) {
+    using Fn = bool (*)(JSContext*);
+    OutOfLineCode* ool =
+      oolCallVM<Fn, RecordReplayProgressReached>(lir, ArgList(), StoreNothing());
+
+    Register tmp = ToRegister(lir->scratch());
+    masm.loadPtr(AbsoluteAddress(ExecutionProgressTarget()), tmp);
+    masm.branchPtr(Assembler::Equal, tmp, ImmPtr(nullptr), ool->rejoin());
+    masm.branchPtr(Assembler::Equal, AbsoluteAddress(ExecutionProgressCounter()),
+                   tmp, ool->entry());
+    masm.bind(ool->rejoin());
+  }
 }
 
 void CodeGenerator::visitWasmInterruptCheck(LWasmInterruptCheck* lir) {

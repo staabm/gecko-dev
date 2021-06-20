@@ -1225,8 +1225,18 @@ extern bool gRecordDataBuffers;
 extern bool gForceEmitExecutionProgress;
 extern bool gForceEmitRecordReplayAsserts;
 
+// Current value of the record/replay progress counter.
 extern uint64_t* ExecutionProgressCounter();
 extern void AdvanceExecutionProgressCounter();
+
+// Any progress value at which we need to notify the record/replay driver when reaching.
+extern uint64_t* ExecutionProgressTarget();
+
+// Callback used by the record/replay driver to set a progress to run to.
+extern void SetExecutionProgressTargetCallback(uint64_t aProgress);
+
+// Called when the target progress has been reached.
+extern bool RecordReplayProgressReached(JSContext* cx);
 
 extern bool ShouldEmitRecordReplayAssert(const char* aFilename,
                                          unsigned aLineno, unsigned aColumn);
