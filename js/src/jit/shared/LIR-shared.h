@@ -633,6 +633,11 @@ class LExecutionProgress : public LInstructionHelper<0, 0, 1> {
  public:
   LIR_HEADER(ExecutionProgress)
 
+  explicit LExecutionProgress(const LDefinition& scratch)
+      : LInstructionHelper(classOpcode) {
+    setTemp(0, scratch);
+  }
+
   LExecutionProgress() : LInstructionHelper(classOpcode) {}
   MExecutionProgress* mir() const { return mir_->toExecutionProgress(); }
 
