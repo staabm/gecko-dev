@@ -1887,9 +1887,11 @@ function onRecordingStarted(recording) {
   }
 
   recording.on("unusable", function(name, data) {
+    // Log the reason so we can see in our CI logs when something went wrong.
+    console.error("Unstable recording: " + data.why);
     const browser = getBrowser();
 
-    reloadAndClearRecordingState(browser, `about:replay?error=${data.why}`);
+    reloadAndClearRecordingState(browser, `https://replay.io/browser/error?message=${data.why}`);
   });
   recording.on("finished", function(name, data) {
     browser = getBrowser();
