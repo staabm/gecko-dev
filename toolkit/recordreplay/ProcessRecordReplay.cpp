@@ -27,6 +27,10 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
+#ifdef XP_MACOSX
+#include "mozilla/MacLaunchHelper.h"
+#endif
+
 extern "C" void RecordReplayOrderDefaultTimeZoneMutex();
 
 namespace mozilla {
@@ -137,6 +141,63 @@ static const char* GetPlatformKind() {
 #endif
 }
 
+extern char gRecordReplayDriver[];
+extern int gRecordReplayDriverSize;
+
+static void* OpenDriverHandle() {
+  const char* driver = getenv("RECORD_REPLAY_DRIVER");
+  bool temporaryDriver = false;
+
+  if (!driver) {
+    const char* tmpdir = getenv("TMPDIR");
+    if (!tmpdir) {
+      fprintf(stderr, "TMPDIR not set, can't create driver.\n");
+      return nullptr;
+    }
+
+    char filename[1024];
+    snprintf(filename, sizeof(filename), "%s/recordreplay.so-XXXXXX", tmpdir);
+    int fd = mkstemp(filename);
+    if (fd < 0) {
+      fprintf(stderr, "mkstemp failed, can't create driver.\n");
+      return nullptr;
+    }
+
+    int nbytes = write(fd, gRecordReplayDriver, gRecordReplayDriverSize);
+    if (nbytes != gRecordReplayDriverSize) {
+      fprintf(stderr, "write to driver temporary file failed, can't create driver.\n");
+      return nullptr;
+    }
+
+    temporaryDriver = true;
+    driver = strdup(filename);
+    close(fd);
+
+#ifdef XP_MACOSX
+    // Strip any quarantine flag on the written file, if necessary, so that
+    // the file can be run or loaded into a process. macOS quarantines any
+    // files created by the browser even if they are related to the update
+    // process.
+    char* args[] = {
+      (char*)"/usr/bin/xattr",
+      (char*)"-d",
+      (char*)"com.apple.quarantine",
+      strdup(driver),
+    };
+    pid_t pid;
+    LaunchChildMac(4, args, &pid);
+#endif
+  }
+
+  void* handle = dlopen(driver, RTLD_LAZY);
+
+  if (temporaryDriver) {
+    unlink(driver);
+  }
+
+  return handle;
+}
+
 bool gRecordAllContent;
 
 extern "C" {
@@ -154,30 +215,9 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   }
   MOZ_RELEASE_ASSERT(dispatchAddress.isSome());
 
-  const char* driver = getenv("RECORD_REPLAY_DRIVER");
-  if (!driver) {
-    fprintf(stderr, "RECORD_REPLAY_DRIVER not set, crashing...\n");
-    MOZ_CRASH("RECORD_REPLAY_DRIVER not set");
-  }
-
-  for (size_t i = 0; i < 60; i++) {
-    gDriverHandle = dlopen(driver, RTLD_LAZY);
-    if (gDriverHandle) {
-      break;
-    }
-
-    // Diagnostics...
-    struct stat s;
-    int rv = stat(driver, &s);
-    fprintf(stderr,
-            "RecordReplayInterface_Initialize DriverStats %s Error %d %s Size %lu Mode %d\n",
-            driver, rv, strerror(errno), (size_t)s.st_size, s.st_mode);
-
-    fprintf(stderr, "Loading driver at %s failed [%s], waiting...\n", driver, dlerror());
-    sleep(1);
-  }
+  gDriverHandle = OpenDriverHandle();
   if (!gDriverHandle) {
-    fprintf(stderr, "Loading driver at %s failed [%s], crashing.\n", driver, dlerror());
+    fprintf(stderr, "Loading driver failed, crashing.\n");
     MOZ_CRASH("RECORD_REPLAY_DRIVER loading failed");
   }
 
