@@ -151,8 +151,7 @@ static void* OpenDriverHandle() {
   if (!driver) {
     const char* tmpdir = getenv("TMPDIR");
     if (!tmpdir) {
-      fprintf(stderr, "TMPDIR not set, can't create driver.\n");
-      return nullptr;
+      tmpdir = "/tmp";
     }
 
     char filename[1024];
