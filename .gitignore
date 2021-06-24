@@ -174,3 +174,5 @@ testing/raptor/.raptor-venv
 testing/raptor/raptor-venv
 testing/raptor/raptor/tests/json/
 testing/raptor/webext/raptor/auto_gen_test_config.js
+
+toolkit/recordreplay/RecordReplayDriver.cpp

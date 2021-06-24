@@ -382,11 +382,18 @@ function Target_getHTMLSource({ url }) {
   return { contents };
 }
 
+// We add the URI of the first loaded page as recording metadata.
+let gHasHTMLContent = false;
+
 function OnHTMLContent(data) {
   const { uri, contents } = JSON.parse(data);
   if (gHtmlContent.has(uri)) {
     gHtmlContent.get(uri).content += contents;
   } else {
+    if (!gHasHTMLContent) {
+      gHasHTMLContent = true;
+      RecordReplayControl.addMetadata({ uri });
+    }
     gHtmlContent.set(uri, { content: contents, contentType: "text/html" });
   }
 }

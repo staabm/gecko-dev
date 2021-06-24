@@ -1450,7 +1450,7 @@ function createRecordingButton() {
     tooltiptext: "record-button.tooltiptext2",
     onClick(evt) {
       const { target: node } = evt;
-      if (getConnectionStatus() || !gHasRecordingDriver || node.classList.contains('waiting')) {
+      if (getConnectionStatus() || node.classList.contains('waiting')) {
         return;
       }
 
@@ -1494,9 +1494,6 @@ function createRecordingButton() {
         let tooltip = status;
         if (status) {
           node.disabled = true;
-        } else if (!gHasRecordingDriver) {
-          node.disabled = true;
-          tooltip = "missingDriver.label";
         } else if (recording) {
           node.disabled = false;
           tooltip = "stopRecording.label";
@@ -1613,27 +1610,6 @@ function getRecordReplayPlatform() {
   }
 }
 
-function DriverName() {
-  return `${getRecordReplayPlatform()}-recordreplay.so`;
-}
-
-function DriverJSON() {
-  return `${getRecordReplayPlatform()}-recordreplay.json`;
-}
-
-// See also SetupRecordReplayDriver in ContentParent.cpp
-function driverFile() {
-  const file = Services.dirsvc.get("UAppData", Ci.nsIFile);
-  file.append(DriverName());
-  return file;
-}
-
-function driverJSONFile() {
-  const file = Services.dirsvc.get("UAppData", Ci.nsIFile);
-  file.append(DriverJSON());
-  return file;
-}
-
 function crashLogFile() {
   const file = Services.dirsvc.get("UAppData", Ci.nsIFile);
   file.append("crashes.log");
@@ -1651,106 +1627,6 @@ async function fetchURL(url) {
   }
   return response;
 }
-
-let gHasRecordingDriver;
-
-async function updateRecordingDriver() {
-  try {
-    fetch;
-  } catch (e) {
-    dump(`updateRecordingDriver: fetch() not in scope, waiting...\n`);
-    setTimeout(updateRecordingDriver, 100);
-    return;
-  }
-
-  // Don't update the driver if one was specified in the environment.
-  if (env.get("RECORD_REPLAY_DRIVER")) {
-    gHasRecordingDriver = true;
-    return;
-  }
-
-  // Set the driver path for use in the recording process.
-  env.set("RECORD_REPLAY_DRIVER", driverFile().path);
-
-  let downloadURL;
-  try {
-    downloadURL = Services.prefs.getStringPref(
-      "devtools.recordreplay.driverDownloads"
-    );
-  } catch (e) {
-    downloadURL = "https://replay.io/downloads";
-  }
-
-  try {
-    const driver = driverFile();
-    const json = driverJSONFile();
-
-    dump(`updateRecordingDriver Starting... [Driver ${driver.path}]\n`);
-
-    if (driver.exists() && !gHasRecordingDriver) {
-      gHasRecordingDriver = true;
-      refreshAllRecordingButtons();
-    }
-
-    // If we have already downloaded the driver, redownload the server JSON
-    // (much smaller than the driver itself) to see if anything has changed.
-    if (json.exists() && driver.exists()) {
-      const response = await fetchURL(`${downloadURL}/${DriverJSON()}`);
-      if (!response) {
-        dump(`updateRecordingDriver JSONFetchFailed\n`);
-        return;
-      }
-      const serverJSON = JSON.parse(await response.text());
-
-      const file = await OS.File.read(json.path);
-      const currentJSON = JSON.parse(new TextDecoder("utf-8").decode(file));
-
-      if (serverJSON.version == currentJSON.version) {
-        // We've already downloaded the latest driver.
-        dump(`updateRecordingDriver AlreadyOnLatestVersion\n`);
-        return;
-      }
-    }
-
-    const jsonResponse = await fetchURL(`${downloadURL}/${DriverJSON()}`);
-    if (!jsonResponse) {
-      dump(`updateRecordingDriver UpdateNeeded JSONFetchFailed\n`);
-      return;
-    }
-    OS.File.writeAtomic(json.path, await jsonResponse.text());
-
-    const driverResponse = await fetchURL(`${downloadURL}/${DriverName()}`);
-    if (!driverResponse) {
-      dump(`updateRecordingDriver UpdateNeeded DriverFetchFailed\n`);
-      return;
-    }
-    OS.File.writeAtomic(driver.path, await driverResponse.arrayBuffer(), {
-      // Write to a temporary path before renaming the result, so that any
-      // recording processes hopefully won't try to load partial binaries
-      // (they will keep trying if the load fails, though).
-      tmpPath: driver.path + ".tmp",
-
-      // Strip quarantine flag from the downloaded file. Even though this is
-      // an update to the browser itself, macOS will still quarantine it and
-      // prevent it from being loaded into recording processes.
-      noQuarantine: true,
-    });
-
-    if (!gHasRecordingDriver) {
-      gHasRecordingDriver = true;
-      refreshAllRecordingButtons();
-    }
-
-    dump(`updateRecordingDriver Updated\n`);
-  } catch (e) {
-    dump(`updateRecordingDriver Exception ${e}\n`);
-  }
-}
-
-// We check to see if there is a new recording driver every time the browser
-// starts up, and periodically after that.
-setTimeout(updateRecordingDriver, 0);
-setInterval(updateRecordingDriver, 1000 * 60 * 20);
 
 async function reloadAndRecordTab(tabbrowser) {
   const tab = tabbrowser.selectedTab;

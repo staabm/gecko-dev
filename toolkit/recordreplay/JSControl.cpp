@@ -44,6 +44,7 @@ static void (*gOnAnnotation)(const char* aKind, const char* aContents);
 static size_t (*gNewTimeWarpTarget)();
 static size_t (*gElapsedTimeMs)();
 static char* (*gGetUnusableRecordingReason)();
+static void (*gAddMetadata)(const char* metadata);
 
 // Callback used when the recording driver is sending us a command to look up
 // some state.
@@ -72,6 +73,7 @@ void InitializeJS() {
   LoadSymbol("RecordReplayNewBookmark", gNewTimeWarpTarget);
   LoadSymbol("RecordReplayElapsedTimeMs", gElapsedTimeMs);
   LoadSymbol("RecordReplayGetUnusableRecordingReason", gGetUnusableRecordingReason);
+  LoadSymbol("RecordReplayAddMetadata", gAddMetadata);
 
   gSetDefaultCommandCallback(CommandCallback);
   gSetClearPauseDataCallback(ClearPauseDataCallback);
@@ -596,6 +598,36 @@ static bool Method_OnAnnotation(JSContext* aCx, unsigned aArgc, Value* aVp) {
   return true;
 }
 
+static bool FillStringCallback(const char16_t* buf, uint32_t len, void* data) {
+  nsCString* str = (nsCString*)data;
+  MOZ_RELEASE_ASSERT(str->Length() == 0);
+  *str = NS_ConvertUTF16toUTF8(buf, len);
+  return true;
+}
+
+static bool Method_AddMetadata(JSContext* aCx, unsigned aArgc, Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  if (!args.get(0).isObject()) {
+    JS_ReportErrorASCII(aCx, "Bad parameters");
+    return false;
+  }
+
+  RootedObject obj(aCx, &args.get(0).toObject());
+
+  nsCString str;
+  if (!JS::ToJSONMaybeSafely(aCx, obj, FillStringCallback, &str)) {
+    return false;
+  }
+
+  if (gAddMetadata) {
+    gAddMetadata(str.get());
+  }
+
+  args.rval().setUndefined();
+  return true;
+}
+
 static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("log", Method_Log, 1, 0),
   JS_FN("onNewSource", Method_OnNewSource, 3, 0),
@@ -609,15 +641,9 @@ static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("onConsoleMessage", Method_OnConsoleMessage, 1, 0),
   JS_FN("onAnnotation", Method_OnAnnotation, 2, 0),
   JS_FN("recordingId", Method_RecordingId, 0, 0),
+  JS_FN("addMetadata", Method_AddMetadata, 1, 0),
   JS_FS_END
 };
-
-static bool FillStringCallback(const char16_t* buf, uint32_t len, void* data) {
-  nsCString* str = (nsCString*)data;
-  MOZ_RELEASE_ASSERT(str->Length() == 0);
-  *str = NS_ConvertUTF16toUTF8(buf, len);
-  return true;
-}
 
 static char* CommandCallback(const char* aMethod, const char* aParams) {
   MOZ_RELEASE_ASSERT(js::IsModuleInitialized());

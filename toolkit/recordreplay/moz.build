@@ -15,6 +15,7 @@ else:
         'HashTable.cpp',
         'JSControl.cpp',
         'ProcessRecordReplay.cpp',
+        'RecordReplayDriver.cpp',
     ]
 
 LOCAL_INCLUDES += [
