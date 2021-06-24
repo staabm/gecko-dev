@@ -77,6 +77,7 @@ static void (*gUnregisterPointer)(void* ptr);
 static int (*gPointerId)(void* ptr);
 static void (*gAssert)(const char* format, va_list);
 static void (*gAssertBytes)(const char* why, const void*, size_t);
+static void (*gSaveRecording)(const char* dir);
 static void (*gFinishRecording)();
 static uint64_t* (*gProgressCounter)();
 static void (*gSetProgressCallback)(void (*aCallback)(uint64_t));
@@ -226,6 +227,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol("RecordReplayValue", gRecordReplayValue);
   LoadSymbol("RecordReplayBytes", gRecordReplayBytes);
   LoadSymbol("RecordReplayPrint", gPrintVA);
+  LoadSymbol("RecordReplaySaveRecording", gSaveRecording);
   LoadSymbol("RecordReplayFinishRecording", gFinishRecording);
   LoadSymbol("RecordReplayRegisterPointer", gRegisterPointer);
   LoadSymbol("RecordReplayUnregisterPointer", gUnregisterPointer);
@@ -260,6 +262,20 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   snprintf(buildId, sizeof(buildId), "%s-gecko-%s", GetPlatformKind(), PlatformBuildID());
   gAttach(*dispatchAddress, buildId);
 
+  if (TestEnv("RECORD_ALL_CONTENT")) {
+    gRecordAllContent = true;
+
+    // We only save information about the recording to disk when recording all
+    // content. We don't want to save this information when the user explicitly
+    // started recording --- they won't use the recording CLI tool
+    // (https://github.com/RecordReplay/recordings-cli) afterwards to inspect
+    // the recording, and we don't want to leak recording IDs to disk in an
+    // unexpected way.
+    if (gSaveRecording) {
+      gSaveRecording(nullptr);
+    }
+  }
+
   js::InitializeJS();
   InitializeGraphics();
 
@@ -286,10 +302,6 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   if (!TestEnv("RECORD_REPLAY_DONT_PROCESS_RECORDINGS") &&
       !TestEnv("RECORD_ALL_CONTENT")) {
     gProcessRecording();
-  }
-
-  if (TestEnv("RECORD_ALL_CONTENT")) {
-    gRecordAllContent = true;
   }
 
   ConfigureGecko();
