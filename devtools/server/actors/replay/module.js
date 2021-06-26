@@ -1201,7 +1201,7 @@ function createProtocolObject(objectId, level) {
     return { objectId, className: "BadObjectId" };
   }
 
-  const className = obj.class;
+  const className = obj.isProxy ? "Proxy" : obj.class;
   let preview;
   if (level != "none") {
     preview = new ProtocolObjectPreview(obj, level).fill();
@@ -1214,7 +1214,16 @@ function createProtocolObject(objectId, level) {
 function isObjectBlacklisted(obj) {
   // Accessing Storage object properties can cause hangs when trying to
   // communicate with the non-existent parent process.
-  return obj.class == "Storage";
+  if (obj.class == "Storage") {
+    return true;
+  }
+
+  // Don't inspect scripted proxies, as we could end up calling into script.
+  if (obj.isProxy) {
+    return true;
+  }
+
+  return false;
 }
 
 // Return whether an object's property should be ignored when generating previews.
