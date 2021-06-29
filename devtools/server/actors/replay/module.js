@@ -382,6 +382,14 @@ function Target_getHTMLSource({ url }) {
   return { contents };
 }
 
+function isInterestingHTML(uri) {
+  // Ignore URIs loaded into extension content processes.
+  if (uri.startsWith("data:text/html") && uri.includes("moz-extension://")) {
+    return false;
+  }
+  return true;
+}
+
 // We add the URI of the first loaded page as recording metadata.
 let gHasHTMLContent = false;
 
@@ -390,7 +398,7 @@ function OnHTMLContent(data) {
   if (gHtmlContent.has(uri)) {
     gHtmlContent.get(uri).content += contents;
   } else {
-    if (!gHasHTMLContent) {
+    if (!gHasHTMLContent && isInterestingHTML(uri)) {
       gHasHTMLContent = true;
       RecordReplayControl.addMetadata({ uri });
     }
