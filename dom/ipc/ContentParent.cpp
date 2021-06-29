@@ -2764,16 +2764,6 @@ ContentParent::ContentParent(const nsACString& aRemoteType,
   : ContentParent(aRemoteType, nsFakePluginTag::NOT_JSPLUGIN,
                   aRecordingDispatchAddress) {}
 
-static nsString GetRecordReplayDriverName() {
-#ifdef XP_MACOSX
-  return u"macOS-recordreplay.so"_ns;
-#elif defined(XP_LINUX)
-  return u"linux-recordreplay.so"_ns;
-#else
-  MOZ_CRASH("GetRecordReplayDriverName unknown platform");
-#endif
-}
-
 // Get the dispatch address to use when recording/replaying.
 // See also getDispatchServer in DevToolsStartup.jsm
 static nsString GetRecordReplayDispatchServer() {
@@ -2782,12 +2772,9 @@ static nsString GetRecordReplayDispatchServer() {
     return NS_ConvertUTF8toUTF16(nsCString(server));
   }
 
-  nsString pref;
-  nsresult rv = Preferences::GetString("devtools.recordreplay.cloudServer", pref);
-  if (NS_FAILED(rv)) {
-    fprintf(stderr, "Warning: Can't determine record/replay server, can't record.\n");
-  }
-  return pref;
+  // When recording all content processes, if RECORD_REPLAY_SERVER isn't specified
+  // then we save recordings to disk.
+  return NS_ConvertUTF8toUTF16(nsCString("*"));
 }
 
 ContentParent::ContentParent(const nsACString& aRemoteType, int32_t aJSPluginID,
