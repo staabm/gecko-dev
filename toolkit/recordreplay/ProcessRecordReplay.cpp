@@ -204,13 +204,17 @@ extern "C" {
 
 MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   // Parse command line options for the process kind and recording file.
-  Maybe<char*> dispatchAddress;
+  Maybe<const char*> dispatchAddress;
   int argc = *aArgc;
   char** argv = *aArgv;
   for (int i = 0; i < argc; i++) {
     if (!strcmp(argv[i], "-recordReplayDispatch")) {
       MOZ_RELEASE_ASSERT(dispatchAddress.isNothing() && i + 1 < argc);
-      dispatchAddress.emplace(argv[i + 1]);
+      const char* arg = argv[i + 1];
+
+      // The special dispatch address "*" is used to indicate that we should
+      // save the recording itself to disk.
+      dispatchAddress.emplace(strcmp(arg, "*") ? arg : nullptr);
     }
   }
   MOZ_RELEASE_ASSERT(dispatchAddress.isSome());

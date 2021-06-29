@@ -237,27 +237,29 @@ static bool IsRecordingUnusable() {
 
 // Recording IDs are UUIDs, and have a fixed length.
 static char gRecordingId[40];
+static bool gHasRecordingId;
 
 static const char* GetRecordingId() {
   if (IsRecordingUnusable()) {
     return nullptr;
   }
-  if (!gRecordingId[0]) {
+  if (!gHasRecordingId) {
     // RecordReplayGetRecordingId() is not currently supported while replaying,
     // so we embed the recording ID in the recording itself.
+    gHasRecordingId = true;
     if (IsRecording()) {
       char* recordingId = gGetRecordingId();
-      if (!recordingId) {
-        MOZ_RELEASE_ASSERT(IsRecordingUnusable());
-        return nullptr;
+      if (recordingId) {
+        MOZ_RELEASE_ASSERT(*recordingId != 0);
+        MOZ_RELEASE_ASSERT(strlen(recordingId) + 1 <= sizeof(gRecordingId));
+        strcpy(gRecordingId, recordingId);
+      } else {
+        memset(gRecordingId, 0, sizeof(gRecordingId));
       }
-      MOZ_RELEASE_ASSERT(*recordingId != 0);
-      MOZ_RELEASE_ASSERT(strlen(recordingId) + 1 <= sizeof(gRecordingId));
-      strcpy(gRecordingId, recordingId);
     }
     RecordReplayBytes("RecordingId", gRecordingId, sizeof(gRecordingId));
   }
-  return gRecordingId;
+  return gRecordingId[0] ? gRecordingId : nullptr;
 }
 
 // If we are recording all content processes, whether any interesting content was found.
@@ -265,10 +267,15 @@ static bool gHasInterestingContent;
 
 // Report the recording as either finished or unusable.
 void SendRecordingFinished() {
-  // If we aren't interested in the recording, mark it as unusable
-  // so the driver doesn't bother with uploading it.
-  if (gRecordAllContent && !gHasInterestingContent) {
-    InvalidateRecording("No interesting content");
+  // When recording all content, we don't notify the UI process about the
+  // new recording. The driver will save information about the recording to disk.
+  if (gRecordAllContent) {
+    // If we aren't interested in the recording, mark it as unusable
+    // so the driver doesn't bother with uploading it.
+    if (!gHasInterestingContent) {
+      InvalidateRecording("No interesting content");
+    }
+    return;
   }
 
   if (!IsModuleInitialized()) {

@@ -382,6 +382,14 @@ function Target_getHTMLSource({ url }) {
   return { contents };
 }
 
+function isInterestingHTML(uri) {
+  // Ignore URIs loaded into extension content processes.
+  if (uri.startsWith("data:text/html") && uri.includes("moz-extension://")) {
+    return false;
+  }
+  return true;
+}
+
 // We add the URI of the first loaded page as recording metadata.
 let gHasHTMLContent = false;
 
@@ -390,7 +398,7 @@ function OnHTMLContent(data) {
   if (gHtmlContent.has(uri)) {
     gHtmlContent.get(uri).content += contents;
   } else {
-    if (!gHasHTMLContent) {
+    if (!gHasHTMLContent && isInterestingHTML(uri)) {
       gHasHTMLContent = true;
       RecordReplayControl.addMetadata({ uri });
     }
@@ -1201,7 +1209,7 @@ function createProtocolObject(objectId, level) {
     return { objectId, className: "BadObjectId" };
   }
 
-  const className = obj.class;
+  const className = obj.isProxy ? "Proxy" : obj.class;
   let preview;
   if (level != "none") {
     preview = new ProtocolObjectPreview(obj, level).fill();
@@ -1214,7 +1222,16 @@ function createProtocolObject(objectId, level) {
 function isObjectBlacklisted(obj) {
   // Accessing Storage object properties can cause hangs when trying to
   // communicate with the non-existent parent process.
-  return obj.class == "Storage";
+  if (obj.class == "Storage") {
+    return true;
+  }
+
+  // Don't inspect scripted proxies, as we could end up calling into script.
+  if (obj.isProxy) {
+    return true;
+  }
+
+  return false;
 }
 
 // Return whether an object's property should be ignored when generating previews.
