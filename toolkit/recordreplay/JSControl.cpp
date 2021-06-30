@@ -9,6 +9,7 @@
 
 #include "mozilla/Base64.h"
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPtr.h"
 #include "js/CharacterEncoding.h"
 #include "js/Conversions.h"
@@ -28,6 +29,33 @@ using namespace JS;
 
 namespace mozilla {
 namespace recordreplay {
+
+// We remember various operations performed by the recording process and add
+// them to the vector below, so that JS can get the complete set and send it
+// up to the UI process for including in metadata about the recording.
+//
+// This is used for operations that could be considered security sensitive,
+// and is currently targeted at times when the recording accesses existing
+// information from the user's profile like cookies and local storage.
+struct RecordingOperation {
+  nsCString mKind;
+  nsCString mValue;
+
+  RecordingOperation(const char* aKind, const char* aValue)
+    : mKind(aKind), mValue(aValue) {}
+};
+static StaticInfallibleVector<RecordingOperation> gRecordingOperations;
+static StaticMutex gRecordingOperationsMutex;
+
+void AddRecordingOperation(const char* aKind, const char* aValue) {
+  if (!recordreplay::IsRecordingOrReplaying()) {
+    return;
+  }
+
+  StaticMutexAutoLock lock(gRecordingOperationsMutex);
+  gRecordingOperations.append(RecordingOperation(aKind, aValue));
+}
+
 namespace js {
 
 static void (*gOnNewSource)(const char* aId, const char* aKind, const char* aUrl);
@@ -635,6 +663,46 @@ static bool Method_AddMetadata(JSContext* aCx, unsigned aArgc, Value* aVp) {
   return true;
 }
 
+static bool Method_RecordingOperations(JSContext* aCx, unsigned aArgc, Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  StaticMutexAutoLock lock(gRecordingOperationsMutex);
+
+  RootedObject rv(aCx, NewArrayObject(aCx, gRecordingOperations.length()));
+  if (!rv) {
+    return false;
+  }
+
+  for (size_t i = 0; i < gRecordingOperations.length(); i++) {
+    RootedString kind(aCx, JS_NewStringCopyZ(aCx, gRecordingOperations[i].mKind.get()));
+    if (!kind) {
+      return false;
+    }
+
+    RootedString value(aCx, JS_NewStringCopyZ(aCx, gRecordingOperations[i].mValue.get()));
+    if (!value) {
+      return false;
+    }
+
+    RootedObject elem(aCx, JS_NewObject(aCx, nullptr));
+    if (!elem) {
+      return false;
+    }
+
+    RootedValue kindVal(aCx, StringValue(kind));
+    RootedValue valueVal(aCx, StringValue(value));
+
+    if (!JS_SetProperty(aCx, elem, "kind", kindVal) ||
+        !JS_SetProperty(aCx, elem, "value", valueVal) ||
+        !JS_SetElement(aCx, rv, i, elem)) {
+      return false;
+    }
+  }
+
+  args.rval().setObject(*rv);
+  return true;
+}
+
 static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("log", Method_Log, 1, 0),
   JS_FN("onNewSource", Method_OnNewSource, 3, 0),
@@ -649,6 +717,7 @@ static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("onAnnotation", Method_OnAnnotation, 2, 0),
   JS_FN("recordingId", Method_RecordingId, 0, 0),
   JS_FN("addMetadata", Method_AddMetadata, 1, 0),
+  JS_FN("recordingOperations", Method_RecordingOperations, 0, 0),
   JS_FS_END
 };
 

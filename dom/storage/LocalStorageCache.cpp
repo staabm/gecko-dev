@@ -19,6 +19,11 @@
 #include "nsThreadUtils.h"
 
 namespace mozilla {
+
+namespace recordreplay {
+  extern void AddRecordingOperation(const char* aKind, const char* aValue);
+}
+
 namespace dom {
 
 #define DOM_STORAGE_CACHE_KEEP_ALIVE_TIME_MS 20000
@@ -75,6 +80,8 @@ LocalStorageCache::LocalStorageCache(const nsACString* aOriginNoSuffix)
       mPersistent(false),
       mPreloadTelemetryRecorded(false) {
   MOZ_COUNT_CTOR(LocalStorageCache);
+
+  recordreplay::AddRecordingOperation("localStorage", mOriginNoSuffix.get());
 }
 
 LocalStorageCache::~LocalStorageCache() {
