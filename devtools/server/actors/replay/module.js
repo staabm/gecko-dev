@@ -527,15 +527,11 @@ function buildRecordingOperations() {
     }
   }
 
-  const rv = {
+  return {
     scriptDomains,
     cookies: cookies ? [...cookies] : undefined,
     storage: storage ? [...storage] : undefined,
   };
-
-  log(`SendRecordingFinished ${JSON.stringify(rv)}`);
-
-  return rv;
 
   function localStorageDomain(value) {
     // Local storage values include the domain with its characters reversed,
