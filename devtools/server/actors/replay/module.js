@@ -338,6 +338,9 @@ gDebugger.onNewScript = (script) => {
   }
 };
 
+// All domains within which scripts were loaded.
+const gScriptDomains = new Set();
+
 function registerSource(source) {
   if (gSources.getId(source)) {
     return;
@@ -370,6 +373,11 @@ function registerSource(source) {
   if (source.introductionType === "inlineScript") {
     kind = "inlineScript";
   }
+
+  try {
+    const domain = new URL(sourceURL).hostname;
+    gScriptDomains.add(domain);
+  } catch (e) {}
 
   RecordReplayControl.onNewSource(id, kind, sourceURL);
 }
@@ -489,6 +497,66 @@ function eventListener(info) {
   }
 }
 
+// Get information about operations performed by the recording which are
+// potentially sensitive and can be shown to users before deciding to make
+// the recording public.
+function buildRecordingOperations() {
+  const scriptDomains = [...gScriptDomains];
+  let cookies, storage;
+
+  for (const { kind, value } of RecordReplayControl.recordingOperations()) {
+    switch (kind) {
+      case "cookie":
+        if (!cookies) {
+          cookies = new Set();
+        }
+        cookies.add(value);
+        break;
+      case "localStorage":
+        if (!storage) {
+          storage = new Set();
+        }
+        storage.add(localStorageDomain(value));
+        break;
+      case "indexedDB":
+        if (!storage) {
+          storage = new Set();
+        }
+        storage.add(indexedDBDomain(value));
+        break;
+    }
+  }
+
+  const rv = {
+    scriptDomains,
+    cookies: cookies ? [...cookies] : undefined,
+    storage: storage ? [...storage] : undefined,
+  };
+
+  log(`SendRecordingFinished ${JSON.stringify(rv)}`);
+
+  return rv;
+
+  function localStorageDomain(value) {
+    // Local storage values include the domain with its characters reversed,
+    // for whatever reason, followed by ".:$protocol:$port"
+    const idx = value.lastIndexOf(".");
+    if (idx < 0) {
+      return value;
+    }
+    return value.substring(0, idx).split("").reverse().join("");
+  }
+
+  function indexedDBDomain(value) {
+    // Indexed DB values include the protocol as well.
+    const idx = value.lastIndexOf("/");
+    if (idx < 0) {
+      return value;
+    }
+    return value.substring(idx + 1);
+  }
+}
+
 function SendRecordingFinished(recordingId) {
   try {
     const document = getWindow().document;
@@ -499,6 +567,7 @@ function SendRecordingFinished(recordingId) {
       duration: new Date() - startTime,
       lastScreenData: getWindowAsImageData(getWindow()),
       lastScreenMimeType: "image/jpeg",
+      operations: buildRecordingOperations(),
     };
     Services.cpmm.sendAsyncMessage("RecordingFinished", data);
   } catch (e) {

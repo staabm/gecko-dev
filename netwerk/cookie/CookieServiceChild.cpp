@@ -34,6 +34,11 @@
 using namespace mozilla::ipc;
 
 namespace mozilla {
+
+namespace recordreplay {
+  extern void AddRecordingOperation(const char* aKind, const char* aValue);
+}
+
 namespace net {
 
 // Pref string constants
@@ -263,6 +268,8 @@ void CookieServiceChild::RecordDocumentCookie(Cookie* aCookie,
   nsAutoCString baseDomain;
   CookieCommons::GetBaseDomainFromHost(mTLDService, aCookie->Host(),
                                        baseDomain);
+
+  recordreplay::AddRecordingOperation("cookie", baseDomain.get());
 
   CookieKey key(baseDomain, aAttrs);
   CookiesList* cookiesList = nullptr;
@@ -497,6 +504,8 @@ CookieServiceChild::SetCookieStringFromDocument(
     nsTArray<CookieStruct> cookiesToSend;
     cookiesToSend.AppendElement(cookie->ToIPC());
 
+    recordreplay::AddRecordingOperation("cookie", baseDomain.get());
+
     // Asynchronously call the parent.
     SendSetCookies(baseDomain, attrs, documentURI, false, cookiesToSend);
   }
@@ -618,6 +627,8 @@ CookieServiceChild::SetCookieStringFromHttp(nsIURI* aHostURI,
 
   // Asynchronously call the parent.
   if (CanSend() && !cookiesToSend.IsEmpty()) {
+    recordreplay::AddRecordingOperation("cookie", baseDomain.get());
+
     SendSetCookies(baseDomain, attrs, aHostURI, true, cookiesToSend);
   }
 
