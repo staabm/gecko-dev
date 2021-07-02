@@ -52,6 +52,8 @@ void AddRecordingOperation(const char* aKind, const char* aValue) {
     return;
   }
 
+  RecordReplayAssert("AddRecordingOperation %s %s", aKind, aValue);
+
   StaticMutexAutoLock lock(gRecordingOperationsMutex);
   gRecordingOperations.append(RecordingOperation(aKind, aValue));
 }
