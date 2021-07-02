@@ -265,6 +265,8 @@ uint32_t CookieServiceChild::CountCookiesFromHashTable(
 
 void CookieServiceChild::RecordDocumentCookie(Cookie* aCookie,
                                               const OriginAttributes& aAttrs) {
+  recordreplay::RecordReplayAssert("CookieServiceChild::RecordDocumentCookie");
+
   nsAutoCString baseDomain;
   CookieCommons::GetBaseDomainFromHost(mTLDService, aCookie->Host(),
                                        baseDomain);
@@ -296,6 +298,8 @@ void CookieServiceChild::RecordDocumentCookie(Cookie* aCookie,
       break;
     }
   }
+
+  recordreplay::RecordReplayAssert("CookieServiceChild::RecordDocumentCookie #1");
 
   int64_t currentTime = PR_Now() / PR_USEC_PER_SEC;
   if (aCookie->Expiry() <= currentTime) {
