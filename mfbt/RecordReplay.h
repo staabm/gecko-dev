@@ -190,8 +190,13 @@ struct MOZ_RAII AutoOrderedLock {
 
 // Mark an existing mutex so that locking operations on it will occur in the
 // same order when replaying as when recording.
+#ifndef XP_WIN
 static inline void AddOrderedPthreadMutex(const char* aName,
                                           pthread_mutex_t* aMutex);
+#else
+static inline void AddOrderedSRWLock(const char* aName,
+                                     /*PSRWLOCK*/ void* aLock);
+#endif
 
 // Atomic wrapper that ensures accesses happen in the same order when
 // recording vs. replaying.
@@ -370,10 +375,17 @@ MOZ_MAKE_RECORD_REPLAY_WRAPPER(CreateOrderedLock, int, 0,
                                (const char* aName), (aName))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(OrderedLock, (int aLock), (aLock))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(OrderedUnlock, (int aLock), (aLock))
+MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AssertScriptedCaller, (const char* aWhy), (aWhy))
+
+#ifndef XP_WIN
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AddOrderedPthreadMutex,
                                     (const char* aName, pthread_mutex_t* aMutex),
                                     (aName, aMutex));
-MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AssertScriptedCaller, (const char* aWhy), (aWhy))
+#else
+MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AddOrderedSRWLock,
+                                    (const char* aName, void* aLock),
+                                    (aName, aLock));
+#endif
 
 #undef MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID
 #undef MOZ_MAKERECORDREPLAYWRAPPER

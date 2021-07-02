@@ -15,7 +15,12 @@
 
 #include <unordered_map>
 #include <unordered_set>
+
+#ifndef XP_WIN
 #include <sys/mman.h>
+#else
+#include <memoryapi.h>
+#endif
 
 namespace mozilla {
 namespace recordreplay {
@@ -114,17 +119,27 @@ class StableHashTableInfo {
         mTable(nullptr),
         mCallbackHash(0) {
     // Allocate RWX memory for callbacks.
+#ifndef XP_WIN
     mCallbackStorage = (uint8_t*)mmap(nullptr, CallbackStorageCapacity,
                                       PROT_READ | PROT_WRITE | PROT_EXEC,
                                       MAP_PRIVATE | MAP_ANON, 0, 0);
     MOZ_RELEASE_ASSERT(mCallbackStorage != MAP_FAILED);
-
+#else
+    mCallbackStorage = (uint8_t*)VirtualAlloc(nullptr, CallbackStorageCapacity,
+                                              MEM_COMMIT | MEM_RESERVE,
+                                              PAGE_EXECUTE_READWRITE);
+    MOZ_RELEASE_ASSERT(mCallbackStorage);
+#endif
     MarkValid();
   }
 
   ~StableHashTableInfo() {
     MOZ_RELEASE_ASSERT(mHashToKey.empty());
+#ifndef XP_WIN
     munmap(mCallbackStorage, CallbackStorageCapacity);
+#else
+    VirtualFree(mCallbackStorage, 0, MEM_RELEASE);
+#endif
 
     UnmarkValid();
   }

@@ -23,7 +23,10 @@
 
 #include <fcntl.h>
 #include <sys/stat.h>
+
+#ifndef XP_WIN
 #include <unistd.h>
+#endif
 
 using namespace JS;
 
@@ -51,6 +54,8 @@ void AddRecordingOperation(const char* aKind, const char* aValue) {
   if (!recordreplay::IsRecordingOrReplaying()) {
     return;
   }
+
+  RecordReplayAssert("AddRecordingOperation %s %s", aKind, aValue);
 
   StaticMutexAutoLock lock(gRecordingOperationsMutex);
   gRecordingOperations.append(RecordingOperation(aKind, aValue));

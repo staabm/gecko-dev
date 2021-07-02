@@ -234,9 +234,9 @@ class MozillaBuildBootstrapper(BaseBootstrapper):
     def ensure_minidump_stackwalk_packages(self, state_dir, checkout_root):
         from mozboot import minidump_stackwalk
 
-        self.install_toolchain_artifact(
-            state_dir, checkout_root, minidump_stackwalk.WINDOWS_MINIDUMP_STACKWALK
-        )
+        #self.install_toolchain_artifact(
+        #    state_dir, checkout_root, minidump_stackwalk.WINDOWS_MINIDUMP_STACKWALK
+        #)
 
     def _update_package_manager(self):
         pass

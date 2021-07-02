@@ -51,8 +51,19 @@ std::condition_variable *initCondition;
 // Used when ICU implementation code passes nullptr for the mutex pointer.
 UMutex globalMutex;
 
-pthread_once_t initFlag = PTHREAD_ONCE_INIT;
-pthread_once_t *pInitFlag = &initFlag;
+std::atomic<int> initFlag{0};
+std::atomic<int> *pInitFlag = &initFlag;
+
+static void call_once(std::atomic<int>* init, void (*callback)()) {
+    int v = 0;
+    bool rv = std::atomic_compare_exchange_strong(init, &v, 1);
+    if (rv) {
+        callback();
+        *init = 2;
+    } else {
+        while (*init != 2) {}
+    }
+}
 
 }  // Anonymous namespace
 
@@ -64,7 +75,7 @@ static UBool U_CALLCONV umtx_cleanup() {
 
     // Reset the once_flag, by destructing it and creating a fresh one in its place.
     // Do not use this trick anywhere else in ICU; use umtx_initOnce, not std::call_once().
-    *pInitFlag = PTHREAD_ONCE_INIT;
+    *pInitFlag = 0;
     return true;
 }
 
@@ -79,7 +90,7 @@ U_CDECL_END
 std::mutex *UMutex::getMutex() {
     std::mutex *retPtr = fMutex.load(std::memory_order_acquire);
     if (retPtr == nullptr) {
-        pthread_once(pInitFlag, umtx_init);
+        call_once(pInitFlag, umtx_init);
         std::lock_guard<std::mutex> guard(*initMutex);
         retPtr = fMutex.load(std::memory_order_acquire);
         if (retPtr == nullptr) {
@@ -142,7 +153,7 @@ umtx_unlock(UMutex* mutex)
 //
 U_COMMON_API UBool U_EXPORT2
 umtx_initImplPreInit(UInitOnce &uio) {
-    pthread_once(pInitFlag, umtx_init);
+    call_once(pInitFlag, umtx_init);
     std::unique_lock<std::mutex> lock(*initMutex);
     if (umtx_loadAcquire(uio.fState) == 0) {
         umtx_storeRelease(uio.fState, 1);

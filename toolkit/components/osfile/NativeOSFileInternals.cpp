@@ -56,7 +56,9 @@
 #  include <windows.h>
 #endif  // defined (XP_WIN)
 
+#if defined(XP_MACOSX)
 #include "mozilla/MacLaunchHelper.h"
+#endif
 
 namespace mozilla {
 

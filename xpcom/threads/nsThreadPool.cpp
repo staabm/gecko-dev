@@ -46,6 +46,17 @@ static void InitThreadPool() {
   gCurrentThreadPool.infallibleInit();
 }
 
+static void call_once(std::atomic<int>* init, void (*callback)()) {
+  int v = 0;
+  bool rv = std::atomic_compare_exchange_strong(init, &v, 1);
+  if (rv) {
+    callback();
+    *init = 2;
+  } else {
+    while (*init != 2) {}
+  }
+}
+
 nsThreadPool::nsThreadPool()
     : Runnable("nsThreadPool"),
       mMutex("[nsThreadPool.mMutex]", /* aOrdered */ true),
@@ -58,8 +69,8 @@ nsThreadPool::nsThreadPool()
       mShutdown(false),
       mRegressiveMaxIdleTime(false),
       mIsAPoolThreadFree(true) {
-  static pthread_once_t flag = PTHREAD_ONCE_INIT;
-  pthread_once(&flag, InitThreadPool);
+  static std::atomic<int> flag{0};
+  call_once(&flag, InitThreadPool);
 
   LOG(("THRD-P(%p) constructor!!!\n", this));
 }

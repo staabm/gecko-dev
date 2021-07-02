@@ -8,8 +8,6 @@
 
 #include "ProcessRecordReplay.h"
 
-#include <sys/mman.h>
-
 namespace mozilla {
 namespace recordreplay {
 

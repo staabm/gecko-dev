@@ -50,7 +50,11 @@ class OffTheBooksMutex : public detail::MutexImpl, BlockingResourceBase {
 #endif
   {
     if (aOrdered) {
+#ifndef XP_WIN
       recordreplay::AddOrderedPthreadMutex(aName, NativeHandle());
+#else
+      recordreplay::AddOrderedSRWLock(aName, NativeHandle());
+#endif
     }
   }
 

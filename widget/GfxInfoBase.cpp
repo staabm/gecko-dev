@@ -52,11 +52,22 @@ static void CallClearOnShutdown() {
   ClearOnShutdown(&GfxInfoBase::sFeatureStatus);
 }
 
+static void call_once(std::atomic<int>* init, void (*callback)()) {
+  int v = 0;
+  bool rv = std::atomic_compare_exchange_strong(init, &v, 1);
+  if (rv) {
+    callback();
+    *init = 2;
+  } else {
+    while (*init != 2) {}
+  }
+}
+
 // Call this when setting sFeatureStatus to a non-null pointer to
 // ensure destruction even if the GfxInfo component is never instantiated.
 static void InitFeatureStatus(nsTArray<gfx::GfxInfoFeatureStatus>* aPtr) {
-  static pthread_once_t sOnce;
-  pthread_once(&sOnce, CallClearOnShutdown);
+  static std::atomic<int> sOnce{0};
+  call_once(&sOnce, CallClearOnShutdown);
   GfxInfoBase::sFeatureStatus = aPtr;
 }
 

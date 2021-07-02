@@ -6,12 +6,15 @@
 #include <windows.h>
 #include "nsNativeAppSupportWin.h"
 
+/* These icons are disabled to avoid build breaks when using non-standard branding. */
+/*
 IDI_APPICON ICON FIREFOX_ICO
 IDI_DOCUMENT ICON DOCUMENT_ICO
 IDI_APPLICATION ICON FIREFOX_ICO
 IDI_NEWWINDOW ICON NEWWINDOW_ICO
 IDI_NEWTAB ICON NEWTAB_ICO
 IDI_PBMODE ICON PBMODE_ICO
+*/
 
 STRINGTABLE DISCARDABLE
 BEGIN

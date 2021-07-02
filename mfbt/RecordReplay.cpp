@@ -38,7 +38,18 @@ namespace recordreplay {
   Macro(NewTimeWarpTarget, ProgressCounter, (), ())                            \
   Macro(ShouldUpdateProgressCounter, bool, (const char* aURL), (aURL))
 
+#ifndef XP_WIN
+#define FOR_EACH_PLATFORM_INTERFACE_VOID(Macro)                                \
+  Macro(InternalAddOrderedPthreadMutex,                                        \
+        (const char* aName, pthread_mutex_t* aMutex), (aName, aMutex))
+#else
+#define FOR_EACH_PLATFORM_INTERFACE_VOID(Macro)                                \
+  Macro(InternalAddOrderedSRWLock,                                             \
+        (const char* aName, void* aLock), (aName, aLock))
+#endif
+
 #define FOR_EACH_INTERFACE_VOID(Macro)                                         \
+  FOR_EACH_PLATFORM_INTERFACE_VOID(Macro)                                      \
   Macro(InternalBeginPassThroughThreadEvents, (), ())                          \
   Macro(InternalEndPassThroughThreadEvents, (), ())                            \
   Macro(InternalBeginDisallowThreadEvents, (), ())                             \
@@ -64,8 +75,6 @@ namespace recordreplay {
   Macro(InternalUnregisterThing, (void* aThing), (aThing))                     \
   Macro(InternalOrderedLock, (int aLock), (aLock))                             \
   Macro(InternalOrderedUnlock, (int aLock), (aLock))                           \
-  Macro(InternalAddOrderedPthreadMutex,                                        \
-        (const char* aName, pthread_mutex_t* aMutex), (aName, aMutex))         \
   Macro(BeginContentParse,                                                     \
         (const void* aToken, const char* aURL, const char* aContentType),      \
         (aToken, aURL, aContentType))                                          \
