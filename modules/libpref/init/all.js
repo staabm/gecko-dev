@@ -805,7 +805,7 @@ pref("toolkit.dump.emit", false);
 
 // Address of the cloud server to connect to for record/replay sessions.
 pref("devtools.recordreplay.cloudServer", "wss://dispatch.replay.io");
-pref("devtools.recordreplay.recordingsUrl", "https://replay.io/view");
+pref("devtools.recordreplay.recordingsUrl", "https://app.replay.io");
 pref("devtools.recordreplay.saveRecordingsUrl", "http://recordings.replay.io");
 pref("devtools.recordreplay.authentication-enabled", true);
 pref("devtools.recordreplay.user", "");
