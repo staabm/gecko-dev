@@ -10,14 +10,14 @@ the Record Replay gecko based browser.
 3. Download `MacOSX10.12.sdk.tar.xz` from https://github.com/phracker/MacOSX-SDKs/releases
 4. untar `MacOSX10.12.sdk.tar.xz` in the repo root to create a `MacOSX10.12.sdk` directory
 5. run `./mach bootstrap` and select (2) Firefox Desktop
-6. run `./mach build`
+6. run `node build`
 7. run `./mach run`
 
 **Linux**
 
 1. `cp mozconfig.linuxsample mozconfig`
 2. run `./mach bootstrap` and select (2) Firefox Desktop
-3. run `./mach build`
+3. run `node build`
 4. run `./mach run`
 
 ### Troubleshooting Tips
