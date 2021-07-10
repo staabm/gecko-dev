@@ -950,9 +950,9 @@ bool js::RecordReplayAssertValue(JSContext* cx, HandlePropertyName name, HandleV
   JS::AutoSuppressGCAnalysis nogc;
 
   char nameBuf[256];
-  MOZ_RELEASE_ASSERT(name->length() < sizeof(nameBuf));
-  memcpy(nameBuf, name->latin1Chars(nogc), name->length());
-  nameBuf[name->length()] = 0;
+  size_t nameLength = std::min<size_t>(name->length(), sizeof(nameBuf) - 1);
+  memcpy(nameBuf, name->latin1Chars(nogc), nameLength);
+  nameBuf[nameLength] = 0;
 
   char buf[1024];
   NonBuiltinFrameIter i(cx, cx->realm()->principals());
