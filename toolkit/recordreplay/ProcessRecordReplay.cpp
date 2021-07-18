@@ -512,11 +512,19 @@ void RecordReplayOrderedUnlock(int aLock) {
 }
 
 #ifndef XP_WIN
+
 MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedPthreadMutex(const char* aName,
                                                                      pthread_mutex_t* aMutex) {
   gAddOrderedPthreadMutex(aName, aMutex);
 }
-#endif
+
+#else // XP_WIN
+
+MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedSRWLock(const char* aName, void* aLock) {
+  gAddOrderedSRWLock(aName, aLock);
+}
+
+#endif // XP_WIN
 
 static Vector<const char*> gCrashNotes;
 

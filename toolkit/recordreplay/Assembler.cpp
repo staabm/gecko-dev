@@ -104,19 +104,16 @@ void* BindFunctionArgument(void* aFunction, void* aArgument,
   // argument position with the bound argument value.
   aAssembler.MoveImmediateToRax(aArgument);
 
-  switch (aArgumentPosition) {
-    case 1:
-      aAssembler.MoveRaxToRegister(Register::RSI);
-      break;
-    case 2:
-      aAssembler.MoveRaxToRegister(Register::RDX);
-      break;
-    case 3:
-      aAssembler.MoveRaxToRegister(Register::RCX);
-      break;
-    default:
-      MOZ_CRASH();
-  }
+#ifndef XP_WIN
+  // macOS and linux use the System V ABI
+  Register abi[] = { Register::RDI, Register::RSI, Register::RDX, Register::RCX };
+#else
+  // windows uses its own fastcall ABI
+  Register abi[] = { Register::RCX, Register::RDX, Register::R8, Register::R9 };
+#endif
+
+  MOZ_RELEASE_ASSERT(aArgumentPosition < ArrayLength(abi));
+  aAssembler.MoveRaxToRegister(abi[aArgumentPosition]);
 
   // Jump to the function that was bound.
   aAssembler.Jump(aFunction);
