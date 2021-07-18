@@ -224,6 +224,12 @@ static DriverHandle OpenDriverHandle() {
   return handle;
 }
 
+static void FreeCallback(void* aPtr) {
+  // This may be calling into jemalloc, which won't happen on all platforms
+  // if the driver tries to call free() directly.
+  free(aPtr);
+}
+
 bool gRecordAllContent;
 
 extern "C" {
@@ -324,6 +330,10 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
     LoadSymbol("RecordReplaySetCrashLogFile", SetCrashLogFile);
     SetCrashLogFile(logFile);
   }
+
+  void (*SetFreeCallback)(void (*aCallback)(void*));
+  LoadSymbol("RecordReplaySetFreeCallback", SetFreeCallback);
+  SetFreeCallback(FreeCallback);
 
   ParseJSFilters("RECORD_REPLAY_RECORD_EXECUTION_ASSERTS", gExecutionAsserts);
   ParseJSFilters("RECORD_REPLAY_RECORD_JS_ASSERTS", gJSAsserts);

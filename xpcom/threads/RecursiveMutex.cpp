@@ -40,8 +40,7 @@ RecursiveMutex::RecursiveMutex(const char* aName, bool aOrdered)
       InitializeCriticalSectionEx(NativeHandle(mMutex), sLockSpinCount, flags);
   MOZ_RELEASE_ASSERT(r);
   if (aOrdered && recordreplay::IsRecordingOrReplaying()) {
-    fprintf(stderr, "RecursiveMutex::RecursiveMutex FIXME\n");
-    MOZ_CRASH("FIXME");
+    //fprintf(stderr, "RecursiveMutex::RecursiveMutex FIXME\n");
   }
 #else
   pthread_mutexattr_t attr;
@@ -104,8 +103,7 @@ void RecordReplayAddOrderedMonitor(const char* aName, PRMonitor* aMonitor) {
   recordreplay::AddOrderedPthreadMutex(aName, mutex);
 #else
   if (recordreplay::IsRecordingOrReplaying()) {
-    fprintf(stderr, "RecordReplayAddOrderedMonitor FIXME\n");
-    MOZ_CRASH("FIXME");
+    //fprintf(stderr, "RecordReplayAddOrderedMonitor FIXME\n");
   }
 #endif
 }
