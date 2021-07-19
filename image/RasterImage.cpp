@@ -464,6 +464,8 @@ RasterImage::WillDrawOpaqueNow() {
 }
 
 void RasterImage::OnSurfaceDiscarded(const SurfaceKey& aSurfaceKey) {
+  recordreplay::RecordReplayAssert("RasterImage::OnSurfaceDiscarded");
+
   MOZ_ASSERT(mProgressTracker);
 
   bool animatedFramesDiscarded =
