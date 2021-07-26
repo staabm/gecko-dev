@@ -1082,7 +1082,7 @@ NS_IMETHODIMP NrUdpSocketIpcProxy::CallListenerClosed() {
 // NrUdpSocketIpc Implementation
 NrUdpSocketIpc::NrUdpSocketIpc()
     : NrSocketIpc(GetIOThreadAndAddUse_s()),
-      monitor_("NrUdpSocketIpc"),
+      monitor_("NrUdpSocketIpc", /* aOrdered */ true),
       err_(false),
       state_(NR_INIT) {}
 
