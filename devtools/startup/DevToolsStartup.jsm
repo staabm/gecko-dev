@@ -35,7 +35,16 @@ const DEVTOOLS_POLICY_DISABLED_PREF = "devtools.policy.disabled";
 const { XPCOMUtils } = ChromeUtils.import(
   "resource://gre/modules/XPCOMUtils.jsm"
 );
-const { getConnectionStatus, setConnectionStatusChangeCallback, toggleRecording, getRecordingState, RecordingState } = ChromeUtils.import(
+const {
+  getConnectionStatus,
+  setConnectionStatusChangeCallback,
+  toggleRecording,
+  getRecordingState,
+  RecordingState,
+  isLoggedIn,
+  saveRecordingToken,
+  isRunningTest,
+} = ChromeUtils.import(
   "resource://devtools/server/actors/replay/connection.js"
 );
 
@@ -736,11 +745,11 @@ DevToolsStartup.prototype = {
 
     function registerWebChannel(url) {
       const urlForWebChannel = Services.io.newURI(url);
-      const channel = new WebChannel("record-replay", urlForWebChannel);
+      const channel = new WebChannel("record-replay-token", urlForWebChannel);
 
       channel.listen((id, message) => {
-        const { user } = message;
-        saveRecordingUser(user);
+        const { token } = message;
+        saveRecordingToken(token);
       });
     }
   },
@@ -1401,31 +1410,6 @@ function recordReplayLog(text) {
 
 ChromeUtils.recordReplayLog = recordReplayLog;
 
-function isLoggedIn() {
-  const userPref = Services.prefs.getStringPref("devtools.recordreplay.user");
-  if (userPref == "") {
-    return;
-  }
-  const user = JSON.parse(userPref);
-
-  // Older versions of Replay did not store the raw object from Auth0 and
-  // instead stored backend DB user info, so we need to explicitly look for
-  // "sub", not just any parsed object.
-  return user == "" ? null : !!user?.sub;
-}
-
-async function saveRecordingUser(user) {
-  if (!user) {
-    Services.prefs.setStringPref("devtools.recordreplay.user", "");
-    return;
-  }
-
-  Services.prefs.setStringPref(
-    "devtools.recordreplay.user",
-    JSON.stringify(user)
-  );
-}
-
 function createRecordingButton() {
   runTestScript();
 
@@ -1449,7 +1433,7 @@ function createRecordingButton() {
 
         node.classList.toggle("recording", state === RecordingState.RECORDING);
         node.classList.toggle("waiting", state === RecordingState.STARTING || state === RecordingState.STOPPING);
-        node.classList.toggle("hidden", !isLoggedIn() && !isRunningTest());
+        node.classList.toggle("hidden", !isLoggedIn());
 
         const status = getConnectionStatus();
         let tooltip = status;
@@ -1468,7 +1452,7 @@ function createRecordingButton() {
       };
       node.refreshStatus();
 
-      Services.prefs.addObserver("devtools.recordreplay.user", () => {
+      Services.prefs.addObserver("devtools.recordreplay.user-token", () => {
         node.refreshStatus();
       });
     },
@@ -1491,16 +1475,22 @@ function createRecordingButton() {
     tooltiptext: "replay-signin-button.tooltiptext2",
     onClick(evt) {
       const { gBrowser } = evt.target.ownerDocument.defaultView;
-      const triggeringPrincipal = Services.scriptSecurityManager.getSystemPrincipal();
-      gBrowser.loadURI("https://app.replay.io/?signin=true", { triggeringPrincipal });
+      const url = "https://app.replay.io/?signin=true";
+      const options = { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() };
+
+      if (getRecordingState(gBrowser.selectedBrowser) === RecordingState.READY) {
+        gBrowser.loadURI(url, options);
+      } else {
+        gBrowser.selectedTab = gBrowser.addTab(url, options);
+      }
     },
     onCreated(node) {
       node.refreshStatus = () => {
-        node.classList.toggle("hidden", isLoggedIn() || isRunningTest());
+        node.classList.toggle("hidden", isLoggedIn());
       };
       node.refreshStatus();
 
-      Services.prefs.addObserver("devtools.recordreplay.user", () => {
+      Services.prefs.addObserver("devtools.recordreplay.user-token", () => {
         node.refreshStatus();
       });
     },
@@ -1533,10 +1523,6 @@ function refreshAllRecordingButtons() {
 // buttons immediately, but make sure that the recording button state does not
 // get out of sync with the display state of the button.
 setInterval(refreshAllRecordingButtons, 2000);
-
-function isRunningTest() {
-  return !!env.get("RECORD_REPLAY_TEST_SCRIPT");
-}
 
 async function runTestScript() {
   const script = env.get("RECORD_REPLAY_TEST_SCRIPT");

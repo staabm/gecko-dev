@@ -47,6 +47,10 @@ function onMainThreadMessage({ data }) {
         });
       break;
     }
+    case "setAccessToken": {
+      gSockets.get(data.channelId).setAccessToken(data.token);
+      break;
+    }
     case "closeChannel": {
       const socket = gSockets.get(data.channelId);
       if (socket) {
@@ -70,6 +74,7 @@ class ProtocolSocket {
     this._pendingMessages = new Map();
     this._socket = null;
     this._onStateChangeCallback = null;
+    this._token = null;
 
     this._initialize();
   }
@@ -95,13 +100,20 @@ class ProtocolSocket {
     this._msgId = 1;
     this._state = "open";
 
+    // Skip the command queue and immediately send the access token when we
+    // connect, if it is available.
+    if (this._token) {
+      this.sendCommand("Authentication.setAccessToken", { accessToken: this._token });
+    }
+
     for (const entry of this._pendingMessages.values()) {
-      if (typeof entry.msg !== "string") {
-        postError("Unexpected non-pending message");
-        return;
+      if (typeof entry.msg === "string") {
+        doSend(this._socket, entry.msg);
+        entry.msg = null;
+      } else {
+        // The setAccessToken message above will follow
+        // this path, but it should be the only thing.
       }
-      doSend(this._socket, entry.msg);
-      entry.msg = null;
     }
 
     this._notifyStateChange();
@@ -175,6 +187,16 @@ class ProtocolSocket {
       error: result.error,
       result: result.result,
     };
+  }
+
+  setAccessToken(token) {
+    this._token = token;
+    if (this._state === "open") {
+      this.sendCommand("Authentication.setAccessToken", { accessToken: token });
+    } else {
+      // The token is automatically sent when the connection switches into
+      // the open state.
+    }
   }
 
   close() {
