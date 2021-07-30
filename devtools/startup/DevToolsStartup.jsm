@@ -1449,7 +1449,7 @@ function createRecordingButton() {
 
         node.classList.toggle("recording", state === RecordingState.RECORDING);
         node.classList.toggle("waiting", state === RecordingState.STARTING || state === RecordingState.STOPPING);
-        node.classList.toggle("hidden", isAuthenticationEnabled() && !isLoggedIn() && !isRunningTest());
+        node.classList.toggle("hidden", !isLoggedIn() && !isRunningTest());
 
         const status = getConnectionStatus();
         let tooltip = status;
@@ -1496,7 +1496,7 @@ function createRecordingButton() {
     },
     onCreated(node) {
       node.refreshStatus = () => {
-        node.classList.toggle("hidden", !isAuthenticationEnabled() || isLoggedIn() || isRunningTest());
+        node.classList.toggle("hidden", isLoggedIn() || isRunningTest());
       };
       node.refreshStatus();
 
@@ -1598,15 +1598,5 @@ function viewRecordings(evt) {
   gBrowser.loadURI(
     Services.prefs.getStringPref("devtools.recordreplay.recordingsUrl"),
     { triggeringPrincipal }
-  );
-}
-
-function isAuthenticationEnabled() {
-  // Authentication is controlled by a preference but can be disabled by an
-  // environment variable.
-  return (
-    Services.prefs.getBoolPref(
-      "devtools.recordreplay.authentication-enabled"
-    ) && !env.get("RECORD_REPLAY_DISABLE_AUTHENTICATION")
   );
 }

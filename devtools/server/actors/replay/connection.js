@@ -205,16 +205,6 @@ class CommandError extends Error {
 // Resolve hooks for promises waiting on a recording to be created.
 const gRecordingCreateWaiters = [];
 
-function isAuthenticationEnabled() {
-  // Authentication is controlled by a preference but can be disabled by an
-  // environment variable.
-  return (
-    Services.prefs.getBoolPref(
-      "devtools.recordreplay.authentication-enabled"
-    ) && !getenv("RECORD_REPLAY_DISABLE_AUTHENTICATION")
-  );
-}
-
 function isRunningTest() {
   return !!getenv("RECORD_REPLAY_TEST_SCRIPT");
 }
@@ -575,10 +565,6 @@ function setRecordingSaved(browser, recordingId) {
   const localTest = getenv("RECORD_REPLAY_LOCAL_TEST");
   if (localTest) {
     extra += `&test=${localTest}`;
-  } else if (!isAuthenticationEnabled()) {
-    // Adding this urlparam disables checks in the devtools that the user has
-    // permission to view the recording.
-    extra += `&test=1`;
   }
 
   const tabbrowser = browser.getTabBrowser();
