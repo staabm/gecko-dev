@@ -1555,17 +1555,6 @@ async function runTestScript() {
   eval(text);
 }
 
-function getRecordReplayPlatform() {
-  switch (AppConstants.platform) {
-    case "macosx":
-      return "macOS";
-    case "linux":
-      return "linux";
-    default:
-      throw new Error(`Unrecognized platform ${AppConstants.platform}`);
-  }
-}
-
 function crashLogFile() {
   const file = Services.dirsvc.get("UAppData", Ci.nsIFile);
   file.append("crashes.log");
@@ -1574,15 +1563,6 @@ function crashLogFile() {
 
 // Set the crash log file which the driver will use.
 env.set("RECORD_REPLAY_CRASH_LOG", crashLogFile().path);
-
-async function fetchURL(url) {
-  const response = await fetch(url);
-  if (response.status < 200 || response.status >= 300) {
-    console.error("Error fetching URL", url, response);
-    return null;
-  }
-  return response;
-}
 
 Services.obs.addObserver(
   subject => refreshRecordingButton(subject.wrappedJSObject.browser.ownerDocument),

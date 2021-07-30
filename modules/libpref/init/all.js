@@ -807,12 +807,7 @@ pref("toolkit.dump.emit", false);
 // Address of the cloud server to connect to for record/replay sessions.
 pref("devtools.recordreplay.cloudServer", "wss://dispatch.replay.io");
 pref("devtools.recordreplay.recordingsUrl", "https://app.replay.io/");
-pref("devtools.recordreplay.saveRecordingsUrl", "http://recordings.replay.io");
 pref("devtools.recordreplay.user", "");
-pref("devtools.recordreplay.has-synced", false);
-
-// Base URL to use when checking for new driver versions.
-pref("devtools.recordreplay.driverDownloads", "https://replay.io/downloads");
 
 // Whether to upload source maps and original sources to the cloud server.
 pref("devtools.recordreplay.uploadSourceMaps", true);
