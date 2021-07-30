@@ -161,6 +161,13 @@ class ProtocolSocket {
     return response.result;
   }
 
+  setAccessToken(token) {
+    if (!token) {
+      throw new Error("Token must be truthy");
+    }
+    gWorker.postMessage({ kind: "setAccessToken", channelId: this._channelId, token });
+  }
+
   close() {
     gSockets.delete(this._channelId);
     gWorker.postMessage({ kind: "closeChannel", channelId: this._channelId });
@@ -191,8 +198,61 @@ gCommandSocket.onStateChange = state => {
   }
 }
 
+let gTokenChangeCallbacks = null;
+function setAccessToken(token, isAPIKey) {
+  gCommandSocket.setAccessToken(token);
+
+  // If we're working with an API key, there's no way for us to get a new
+  // key to try again, so we can bail early and let the retry code figure
+  // out what it wants to do.
+  if (isAPIKey) {
+    if (gTokenChangeCallbacks) {
+      throw new Error("Unexpected API key");
+    }
+    return;
+  }
+  for (const callback of gTokenChangeCallbacks || []) {
+    callback();
+  }
+  gTokenChangeCallbacks = new Set();
+}
+
+const AUTHENTICATION_REQUIRED_CODE = 49;
+
 async function sendCommand(method, params) {
-  return gCommandSocket.sendCommand(method, params);
+  const tokenCallbacks = gTokenChangeCallbacks;
+  try {
+    return await gCommandSocket.sendCommand(method, params);
+  } catch (err) {
+    if (!(err instanceof CommandError) || err.code !== AUTHENTICATION_REQUIRED_CODE) {
+      throw err;
+    }
+
+    // If there was no set of token callbacks to begin with, we can assume that
+    // we'll either have hidden the record button in the first place, or are working
+    // with an API key that can't be renewed and thus don't have anything to wait for.
+    if (!tokenCallbacks) {
+      throw err;
+    }
+
+    // If the token hasn't been changed since the first attempt was dispatched,
+    // we can let the user know and wait for them to sign in again.
+    if (tokenCallbacks === gTokenChangeCallbacks) {
+      clearUserToken();
+      if (gTokenChangeCallbacks.size === 0) {
+        alert("Your Replay session has expired while recording. \nPlease sign in to see your new recording.");
+      }
+
+      await new Promise(resolve => {
+        gTokenChangeCallbacks.add(function handler(value) {
+          gTokenChangeCallbacks.delete(handler);
+          resolve(value);
+        });
+      });
+    }
+
+    return await gCommandSocket.sendCommand(method, params);
+  }
 }
 
 class CommandError extends Error {
@@ -205,18 +265,105 @@ class CommandError extends Error {
 // Resolve hooks for promises waiting on a recording to be created.
 const gRecordingCreateWaiters = [];
 
-function isAuthenticationEnabled() {
-  // Authentication is controlled by a preference but can be disabled by an
-  // environment variable.
-  return (
-    Services.prefs.getBoolPref(
-      "devtools.recordreplay.authentication-enabled"
-    ) && !getenv("RECORD_REPLAY_DISABLE_AUTHENTICATION")
-  );
+function isLoggedIn() {
+  if (isRunningTest()) {
+    // Tests always behave as if they are logged in because we hardcode the authid
+    // to send when tests are running.
+    return true;
+  }
+
+  return !!Services.prefs.getStringPref("devtools.recordreplay.user-token") || !!gOriginalApiKey;
+}
+
+async function saveRecordingToken(token) {
+  Services.prefs.setStringPref("devtools.recordreplay.user-token", token || "");
 }
 
 function isRunningTest() {
   return !!getenv("RECORD_REPLAY_TEST_SCRIPT");
+}
+
+function clearUserToken() {
+  saveRecordingToken(null);
+}
+
+// If there is an API key, all authentication in the browser uses that
+// key and ignores tokens provided by any logged-in session.
+const gOriginalApiKey = getenv("RECORD_REPLAY_API_KEY");
+if (gOriginalApiKey) {
+  setAccessToken(gOriginalApiKey, true /* isAPIKey */);
+} else if (isRunningTest()) {
+  // The record button is force-enabled when running tests, and if there
+  // is no API key, we'll send the authId as part of setRecordingMetadata,
+  // so for now we don't do anything with the user token.
+  // Eventually we should switch our tests to use API keys and then we'll
+  // be able to delete some of this.
+} else {
+  let gExpirationTimer;
+
+  const ensureAccessTokenStateSynchronized = function() {
+    if (gExpirationTimer) {
+      clearTimeout(gExpirationTimer);
+      gExpirationTimer = null;
+    }
+
+    let token = Services.prefs.getStringPref("devtools.recordreplay.user-token");
+    if (!token) {
+      return;
+    }
+
+    const expiration = getTokenExpiration(token);
+    if (typeof expiration !== "number") {
+      ChromeUtils.recordReplayLog(`InvalidJWTExpiration`);
+      clearUserToken();
+      return;
+    }
+
+    const timeToExpiration = expiration - Date.now();
+    if (timeToExpiration <= 0) {
+      clearUserToken();
+      return;
+    }
+
+    gExpirationTimer = setTimeout(clearUserToken, timeToExpiration);
+
+    setenv("RECORD_REPLAY_API_KEY", token);
+    setAccessToken(token);
+  }
+
+  Services.prefs.addObserver("devtools.recordreplay.user-token", () => {
+    ensureAccessTokenStateSynchronized();
+  });
+  ensureAccessTokenStateSynchronized();
+}
+
+function getLoggedInUserAuthId() {
+  // Tests currently don't have an API key, so the only way to assign test recordings
+  // to the test user is to pass in the auth ID.
+  if (isRunningTest() && !getenv("RECORD_REPLAY_API_KEY")) {
+    return "auth0|5f6e41315c863800757cdf74";
+  }
+  return undefined;
+}
+
+function getTokenExpiration(token) {
+  const [header, payload, cypher] = token.split(".", 3);
+
+  if (typeof payload !== "string") {
+    return null;
+  }
+
+  let payloadObject;
+  try {
+    payloadObject = JSON.parse(
+      new TextDecoder().decode(ChromeUtils.base64URLDecode(payload, { padding: "reject" }))
+    );
+  } catch (err) {
+    payloadObject = null;
+  }
+
+  const exp = typeof payloadObject === "object" && payloadObject?.exp;
+  return typeof exp === "number" ? exp * 1000 : null;
 }
 
 const SEEN_MANAGERS = new WeakSet();
@@ -575,10 +722,6 @@ function setRecordingSaved(browser, recordingId) {
   const localTest = getenv("RECORD_REPLAY_LOCAL_TEST");
   if (localTest) {
     extra += `&test=${localTest}`;
-  } else if (!isAuthenticationEnabled()) {
-    // Adding this urlparam disables checks in the devtools that the user has
-    // permission to view the recording.
-    extra += `&test=1`;
   }
 
   const tabbrowser = browser.getTabBrowser();
@@ -880,20 +1023,6 @@ async function withUploadedResource(text, callback) {
   return callback(await uploadResource(text));
 }
 
-function getLoggedInUserAuthId() {
-  if (isRunningTest()) {
-    return "auth0|5f6e41315c863800757cdf74";
-  }
-
-  const userPref = Services.prefs.getStringPref("devtools.recordreplay.user");
-  if (userPref == "") {
-    return;
-  }
-
-  const user = JSON.parse(userPref);
-  return user == "" ? "" : user.sub;
-}
-
 Services.ppmm.addMessageListener("RecordingStarting", {
   receiveMessage(msg) {
     handleRecordingStarted(msg.target);
@@ -901,4 +1030,16 @@ Services.ppmm.addMessageListener("RecordingStarting", {
 });
 
 // eslint-disable-next-line no-unused-vars
-var EXPORTED_SYMBOLS = ["setConnectionStatusChangeCallback", "getConnectionStatus", "getDispatchServer", "isRecordingAllTabs", "isRecording", "toggleRecording", "getRecordingState", "RecordingState"];
+var EXPORTED_SYMBOLS = [
+  "setConnectionStatusChangeCallback",
+  "getConnectionStatus",
+  "getDispatchServer",
+  "isRecordingAllTabs",
+  "isRecording",
+  "toggleRecording",
+  "getRecordingState",
+  "RecordingState",
+  "isLoggedIn",
+  "saveRecordingToken",
+  "isRunningTest",
+];
