@@ -20,7 +20,7 @@ ModuleLoadFrame::ModuleLoadFrame(PCUNICODE_STRING aRequestedDllName)
   EnsureInitialized();
   sTopFrame.set(this);
 
-  gLoaderPrivateAPI.NotifyBeginDllLoad(mLoadInfo, &mContext, aRequestedDllName);
+  gLoaderPrivateAPI().NotifyBeginDllLoad(mLoadInfo, &mContext, aRequestedDllName);
 }
 
 ModuleLoadFrame::ModuleLoadFrame(nt::AllocatedUnicodeString&& aSectionName,
@@ -33,11 +33,11 @@ ModuleLoadFrame::ModuleLoadFrame(nt::AllocatedUnicodeString&& aSectionName,
       mLoadInfo(std::move(aSectionName), aMapBaseAddr, aLoadStatus) {
   sTopFrame.set(this);
 
-  gLoaderPrivateAPI.NotifyBeginDllLoad(&mContext, mLoadInfo.mSectionName);
+  gLoaderPrivateAPI().NotifyBeginDllLoad(&mContext, mLoadInfo.mSectionName);
 }
 
 ModuleLoadFrame::~ModuleLoadFrame() {
-  gLoaderPrivateAPI.NotifyEndDllLoad(mContext, mLoadNtStatus,
+  gLoaderPrivateAPI().NotifyEndDllLoad(mContext, mLoadNtStatus,
                                      std::move(mLoadInfo));
   sTopFrame.set(mPrev);
 }
@@ -77,7 +77,7 @@ void ModuleLoadFrame::NotifySectionMap(
     // the executable's dependent DLLs. If mozglue is present then
     // IsDefaultObserver will return false, indicating that we are beyond
     // initial process startup.
-    if (gLoaderPrivateAPI.IsDefaultObserver()) {
+    if (gLoaderPrivateAPI().IsDefaultObserver()) {
       OnBareSectionMap(std::move(aSectionName), aMapBaseAddr, aMapNtStatus,
                        aLoadStatus);
     }
@@ -125,7 +125,7 @@ NTSTATUS ModuleLoadFrame::SetLoadStatus(NTSTATUS aNtStatus,
     return aNtStatus;
   }
 
-  if (!gLoaderPrivateAPI.SubstituteForLSP(mLoadInfo.mRequestedDllName,
+  if (!gLoaderPrivateAPI().SubstituteForLSP(mLoadInfo.mRequestedDllName,
                                           aOutHandle)) {
     return aNtStatus;
   }

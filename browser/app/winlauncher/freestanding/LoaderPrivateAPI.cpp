@@ -120,7 +120,7 @@ namespace freestanding {
 // Note: For now we avoid the non-trivial initializer for gLoaderPrivateAPI
 // with this helper, to workaround issues calling the main initialization
 // routine in windows executables when replaying.
-LoaderPrivateAPI& LoaderPrivateAPI() {
+LoaderPrivateAPI& gLoaderPrivateAPI() {
   return gPrivateAPI;
 }
 

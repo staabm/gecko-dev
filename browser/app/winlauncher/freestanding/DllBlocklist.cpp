@@ -396,7 +396,7 @@ NTSTATUS NTAPI patched_NtMapViewOfSection(
 
   // Get the section name
   nt::MemorySectionNameBuf sectionFileName(
-      gLoaderPrivateAPI.GetSectionNameBuffer(*aBaseAddress));
+      gLoaderPrivateAPI().GetSectionNameBuffer(*aBaseAddress));
   if (sectionFileName.IsEmpty()) {
     ::NtUnmapViewOfSection(aProcess, *aBaseAddress);
     return STATUS_ACCESS_DENIED;

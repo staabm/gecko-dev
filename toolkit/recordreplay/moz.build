@@ -10,7 +10,7 @@ SOURCES += [
     'HashTable.cpp',
     'JSControl.cpp',
     'ProcessRecordReplay.cpp',
-    'RecordReplayDriver.cpp',
+    # 'RecordReplayDriver.cpp',
 ]
 
 LOCAL_INCLUDES += [

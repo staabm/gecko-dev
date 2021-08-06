@@ -21,7 +21,7 @@ extern "C" MOZ_EXPORT nt::LoaderAPI* GetNtLoaderAPI(
   }
 
   freestanding::EnsureInitialized();
-  freestanding::LoaderPrivateAPI& api = freestanding::gLoaderPrivateAPI;
+  freestanding::LoaderPrivateAPI& api = freestanding::gLoaderPrivateAPI();
   api.SetObserver(aNewObserver);
 
   return &api;
