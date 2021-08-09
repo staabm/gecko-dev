@@ -111,28 +111,7 @@ static void* LoadSymbol(const char* aName) {
 #ifdef XP_WIN
   static HMODULE module;
   if (!module) {
-    DWORD cbNeeded = 0, cbNeeded2 = 0;
-    if (!EnumProcessModules(GetCurrentProcess(), nullptr, 0, &cbNeeded)) {
-      fprintf(stderr, "EnumProcessModules failed #1 %d\n", GetLastError());
-      MOZ_CRASH("EnumProcessModules failed");
-    }
-    HMODULE* modules = (HMODULE*)malloc(cbNeeded);
-    if (!EnumProcessModules(GetCurrentProcess(), modules, cbNeeded, &cbNeeded2)) {
-      fprintf(stderr, "EnumProcessModules failed #2 %d\n", GetLastError());
-      MOZ_CRASH("EnumProcessModules failed");
-    }
-    for (int i = 0; i < cbNeeded / sizeof(HMODULE); i++) {
-      char path[MAX_PATH];
-      if (!GetModuleFileNameA(modules[i], path, sizeof(path))) {
-        fprintf(stderr, "GetModuleFilename failed\n");
-      } else {
-        const char* ptr = strstr(path, "\\xul.dll");
-        if (ptr && !ptr[8]) {
-          module = modules[i];
-          break;
-        }
-      }
-    }
+    module = GetModuleHandle("xul.dll");
     if (!module) {
       fprintf(stderr, "Could not find libxul.dll in loaded modules, crashing...\n");
       MOZ_CRASH("Unexpected modules");

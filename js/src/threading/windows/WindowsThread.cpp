@@ -80,6 +80,7 @@ ThreadId ThreadId::ThisThreadId() {
 }
 
 void ThisThread::SetName(const char* name) {
+  /*
   MOZ_RELEASE_ASSERT(name);
 
 #ifdef _MSC_VER
@@ -110,6 +111,7 @@ void ThisThread::SetName(const char* name) {
     // Do nothing.
   }
 #endif  // _MSC_VER
+  */
 }
 
 void ThisThread::GetName(char* nameBuffer, size_t len) {

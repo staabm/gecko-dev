@@ -109,7 +109,6 @@ static void Init() {
 }  // namespace mozilla
 
 static mozilla::freestanding::DefaultLoaderObserver gDefaultObserver;
-static mozilla::freestanding::LoaderPrivateAPIImp gPrivateAPI;
 
 static mozilla::nt::SRWLock gLoaderObserverLock;
 static mozilla::nt::LoaderObserver* gLoaderObserver = &gDefaultObserver;
@@ -120,8 +119,12 @@ namespace freestanding {
 // Note: For now we avoid the non-trivial initializer for gLoaderPrivateAPI
 // with this helper, to workaround issues calling the main initialization
 // routine in windows executables when replaying.
-LoaderPrivateAPI& LoaderPrivateAPI() {
-  return gPrivateAPI;
+LoaderPrivateAPI& GetLoaderPrivateAPI() {
+  static LoaderPrivateAPIImp* gPrivateAPI;
+  if (!gPrivateAPI) {
+    gPrivateAPI = new LoaderPrivateAPIImp();
+  }
+  return *gPrivateAPI;
 }
 
 void DefaultLoaderObserver::OnEndDllLoad(void* aContext, NTSTATUS aNtStatus,
