@@ -909,11 +909,13 @@ nsString ContentParent::GetRecording(Element* aFrameElement) {
 already_AddRefed<ContentParent> ContentParent::GetUsedBrowserProcess(
     const nsACString& aRemoteType, nsTArray<ContentParent*>& aContentParents,
     uint32_t aMaxContentParents, bool aPreferUsed) {
-  // This code is disabled, as the presence of recording tabs can cause other
-  // new tabs to not render. There might be a simple fix here but it doesn't
-  // seem worth investigating.
-  return nullptr;
-  /*
+  // This code is disabled behind a pref, as the presence of recording tabs
+  // can cause other new tabs to not render. There might be a simple fix
+  // here but it doesn't seem worth investigating.
+  if (!Preferences::GetBool("devtools.recordreplay.preloadProcess")) {
+    return nullptr;
+  }
+
 #ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
   AutoRestore ar(sInProcessSelector);
   sInProcessSelector = true;
@@ -1033,7 +1035,6 @@ already_AddRefed<ContentParent> ContentParent::GetUsedBrowserProcess(
   }
 
   return nullptr;
-  */
 }
 
 /*static*/
