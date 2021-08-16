@@ -9,6 +9,10 @@ const { WebChannelBroker } = ChromeUtils.import(
   "resource://gre/modules/WebChannel.jsm"
 );
 
+const { pingTelemetry } = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/telemetry.js"
+);
+
 const ERRNO_MISSING_PRINCIPAL = 1;
 const ERRNO_NO_SUCH_CHANNEL = 2;
 
@@ -92,5 +96,6 @@ class WebChannelParent extends JSWindowActorParent {
       Cu.reportError("Failed to send a WebChannel error. Target invalid.");
     }
     Cu.reportError(id.toString() + " error message. " + errorMsg);
+    pingTelemetry("WebChannel", "error", {channelId: id, errorNumber: errorNo, message: errorMsg});
   }
 }
