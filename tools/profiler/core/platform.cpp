@@ -4094,9 +4094,13 @@ void profiler_init(void* aStackTop) {
   {
     PSAutoLock lock(gPSMutex);
 
+    recordreplay::RecordReplayAssert("profiler_init #1");
+
     // We've passed the possible failure point. Instantiate CorePS, which
     // indicates that the profiler has initialized successfully.
     CorePS::Create(lock);
+
+    recordreplay::RecordReplayAssert("profiler_init #2");
 
     // profiler_init implicitly registers this thread as main thread.
     Unused << locked_register_thread(lock, kMainThreadName, aStackTop);

@@ -11,6 +11,7 @@
 #include "base/message_loop.h"
 #include "base/histogram.h"
 #include "base/win_util.h"
+#include "mozilla/RecordReplay.h"
 #include "WinUtils.h"
 #include "GeckoProfiler.h"
 
@@ -378,14 +379,20 @@ MessagePumpForIO::MessagePumpForIO() {
 }
 
 void MessagePumpForIO::ScheduleWork() {
-  if (InterlockedExchange(&have_work_, 1))
+  mozilla::recordreplay::RecordReplayAssert("MessagePumpForIO::ScheduleWork Start");
+
+  if (InterlockedExchange(&have_work_, 1)) {
+    mozilla::recordreplay::RecordReplayAssert("MessagePumpForIO::ScheduleWork #1");
     return;  // Someone else continued the pumping.
+  }
 
   // Make sure the MessagePump does some work for us.
   BOOL ret =
       PostQueuedCompletionStatus(port_, 0, reinterpret_cast<ULONG_PTR>(this),
                                  reinterpret_cast<OVERLAPPED*>(this));
   DCHECK(ret);
+
+  mozilla::recordreplay::RecordReplayAssert("MessagePumpForIO::ScheduleWork Done");
 }
 
 void MessagePumpForIO::ScheduleDelayedWork(const TimeTicks& delayed_work_time) {

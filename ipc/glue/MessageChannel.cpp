@@ -930,6 +930,8 @@ bool MessageChannel::OpenOnSameThread(MessageChannel* aTargetChan,
 }
 
 bool MessageChannel::Send(UniquePtr<Message> aMsg) {
+  recordreplay::RecordReplayAssert("MessageChannel::Send Start");
+
   if (aMsg->size() >= kMinTelemetryMessageSize) {
     Telemetry::Accumulate(Telemetry::IPC_MESSAGE_SIZE2, aMsg->size());
   }
@@ -956,6 +958,7 @@ bool MessageChannel::Send(UniquePtr<Message> aMsg) {
   AssertWorkerThread();
   mMonitor->AssertNotCurrentThreadOwns();
   if (MSG_ROUTING_NONE == aMsg->routing_id()) {
+    recordreplay::RecordReplayAssert("MessageChannel::Send #1");
     ReportMessageRouteError("MessageChannel::Send");
     return false;
   }
@@ -966,21 +969,27 @@ bool MessageChannel::Send(UniquePtr<Message> aMsg) {
 
   MonitorAutoLock lock(*mMonitor);
   if (!Connected()) {
+    recordreplay::RecordReplayAssert("MessageChannel::Send #2");
     ReportConnectionError("MessageChannel", aMsg.get());
     return false;
   }
 
   AddProfilerMarker(*aMsg, MessageDirection::eSending);
   SendMessageToLink(std::move(aMsg));
+
+  recordreplay::RecordReplayAssert("MessageChannel::Send Done");
   return true;
 }
 
 void MessageChannel::SendMessageToLink(UniquePtr<Message> aMsg) {
+  recordreplay::RecordReplayAssert("MessageChannel::SendMessageToLink Start");
   if (mIsPostponingSends) {
+    recordreplay::RecordReplayAssert("MessageChannel::SendMessageToLink #1");
     mPostponedSends.push_back(std::move(aMsg));
     return;
   }
   mLink->SendMessage(std::move(aMsg));
+  recordreplay::RecordReplayAssert("MessageChannel::SendMessageToLink Done");
 }
 
 void MessageChannel::BeginPostponingSends() {
@@ -1052,6 +1061,8 @@ class BuildIDsMatchMessage : public IPC::Message {
 // buildIDs don't match. This is a minor variation on
 // MessageChannel::Send(Message* aMsg).
 bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
+  recordreplay::RecordReplayAssert("MessageChannel::SendBuildIDsMatchMessage Start");
+
   MOZ_ASSERT(!XRE_IsParentProcess());
 
   nsCString parentBuildID(aParentBuildID);
@@ -1060,6 +1071,7 @@ bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
   if (parentBuildID != childBuildID) {
     // The build IDs didn't match, usually because an update occurred in the
     // background.
+    recordreplay::RecordReplayAssert("MessageChannel::SendBuildIDsMatchMessage #1");
     return false;
   }
 
@@ -1075,9 +1087,11 @@ bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
   MonitorAutoLock lock(*mMonitor);
   if (!Connected()) {
     ReportConnectionError("MessageChannel", msg.get());
+    recordreplay::RecordReplayAssert("MessageChannel::SendBuildIDsMatchMessage #2");
     return false;
   }
   mLink->SendMessage(std::move(msg));
+  recordreplay::RecordReplayAssert("MessageChannel::SendBuildIDsMatchMessage Done");
   return true;
 }
 

@@ -133,6 +133,8 @@ void ProcessLink::Open(UniquePtr<Transport> aTransport, MessageLoop* aIOLoop,
 }
 
 void ProcessLink::SendMessage(UniquePtr<Message> msg) {
+  recordreplay::RecordReplayAssert("ProcessLink::SendMessage Start");
+
   if (msg->size() > IPC::Channel::kMaximumMessageSize) {
     CrashReporter::AnnotateCrashReport(
         CrashReporter::Annotation::IPCMessageName,
@@ -153,6 +155,8 @@ void ProcessLink::SendMessage(UniquePtr<Message> msg) {
   mIOLoop->PostTask(NewNonOwningRunnableMethod<UniquePtr<Message>&&>(
       "IPC::Channel::Send", mTransport.get(), &Transport::Send,
       std::move(msg)));
+
+  recordreplay::RecordReplayAssert("ProcessLink::SendMessage Done");
 }
 
 void ProcessLink::SendClose() {

@@ -710,6 +710,9 @@ bool ContentChild::Init(MessageLoop* aIOLoop, base::ProcessId aParentPid,
   // errors due to parent and content processes having different
   // versions.
   MessageChannel* channel = GetIPCChannel();
+
+  recordreplay::RecordReplayAssert("ContentChild::Init #1 %d", !!channel);
+
   if (channel && !channel->SendBuildIDsMatchMessage(aParentBuildID)) {
     // We need to quit this process if the buildID doesn't match the parent's.
     // This can occur when an update occurred in the background.
