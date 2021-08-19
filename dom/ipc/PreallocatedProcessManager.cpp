@@ -47,6 +47,8 @@ class PreallocatedProcessManagerImpl final : public nsIObserver {
 
   static StaticRefPtr<PreallocatedProcessManagerImpl> sSingleton;
 
+  static nsresult GetReplayDispatchServer(nsAString& dispatchServer);
+
   PreallocatedProcessManagerImpl();
   ~PreallocatedProcessManagerImpl();
   PreallocatedProcessManagerImpl(const PreallocatedProcessManagerImpl&) =
@@ -117,6 +119,15 @@ PreallocatedProcessManagerImpl::~PreallocatedProcessManagerImpl() {
   // This shouldn't happen, because the promise callbacks should
   // hold strong references, but let't make absolutely sure:
   MOZ_RELEASE_ASSERT(!mLaunchInProgress);
+}
+
+nsresult PreallocatedProcessManagerImpl::GetReplayDispatchServer(nsAString& addr) {
+  const char* envAddr = getenv("RECORD_REPLAY_SERVER");
+  if (envAddr) {
+    CopyUTF8toUTF16(mozilla::Span(envAddr, strlen(envAddr)), addr);
+    return NS_OK;
+  }
+  return Preferences::GetString("devtools.recordreplay.cloudServer", addr);
 }
 
 void PreallocatedProcessManagerImpl::Init() {

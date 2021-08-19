@@ -650,8 +650,10 @@ static const char* sObserverTopics[] = {
 // PreallocateProcess is called by the PreallocatedProcessManager.
 // ContentParent then takes this process back within GetNewOrUsedBrowserProcess.
 /*static*/ RefPtr<ContentParent::LaunchPromise>
-ContentParent::PreallocateProcess() {
-  RefPtr<ContentParent> process = new ContentParent(PREALLOC_REMOTE_TYPE, nsString());
+ContentParent::PreallocateProcess(const nsAString& aRecordingDispatchAddress) {
+  RefPtr<ContentParent> process = new ContentParent(
+    PREALLOC_REMOTE_TYPE,
+    aRecordingDispatchAddress);
 
   MOZ_LOG(ContentParent::GetLog(), LogLevel::Debug,
           ("Preallocating process of type prealloc"));
