@@ -78,8 +78,7 @@ MFBT_API TimeStamp TimeStamp::ProcessCreation(bool* aIsInconsistent) {
 
   recordreplay::RecordReplayAssert("ProcessCreation #1");
 
-  if (recordreplay::RecordReplayValue("ProcessCreation",
-                                      sInitOnce.mProcessCreation.IsNull())) {
+  if (sInitOnce.mProcessCreation.IsNull()) {
     recordreplay::RecordReplayAssert("ProcessCreation #2");
 
     char* mozAppRestart = getenv("MOZ_APP_RESTART");
