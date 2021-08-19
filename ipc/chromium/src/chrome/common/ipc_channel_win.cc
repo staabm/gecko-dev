@@ -330,6 +330,14 @@ bool Channel::ChannelImpl::ProcessConnection() {
 
 bool Channel::ChannelImpl::ProcessIncomingMessages(
     MessageLoopForIO::IOContext* context, DWORD bytes_read) {
+  mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages Start %d", (int)bytes_read);
+
+  // The asynchronous write to the buffer from ReadFile is not currently
+  // handled when replaying.
+  mozilla::recordreplay::RecordReplayBytes("ChannelImpl::ProcessIncomingMessages",
+                                           input_buf_.get() + input_buf_offset_,
+                                           bytes_read);
+
   ASSERT_OWNINGTHREAD(ChannelImpl);
   if (input_state_.is_pending) {
     input_state_.is_pending = false;
@@ -342,6 +350,8 @@ bool Channel::ChannelImpl::ProcessIncomingMessages(
   }
 
   for (;;) {
+    mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #1");
+
     if (bytes_read == 0) {
       if (INVALID_HANDLE_VALUE == pipe_) return false;
 
@@ -353,17 +363,22 @@ bool Channel::ChannelImpl::ProcessIncomingMessages(
         DWORD err = GetLastError();
         if (err == ERROR_IO_PENDING) {
           input_state_.is_pending = true;
+          mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #2.1");
           return true;
         }
         if (err != ERROR_BROKEN_PIPE) {
           CHROMIUM_LOG(ERROR) << "pipe error: " << err;
         }
+        mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #2.2");
         return false;
       }
       input_state_.is_pending = true;
+      mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #2.3");
       return true;
     }
     DCHECK(bytes_read);
+
+    mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #3 %d", (int)bytes_read);
 
     // Process messages from input buffer.
 
@@ -371,6 +386,8 @@ bool Channel::ChannelImpl::ProcessIncomingMessages(
     const char* end = input_buf_.get() + input_buf_offset_ + bytes_read;
 
     while (p < end) {
+      mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #4");
+
       // Try to figure out how big the message is. Size is 0 if we haven't read
       // enough of the header to know the size.
       uint32_t message_length = 0;
@@ -379,6 +396,8 @@ bool Channel::ChannelImpl::ProcessIncomingMessages(
       } else {
         message_length = Message::MessageSize(p, end);
       }
+
+      mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #4.1 %u %d %d %u", message_length, incoming_message_.isSome(), (int)(end - p), mozilla::HashBytes(p, end - p));
 
       if (!message_length) {
         // We haven't seen the full message header.
@@ -390,6 +409,7 @@ bool Channel::ChannelImpl::ProcessIncomingMessages(
         memmove(input_buf_.get(), p, end - p);
         input_buf_offset_ = end - p;
 
+        mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #5");
         break;
       }
 
@@ -414,6 +434,8 @@ bool Channel::ChannelImpl::ProcessIncomingMessages(
 
         // Are we done reading this message?
         partial = in_buf != remaining;
+
+        mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #5.1 %d %u %u", partial, in_buf, remaining);
       } else {
         // How much data from this message is stored in input_buf_?
         uint32_t in_buf = std::min(message_length, uint32_t(end - p));
@@ -423,7 +445,11 @@ bool Channel::ChannelImpl::ProcessIncomingMessages(
 
         // Are we done reading this message?
         partial = in_buf != message_length;
+
+        mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #5.2 %d %u %u %d", partial, in_buf, message_length, (int)incoming_message_.ref().size());
       }
+
+      mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #6 %d", partial);
 
       if (partial) {
         break;
@@ -443,6 +469,7 @@ bool Channel::ChannelImpl::ProcessIncomingMessages(
 #endif
       if (m.routing_id() == MSG_ROUTING_NONE &&
           m.type() == HELLO_MESSAGE_TYPE) {
+        mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #7");
         // The Hello message contains the process id and must include the
         // shared secret, if we are waiting for it.
         MessageIterator it = MessageIterator(m);
@@ -457,9 +484,12 @@ bool Channel::ChannelImpl::ProcessIncomingMessages(
         waiting_for_shared_secret_ = false;
         listener_->OnChannelConnected(other_pid_);
       } else {
+        mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #8");
         mozilla::LogIPCMessage::Run run(&m);
         listener_->OnMessageReceived(std::move(m));
       }
+
+      mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessIncomingMessages #9");
 
       incoming_message_.reset();
     }

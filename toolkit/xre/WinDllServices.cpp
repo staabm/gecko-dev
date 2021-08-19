@@ -27,13 +27,19 @@ const char* DllServices::kTopicDllLoadedNonMainThread =
 
 /* static */
 DllServices* DllServices::Get() {
+  recordreplay::RecordReplayAssert("DllServices::Get Start");
+
   static StaticLocalRefPtr<DllServices> sInstance(
       []() -> already_AddRefed<DllServices> {
+        recordreplay::RecordReplayAssert("DllServices::Get Callback Start");
+
         RefPtr<DllServices> dllSvc(new DllServices());
         // Full DLL services require XPCOM, which GMP doesn't have
         if (XRE_IsGMPluginProcess()) {
+          recordreplay::RecordReplayAssert("DllServices::Get Callback #0.1");
           dllSvc->EnableBasic();
         } else {
+          recordreplay::RecordReplayAssert("DllServices::Get Callback #0.2");
           dllSvc->EnableFull();
         }
 
@@ -42,6 +48,7 @@ DllServices* DllServices::Get() {
         };
 
         if (NS_IsMainThread()) {
+          recordreplay::RecordReplayAssert("DllServices::Get Callback #1");
           setClearOnShutdown();
           return dllSvc.forget();
         }
@@ -51,8 +58,11 @@ DllServices* DllServices::Get() {
             NS_NewRunnableFunction("mozilla::DllServices::Get",
                                    std::move(setClearOnShutdown)));
 
+        recordreplay::RecordReplayAssert("DllServices::Get Callback Done");
         return dllSvc.forget();
       }());
+
+  recordreplay::RecordReplayAssert("DllServices::Get Done");
 
   return sInstance;
 }

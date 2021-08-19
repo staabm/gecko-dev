@@ -56,6 +56,7 @@ Message::Message() : Pickle(MSG_HEADER_SZ) {
 Message::Message(int32_t routing_id, msgid_t type, uint32_t segment_capacity,
                  HeaderFlags flags, bool recordWriteLatency)
     : Pickle(MSG_HEADER_SZ, segment_capacity) {
+  mozilla::recordreplay::RecordReplayAssert("Message::Message Start");
   MOZ_COUNT_CTOR(IPC::Message);
   header()->routing = routing_id;
   header()->type = type;
@@ -78,6 +79,7 @@ Message::Message(int32_t routing_id, msgid_t type, uint32_t segment_capacity,
   }
 #endif
   if (recordWriteLatency) {
+    mozilla::recordreplay::RecordReplayAssert("Message::Message #1");
     create_time_ = mozilla::TimeStamp::Now();
   }
 }

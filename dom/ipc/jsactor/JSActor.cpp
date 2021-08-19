@@ -196,12 +196,15 @@ static Maybe<ipc::StructuredCloneData> CaptureJSStack(JSContext* aCx) {
 
 void JSActor::SendAsyncMessage(JSContext* aCx, const nsAString& aMessageName,
                                JS::Handle<JS::Value> aObj, ErrorResult& aRv) {
+  recordreplay::RecordReplayAssert("JSActor::SendAsyncMessage Start");
+
   Maybe<ipc::StructuredCloneData> data{std::in_place};
   if (!nsFrameMessageManager::GetParamsForMessage(
           aCx, aObj, JS::UndefinedHandleValue, *data)) {
     aRv.ThrowDataCloneError(nsPrintfCString(
         "Failed to serialize message '%s::%s'",
         NS_LossyConvertUTF16toASCII(aMessageName).get(), mName.get()));
+    recordreplay::RecordReplayAssert("JSActor::SendAsyncMessage #1");
     return;
   }
 
@@ -211,6 +214,8 @@ void JSActor::SendAsyncMessage(JSContext* aCx, const nsAString& aMessageName,
   meta.kind() = JSActorMessageKind::Message;
 
   SendRawMessage(meta, std::move(data), CaptureJSStack(aCx), aRv);
+
+  recordreplay::RecordReplayAssert("JSActor::SendAsyncMessage Done");
 }
 
 already_AddRefed<Promise> JSActor::SendQuery(JSContext* aCx,

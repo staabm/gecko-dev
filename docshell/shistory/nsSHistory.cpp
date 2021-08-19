@@ -58,7 +58,14 @@ static const char* kObservedPrefs[] = {
 
 static int32_t gHistoryMaxSize = 50;
 // List of all SHistory objects, used for content viewer cache eviction
-static LinkedList<nsSHistory> gSHistoryList;
+static LinkedList<nsSHistory>& GetSHistoryList() {
+  static LinkedList<nsSHistory>* ptr;
+  if (!ptr) {
+    ptr = new LinkedList<nsSHistory>();
+  }
+  return *ptr;
+}
+#define gSHistoryList GetSHistoryList()
 // Max viewers allowed total, across all SHistory objects - negative default
 // means we will calculate how many viewers to cache based on total memory
 int32_t nsSHistory::sHistoryMaxTotalViewers = -1;

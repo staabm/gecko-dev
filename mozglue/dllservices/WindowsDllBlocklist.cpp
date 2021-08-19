@@ -16,6 +16,7 @@
 #include "nsWindowsDllInterceptor.h"
 #include "mozilla/CmdLineAndEnvUtils.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/RecordReplay.h"
 #include "mozilla/StackWalk_windows.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/UniquePtr.h"
@@ -761,11 +762,15 @@ Authenticode* GetAuthenticode();
 
 MFBT_API void DllBlocklist_SetFullDllServices(
     mozilla::glue::detail::DllServicesBase* aSvc) {
+  mozilla::recordreplay::RecordReplayAssert("DllBlocklist_SetFullDllServices Start");
+
   glue::AutoExclusiveLock lock(gDllServicesLock);
   if (aSvc) {
     aSvc->SetAuthenticodeImpl(GetAuthenticode());
     aSvc->SetWinLauncherFunctions(gWinLauncherFunctions);
+    mozilla::recordreplay::RecordReplayAssert("DllBlocklist_SetFullDllServices #1");
     gMozglueLoaderObserver.Forward(aSvc);
+    mozilla::recordreplay::RecordReplayAssert("DllBlocklist_SetFullDllServices #2");
   }
 
   gDllServices = aSvc;

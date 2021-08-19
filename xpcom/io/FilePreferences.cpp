@@ -120,12 +120,14 @@ void InitPrefs() {
 }
 
 void InitDirectoriesWhitelist() {
+  recordreplay::RecordReplayAssert("InitDirectoriesWhitelist Start");
   // NS_GRE_DIR is the installation path where the binary resides.
   AllowUNCDirectory(NS_GRE_DIR);
   // NS_APP_USER_PROFILE_50_DIR and NS_APP_USER_PROFILE_LOCAL_50_DIR are the two
   // parts of the profile we store permanent and local-specific data.
   AllowUNCDirectory(NS_APP_USER_PROFILE_50_DIR);
   AllowUNCDirectory(NS_APP_USER_PROFILE_LOCAL_50_DIR);
+  recordreplay::RecordReplayAssert("InitDirectoriesWhitelist Done");
 }
 
 namespace {  // anon

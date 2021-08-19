@@ -2792,6 +2792,8 @@ JS_PUBLIC_API bool JS_CallFunctionValue(JSContext* cx, HandleObject obj,
                                         HandleValue fval,
                                         const HandleValueArray& args,
                                         MutableHandleValue rval) {
+  mozilla::recordreplay::RecordReplayAssert("JS_CallFunctionValue");
+
   MOZ_ASSERT(!cx->zone()->isAtomsZone());
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
@@ -2810,6 +2812,8 @@ JS_PUBLIC_API bool JS_CallFunction(JSContext* cx, HandleObject obj,
                                    HandleFunction fun,
                                    const HandleValueArray& args,
                                    MutableHandleValue rval) {
+  mozilla::recordreplay::RecordReplayAssert("JS_CallFunction");
+
   MOZ_ASSERT(!cx->zone()->isAtomsZone());
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
@@ -2829,6 +2833,8 @@ JS_PUBLIC_API bool JS_CallFunctionName(JSContext* cx, HandleObject obj,
                                        const char* name,
                                        const HandleValueArray& args,
                                        MutableHandleValue rval) {
+  mozilla::recordreplay::RecordReplayAssert("JS_CallFunctionName");
+
   MOZ_ASSERT(!cx->zone()->isAtomsZone());
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
@@ -2857,6 +2863,8 @@ JS_PUBLIC_API bool JS_CallFunctionName(JSContext* cx, HandleObject obj,
 JS_PUBLIC_API bool JS::Call(JSContext* cx, HandleValue thisv, HandleValue fval,
                             const JS::HandleValueArray& args,
                             MutableHandleValue rval) {
+  mozilla::recordreplay::RecordReplayAssert("JS::Call");
+
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
   cx->check(thisv, fval, args);

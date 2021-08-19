@@ -455,6 +455,8 @@ bool BrowserChild::DoUpdateZoomConstraints(
 
 nsresult BrowserChild::Init(mozIDOMWindowProxy* aParent,
                             WindowGlobalChild* aInitialWindowChild) {
+  recordreplay::RecordReplayAssert("BrowserChild::Init Start");
+
   MOZ_ASSERT_IF(aInitialWindowChild,
                 aInitialWindowChild->BrowsingContext() == mBrowsingContext);
 
@@ -462,6 +464,7 @@ nsresult BrowserChild::Init(mozIDOMWindowProxy* aParent,
   mPuppetWidget = static_cast<PuppetWidget*>(widget.get());
   if (!mPuppetWidget) {
     NS_ERROR("couldn't create fake widget");
+    recordreplay::RecordReplayAssert("BrowserChild::Init #1");
     return NS_ERROR_FAILURE;
   }
   mPuppetWidget->InfallibleCreate(nullptr,
@@ -469,8 +472,10 @@ nsresult BrowserChild::Init(mozIDOMWindowProxy* aParent,
                                   LayoutDeviceIntRect(0, 0, 0, 0),
                                   nullptr);  // HandleWidgetEvent
 
+  recordreplay::RecordReplayAssert("BrowserChild::Init #2");
   mWebBrowser = nsWebBrowser::Create(this, mPuppetWidget, mBrowsingContext,
                                      aInitialWindowChild);
+  recordreplay::RecordReplayAssert("BrowserChild::Init #3");
   nsIWebBrowser* webBrowser = mWebBrowser;
 
   mWebNav = do_QueryInterface(webBrowser);
@@ -564,6 +569,7 @@ nsresult BrowserChild::Init(mozIDOMWindowProxy* aParent,
   // important for OOP iframes, which start off as hidden.
   UpdateVisibility();
 
+  recordreplay::RecordReplayAssert("BrowserChild::Init Done");
   return NS_OK;
 }
 

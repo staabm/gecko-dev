@@ -9,6 +9,7 @@
 #include "mozilla/AutoProfilerLabel.h"
 #include "mozilla/BaseProfilerMarkers.h"
 #include "mozilla/glue/WindowsUnicode.h"
+#include "mozilla/RecordReplay.h"
 #include "mozilla/StackWalk_windows.h"
 
 namespace {
@@ -60,6 +61,10 @@ bool LoaderObserver::SubstituteForLSP(PCUNICODE_STRING aLSPLeafName,
 
 void LoaderObserver::OnEndDllLoad(void* aContext, NTSTATUS aNtStatus,
                                   ModuleLoadInfo&& aModuleLoadInfo) {
+  if (mozilla::recordreplay::IsRecordingOrReplaying()) {
+    return;
+  }
+
 #ifdef _M_AMD64
   DesuppressStackWalking();
 #endif
@@ -110,8 +115,15 @@ void LoaderObserver::Forward(nt::LoaderObserver* aNext) {
 }
 
 void LoaderObserver::Forward(detail::DllServicesBase* aNext) {
+  mozilla::recordreplay::RecordReplayAssert("LoaderObserver::Forward Start");
+
+  if (mozilla::recordreplay::IsRecordingOrReplaying()) {
+    return;
+  }
+
   MOZ_ASSERT(aNext);
   if (!aNext) {
+    mozilla::recordreplay::RecordReplayAssert("LoaderObserver::Forward #1");
     return;
   }
 
@@ -124,11 +136,14 @@ void LoaderObserver::Forward(detail::DllServicesBase* aNext) {
   }
 
   if (!moduleLoads) {
+    mozilla::recordreplay::RecordReplayAssert("LoaderObserver::Forward #2");
     return;
   }
 
   aNext->DispatchModuleLoadBacklogNotification(std::move(*moduleLoads));
   delete moduleLoads;
+
+  mozilla::recordreplay::RecordReplayAssert("LoaderObserver::Forward Done");
 }
 
 void LoaderObserver::Disable() {

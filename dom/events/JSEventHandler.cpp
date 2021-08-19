@@ -150,8 +150,10 @@ nsresult JSEventHandler::HandleEvent(Event* aEvent) {
         mTypedHandler.OnErrorEventHandler();
     ErrorResult rv;
     JS::Rooted<JS::Value> retval(RootingCx());
+    recordreplay::RecordReplayAssert("JSEventHandler::HandleEvent #1");
     handler->Call(target, msgOrEvent, fileName, lineNumber, columnNumber, error,
                   &retval, rv);
+    recordreplay::RecordReplayAssert("JSEventHandler::HandleEvent #2");
     if (rv.Failed()) {
       return rv.StealNSResult();
     }
@@ -169,7 +171,9 @@ nsresult JSEventHandler::HandleEvent(Event* aEvent) {
         mTypedHandler.OnBeforeUnloadEventHandler();
     ErrorResult rv;
     nsString retval;
+    recordreplay::RecordReplayAssert("JSEventHandler::HandleEvent #3");
     handler->Call(target, *aEvent, retval, rv);
+    recordreplay::RecordReplayAssert("JSEventHandler::HandleEvent #4");
     if (rv.Failed()) {
       return rv.StealNSResult();
     }
@@ -198,7 +202,9 @@ nsresult JSEventHandler::HandleEvent(Event* aEvent) {
   ErrorResult rv;
   RefPtr<EventHandlerNonNull> handler = mTypedHandler.NormalEventHandler();
   JS::Rooted<JS::Value> retval(RootingCx());
+  recordreplay::RecordReplayAssert("JSEventHandler::HandleEvent #5");
   handler->Call(target, *aEvent, &retval, rv);
+  recordreplay::RecordReplayAssert("JSEventHandler::HandleEvent #6");
   if (rv.Failed()) {
     return rv.StealNSResult();
   }
