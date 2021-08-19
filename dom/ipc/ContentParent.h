@@ -152,7 +152,8 @@ class ContentParent final
   /**
    * Create a subprocess suitable for use later as a content process.
    */
-  static RefPtr<LaunchPromise> PreallocateProcess();
+  static RefPtr<LaunchPromise> PreallocateProcess(
+    const nsAString& aRecordingDispatchAddress = nsString());
 
   /**
    * Start up the content-process machinery.  This might include
