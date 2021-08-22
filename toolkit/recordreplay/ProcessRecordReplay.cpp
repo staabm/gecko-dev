@@ -17,6 +17,7 @@
 #include "mozilla/StaticMutex.h"
 #include "mozilla/VsyncDispatcher.h"
 #include "nsAppRunner.h"
+#include "nsNSSComponent.h"
 #include "pratom.h"
 #include "nsPrintfCString.h"
 
@@ -145,6 +146,11 @@ static void ConfigureGecko() {
 
   // Order statically allocated mutex in intl code.
   RecordReplayOrderDefaultTimeZoneMutex();
+
+#ifdef XP_WIN
+  // Make sure NSS is always initialized in case it gets used while generating paint data.
+  EnsureNSSInitializedChromeOrContent();
+#endif
 }
 
 static const char* GetPlatformKind() {
