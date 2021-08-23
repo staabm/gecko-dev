@@ -223,21 +223,17 @@ nsresult NS_GetMainThread(nsIThread** aResult) {
 }
 
 nsresult NS_DispatchToCurrentThread(already_AddRefed<nsIRunnable>&& aEvent) {
-  recordreplay::RecordReplayAssert("NS_DispatchToCurrentThread Start");
-
   nsresult rv;
   nsCOMPtr<nsIRunnable> event(aEvent);
 #ifdef MOZILLA_INTERNAL_API
   nsIEventTarget* thread = GetCurrentEventTarget();
   if (!thread) {
-    recordreplay::RecordReplayAssert("NS_DispatchToCurrentThread #1");
     return NS_ERROR_UNEXPECTED;
   }
 #else
   nsCOMPtr<nsIThread> thread;
   rv = NS_GetCurrentThread(getter_AddRefs(thread));
   if (NS_WARN_IF(NS_FAILED(rv))) {
-    recordreplay::RecordReplayAssert("NS_DispatchToCurrentThread #2");
     return rv;
   }
 #endif

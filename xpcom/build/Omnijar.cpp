@@ -37,8 +37,6 @@ void Omnijar::CleanUpOne(Type aType) {
 }
 
 void Omnijar::InitOne(nsIFile* aPath, Type aType) {
-  recordreplay::RecordReplayAssert("Omnijar::InitOne Start %d", (int)aType);
-
   nsCOMPtr<nsIFile> file;
   if (aPath) {
     file = aPath;
@@ -49,7 +47,6 @@ void Omnijar::InitOne(nsIFile* aPath, Type aType) {
     constexpr auto kOmnijarName = nsLiteralCString{MOZ_STRINGIFY(OMNIJAR_NAME)};
     if (NS_FAILED(dir->Clone(getter_AddRefs(file))) ||
         NS_FAILED(file->AppendNative(kOmnijarName))) {
-      recordreplay::RecordReplayAssert("Omnijar::InitOne #1");
       return;
     }
   }
@@ -68,7 +65,6 @@ void Omnijar::InitOne(nsIFile* aPath, Type aType) {
         sIsUnified = true;
       }
     }
-    recordreplay::RecordReplayAssert("Omnijar::InitOne #2");
     return;
   }
 
@@ -78,11 +74,8 @@ void Omnijar::InitOne(nsIFile* aPath, Type aType) {
     // If we're using omni.jar on both GRE and APP and their path
     // is the same, we're in the unified case.
     sIsUnified = true;
-    recordreplay::RecordReplayAssert("Omnijar::InitOne #3");
     return;
   }
-
-  recordreplay::RecordReplayAssert("Omnijar::InitOne #4");
 
   RefPtr<nsZipArchive> zipReader = new nsZipArchive();
   if (NS_FAILED(zipReader->OpenArchive(file))) {

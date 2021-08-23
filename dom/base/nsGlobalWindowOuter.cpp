@@ -2058,8 +2058,6 @@ nsresult nsGlobalWindowOuter::SetNewDocument(Document* aDocument,
                                              nsISupports* aState,
                                              bool aForceReuseInnerWindow,
                                              WindowGlobalChild* aActor) {
-  recordreplay::RecordReplayAssert("nsGlobalWindowOuter::SetNewDocument Start");
-
   MOZ_ASSERT(mDocumentPrincipal == nullptr,
              "mDocumentPrincipal prematurely set!");
   MOZ_ASSERT(mDocumentStoragePrincipal == nullptr,
@@ -2487,7 +2485,6 @@ nsresult nsGlobalWindowOuter::SetNewDocument(Document* aDocument,
 
     if (!isContentAboutBlankInChromeDocshell) {
       newInnerWindow->mHasNotifiedGlobalCreated = true;
-      recordreplay::RecordReplayAssert("nsGlobalWindowOuter::SetNewDocument #10");
       nsContentUtils::AddScriptRunner(NewRunnableMethod(
           "nsGlobalWindowOuter::DispatchDOMWindowCreated", this,
           &nsGlobalWindowOuter::DispatchDOMWindowCreated));
@@ -2587,10 +2584,7 @@ void nsGlobalWindowOuter::PreloadLocalStorage() {
 }
 
 void nsGlobalWindowOuter::DispatchDOMWindowCreated() {
-  recordreplay::RecordReplayAssert("nsGlobalWindowOuter::DispatchDOMWindowCreated Start");
-
   if (!mDoc) {
-    recordreplay::RecordReplayAssert("nsGlobalWindowOuter::DispatchDOMWindowCreated #1");
     return;
   }
 
@@ -2599,8 +2593,6 @@ void nsGlobalWindowOuter::DispatchDOMWindowCreated() {
                                       u"DOMWindowCreated"_ns, CanBubble::eYes,
                                       Cancelable::eNo);
 
-  recordreplay::RecordReplayAssert("nsGlobalWindowOuter::DispatchDOMWindowCreated #2");
-
   nsCOMPtr<nsIObserverService> observerService =
       mozilla::services::GetObserverService();
 
@@ -2608,7 +2600,6 @@ void nsGlobalWindowOuter::DispatchDOMWindowCreated() {
   // consequently cause mDoc to be set to nullptr by DropOuterWindowDocs(),
   // so check it again here.
   if (observerService && mDoc) {
-    recordreplay::RecordReplayAssert("nsGlobalWindowOuter::DispatchDOMWindowCreated #3");
     nsAutoString origin;
     nsIPrincipal* principal = mDoc->NodePrincipal();
     nsContentUtils::GetUTFOrigin(principal, origin);
@@ -2618,8 +2609,6 @@ void nsGlobalWindowOuter::DispatchDOMWindowCreated() {
                                          : "content-document-global-created",
                                      origin.get());
   }
-
-  recordreplay::RecordReplayAssert("nsGlobalWindowOuter::DispatchDOMWindowCreated Done");
 }
 
 void nsGlobalWindowOuter::ClearStatus() { SetStatusOuter(u""_ns); }

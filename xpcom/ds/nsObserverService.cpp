@@ -270,8 +270,6 @@ NS_IMETHODIMP nsObserverService::NotifyObservers(nsISupports* aSubject,
                                                  const char16_t* aSomeData) {
   LOG(("nsObserverService::NotifyObservers(%s)", aTopic));
 
-  recordreplay::RecordReplayAssert("nsObserverService::NotifyObservers Start");
-
   MOZ_TRY(EnsureValidCall());
   if (NS_WARN_IF(!aTopic)) {
     return NS_ERROR_INVALID_ARG;
@@ -289,7 +287,6 @@ NS_IMETHODIMP nsObserverService::NotifyObservers(nsISupports* aSubject,
     observerList->NotifyObservers(aSubject, aTopic, aSomeData);
   }
 
-  recordreplay::RecordReplayAssert("nsObserverService::NotifyObservers #1");
   uint32_t latencyMs = round((TimeStamp::Now() - start).ToMilliseconds());
   if (latencyMs >= kMinTelemetryNotifyObserversLatencyMs) {
     Telemetry::Accumulate(Telemetry::NOTIFY_OBSERVERS_LATENCY_MS,

@@ -8101,7 +8101,6 @@ nsresult nsDocShell::NewContentViewerObj(const nsACString& aContentType,
 
 nsresult nsDocShell::SetupNewViewer(nsIContentViewer* aNewViewer,
                                     WindowGlobalChild* aWindowActor) {
-  recordreplay::RecordReplayAssert("nsDocShell::SetupNewViewer Start");
   MOZ_ASSERT(!mIsBeingDestroyed);
 
   //
@@ -8215,7 +8214,6 @@ nsresult nsDocShell::SetupNewViewer(nsIContentViewer* aNewViewer,
   if (NS_FAILED(mContentViewer->Init(widget, bounds, aWindowActor))) {
     mContentViewer = nullptr;
     NS_WARNING("ContentViewer Initialization failed");
-    recordreplay::RecordReplayAssert("nsDocShell::SetupNewViewer #1");
     return NS_ERROR_FAILURE;
   }
 
@@ -8244,7 +8242,6 @@ nsresult nsDocShell::SetupNewViewer(nsIContentViewer* aNewViewer,
   // until we have enough of the new page to show.  Just return with the new
   // viewer still set to hidden.
 
-  recordreplay::RecordReplayAssert("nsDocShell::SetupNewViewer Done");
   return NS_OK;
 }
 

@@ -445,14 +445,12 @@ static bool ExecuteScript(JSContext* cx, HandleObjectVector envChain,
 MOZ_NEVER_INLINE JS_PUBLIC_API bool JS_ExecuteScript(JSContext* cx,
                                                      HandleScript scriptArg,
                                                      MutableHandleValue rval) {
-  mozilla::recordreplay::RecordReplayAssert("JS_ExecuteScript");
   RootedObject globalLexical(cx, &cx->global()->lexicalEnvironment());
   return ExecuteScript(cx, globalLexical, scriptArg, rval);
 }
 
 MOZ_NEVER_INLINE JS_PUBLIC_API bool JS_ExecuteScript(JSContext* cx,
                                                      HandleScript scriptArg) {
-  mozilla::recordreplay::RecordReplayAssert("JS_ExecuteScript");
   RootedObject globalLexical(cx, &cx->global()->lexicalEnvironment());
   RootedValue rval(cx);
   return ExecuteScript(cx, globalLexical, scriptArg, &rval);
@@ -461,13 +459,11 @@ MOZ_NEVER_INLINE JS_PUBLIC_API bool JS_ExecuteScript(JSContext* cx,
 MOZ_NEVER_INLINE JS_PUBLIC_API bool JS_ExecuteScript(
     JSContext* cx, HandleObjectVector envChain, HandleScript scriptArg,
     MutableHandleValue rval) {
-  mozilla::recordreplay::RecordReplayAssert("JS_ExecuteScript");
   return ExecuteScript(cx, envChain, scriptArg, rval);
 }
 
 MOZ_NEVER_INLINE JS_PUBLIC_API bool JS_ExecuteScript(
     JSContext* cx, HandleObjectVector envChain, HandleScript scriptArg) {
-  mozilla::recordreplay::RecordReplayAssert("JS_ExecuteScript");
   RootedValue rval(cx);
   return ExecuteScript(cx, envChain, scriptArg, &rval);
 }
@@ -475,7 +471,6 @@ MOZ_NEVER_INLINE JS_PUBLIC_API bool JS_ExecuteScript(
 JS_PUBLIC_API bool JS::CloneAndExecuteScript(JSContext* cx,
                                              HandleScript scriptArg,
                                              JS::MutableHandleValue rval) {
-  mozilla::recordreplay::RecordReplayAssert("CloneAndExecuteScript");
   CHECK_THREAD(cx);
   RootedScript script(cx, scriptArg);
   RootedObject globalLexical(cx, &cx->global()->lexicalEnvironment());
@@ -492,7 +487,6 @@ JS_PUBLIC_API bool JS::CloneAndExecuteScript(JSContext* cx,
                                              JS::HandleObjectVector envChain,
                                              HandleScript scriptArg,
                                              JS::MutableHandleValue rval) {
-  mozilla::recordreplay::RecordReplayAssert("CloneAndExecuteScript");
   CHECK_THREAD(cx);
   RootedScript script(cx, scriptArg);
   if (script->realm() != cx->realm()) {
@@ -534,7 +528,6 @@ JS_PUBLIC_API bool JS::Evaluate(JSContext* cx,
                                 const ReadOnlyCompileOptions& options,
                                 SourceText<Utf8Unit>& srcBuf,
                                 MutableHandle<Value> rval) {
-  mozilla::recordreplay::RecordReplayAssert("JS::Evaluate");
   RootedObject globalLexical(cx, &cx->global()->lexicalEnvironment());
   return EvaluateSourceBuffer(cx, ScopeKind::Global, globalLexical, options,
                               srcBuf, rval);
@@ -544,7 +537,6 @@ JS_PUBLIC_API bool JS::Evaluate(JSContext* cx,
                                 const ReadOnlyCompileOptions& optionsArg,
                                 SourceText<char16_t>& srcBuf,
                                 MutableHandleValue rval) {
-  mozilla::recordreplay::RecordReplayAssert("JS::Evaluate");
   RootedObject globalLexical(cx, &cx->global()->lexicalEnvironment());
   return EvaluateSourceBuffer(cx, ScopeKind::Global, globalLexical, optionsArg,
                               srcBuf, rval);
@@ -554,7 +546,6 @@ JS_PUBLIC_API bool JS::Evaluate(JSContext* cx, HandleObjectVector envChain,
                                 const ReadOnlyCompileOptions& options,
                                 SourceText<char16_t>& srcBuf,
                                 MutableHandleValue rval) {
-  mozilla::recordreplay::RecordReplayAssert("JS::Evaluate");
   RootedObject env(cx);
   RootedScope scope(cx);
   if (!CreateNonSyntacticEnvironmentChain(cx, envChain, &env, &scope)) {
@@ -567,7 +558,6 @@ JS_PUBLIC_API bool JS::Evaluate(JSContext* cx, HandleObjectVector envChain,
 JS_PUBLIC_API bool JS::EvaluateUtf8Path(
     JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
     const char* filename, MutableHandleValue rval) {
-  mozilla::recordreplay::RecordReplayAssert("JS::EvaluateUtf8Path");
   FileContents buffer(cx);
   {
     AutoFile file;

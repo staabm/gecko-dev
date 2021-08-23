@@ -371,8 +371,6 @@ nsresult nsLookAndFeel::NativeGetColor(ColorID aID, nscolor& aColor) {
 nsresult nsLookAndFeel::NativeGetInt(IntID aID, int32_t& aResult) {
   nsresult res = NS_OK;
 
-  recordreplay::RecordReplayAssert("nsLookAndFeel::NativeGetInt %d", (int)aID);
-
   switch (aID) {
     case IntID::ScrollButtonLeftMouseButtonAction:
       aResult = 0;

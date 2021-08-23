@@ -5576,8 +5576,6 @@ void nsContentUtils::RemoveScriptBlocker() {
     return;
   }
 
-  recordreplay::RecordReplayAssert("nsContentUtils::RemoveScriptBlocker #1");
-
   uint32_t firstBlocker = sRunnersCountAtFirstBlocker;
   uint32_t lastBlocker = sBlockedScriptRunners->Length();
   uint32_t originalFirstBlocker = firstBlocker;
@@ -5591,9 +5589,7 @@ void nsContentUtils::RemoveScriptBlocker() {
     ++firstBlocker;
 
     // Calling the runnable can reenter us
-    recordreplay::RecordReplayAssert("nsContentUtils::RemoveScriptBlocker #2");
     runnable->Run();
-    recordreplay::RecordReplayAssert("nsContentUtils::RemoveScriptBlocker #3");
     // So can dropping the reference to the runnable
     runnable = nullptr;
 
@@ -5605,8 +5601,6 @@ void nsContentUtils::RemoveScriptBlocker() {
   sRemovingScriptBlockers = true;
 #endif
   sBlockedScriptRunners->RemoveElementsAt(originalFirstBlocker, blockersCount);
-
-  recordreplay::RecordReplayAssert("nsContentUtils::RemoveScriptBlocker Done");
 }
 
 /* static */
@@ -5646,15 +5640,12 @@ void nsContentUtils::WarnScriptWasIgnored(Document* aDocument) {
 
 /* static */
 void nsContentUtils::AddScriptRunner(already_AddRefed<nsIRunnable> aRunnable) {
-  recordreplay::RecordReplayAssert("nsContentUtils::AddScriptRunner Start");
-
   nsCOMPtr<nsIRunnable> runnable = aRunnable;
   if (!runnable) {
     return;
   }
 
   if (sScriptBlockerCount) {
-    recordreplay::RecordReplayAssert("nsContentUtils::AddScriptRunner #1");
     sBlockedScriptRunners->AppendElement(runnable.forget());
     return;
   }

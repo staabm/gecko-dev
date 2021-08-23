@@ -379,10 +379,7 @@ MessagePumpForIO::MessagePumpForIO() {
 }
 
 void MessagePumpForIO::ScheduleWork() {
-  mozilla::recordreplay::RecordReplayAssert("MessagePumpForIO::ScheduleWork Start");
-
   if (have_work_.exchange(1)) {
-    mozilla::recordreplay::RecordReplayAssert("MessagePumpForIO::ScheduleWork #1");
     return;  // Someone else continued the pumping.
   }
 
@@ -391,8 +388,6 @@ void MessagePumpForIO::ScheduleWork() {
       PostQueuedCompletionStatus(port_, 0, reinterpret_cast<ULONG_PTR>(this),
                                  reinterpret_cast<OVERLAPPED*>(this));
   DCHECK(ret);
-
-  mozilla::recordreplay::RecordReplayAssert("MessagePumpForIO::ScheduleWork Done");
 }
 
 void MessagePumpForIO::ScheduleDelayedWork(const TimeTicks& delayed_work_time) {

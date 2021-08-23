@@ -2875,22 +2875,11 @@ nsresult nsLocalFile::HasFileAttribute(DWORD aFileAttrib, bool* aResult) {
   }
 
   DWORD attributes = GetFileAttributesW(mResolvedPath.get());
-
-  recordreplay::RecordReplayAssert("nsLocalFile::HasFileAttributes %u %u",
-                                   aFileAttrib, attributes);
-
   if (INVALID_FILE_ATTRIBUTES == attributes) {
-    nsresult rv = ConvertWinError(GetLastError());
-    recordreplay::RecordReplayAssert("nsLocalFile::HasFileAttributes #1 %d",
-                                     (int)rv);
-    return rv;
+    return ConvertWinError(GetLastError());
   }
 
   *aResult = ((attributes & aFileAttrib) != 0);
-
-  recordreplay::RecordReplayAssert("nsLocalFile::HasFileAttributes #2 %d",
-                                   *aResult);
-
   return NS_OK;
 }
 

@@ -61,6 +61,8 @@ bool LoaderObserver::SubstituteForLSP(PCUNICODE_STRING aLSPLeafName,
 
 void LoaderObserver::OnEndDllLoad(void* aContext, NTSTATUS aNtStatus,
                                   ModuleLoadInfo&& aModuleLoadInfo) {
+  // LoaderObserver functionality is suppressed for now when recording/replaying,
+  // as DLL load events will not be triggered when replaying.
   if (mozilla::recordreplay::IsRecordingOrReplaying()) {
     return;
   }
@@ -115,15 +117,12 @@ void LoaderObserver::Forward(nt::LoaderObserver* aNext) {
 }
 
 void LoaderObserver::Forward(detail::DllServicesBase* aNext) {
-  mozilla::recordreplay::RecordReplayAssert("LoaderObserver::Forward Start");
-
   if (mozilla::recordreplay::IsRecordingOrReplaying()) {
     return;
   }
 
   MOZ_ASSERT(aNext);
   if (!aNext) {
-    mozilla::recordreplay::RecordReplayAssert("LoaderObserver::Forward #1");
     return;
   }
 
@@ -136,14 +135,11 @@ void LoaderObserver::Forward(detail::DllServicesBase* aNext) {
   }
 
   if (!moduleLoads) {
-    mozilla::recordreplay::RecordReplayAssert("LoaderObserver::Forward #2");
     return;
   }
 
   aNext->DispatchModuleLoadBacklogNotification(std::move(*moduleLoads));
   delete moduleLoads;
-
-  mozilla::recordreplay::RecordReplayAssert("LoaderObserver::Forward Done");
 }
 
 void LoaderObserver::Disable() {

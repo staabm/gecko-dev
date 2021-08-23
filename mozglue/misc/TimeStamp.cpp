@@ -9,7 +9,6 @@
  */
 
 #include "mozilla/Atomics.h"
-#include "mozilla/RecordReplay.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Uptime.h"
 #include <stdio.h>
@@ -76,11 +75,7 @@ MFBT_API TimeStamp TimeStamp::ProcessCreation(bool* aIsInconsistent) {
     *aIsInconsistent = false;
   }
 
-  recordreplay::RecordReplayAssert("ProcessCreation #1");
-
   if (sInitOnce.mProcessCreation.IsNull()) {
-    recordreplay::RecordReplayAssert("ProcessCreation #2");
-
     char* mozAppRestart = getenv("MOZ_APP_RESTART");
     TimeStamp ts;
 
@@ -92,8 +87,6 @@ MFBT_API TimeStamp TimeStamp::ProcessCreation(bool* aIsInconsistent) {
        * process startup time. */
       ts = sInitOnce.mFirstTimeStamp;
     } else {
-      recordreplay::RecordReplayAssert("ProcessCreation #3");
-
       TimeStamp now = Now();
       uint64_t uptime = ComputeProcessUptime();
 
@@ -112,8 +105,6 @@ MFBT_API TimeStamp TimeStamp::ProcessCreation(bool* aIsInconsistent) {
 
     sInitOnce.mProcessCreation = ts;
   }
-
-  recordreplay::RecordReplayAssert("ProcessCreation Done");
 
   return sInitOnce.mProcessCreation;
 }
