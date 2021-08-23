@@ -18,7 +18,6 @@ if (process.platform != "win32") {
   fs.writeFileSync(
     `${gecko}/toolkit/recordreplay/RecordReplayDriver.cpp`,
     `
->>>>>>> windows-port
 namespace mozilla::recordreplay {
   char gRecordReplayDriver[] = "${driverString}";
   int gRecordReplayDriverSize = ${driverContents.length};
