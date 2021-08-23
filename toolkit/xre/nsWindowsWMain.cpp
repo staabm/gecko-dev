@@ -91,10 +91,7 @@ static void FreeAllocStrings(int argc, char** argv) {
   delete[] argv;
 }
 
-// Note: Currently we export wmain so that when replaying it can be called
-// directly without having to go through the normal userspace executable
-// startup routines.
-__declspec(dllexport) int wmain(int argc, WCHAR** argv) {
+int wmain(int argc, WCHAR** argv) {
   SanitizeEnvironmentVariables();
   SetDllDirectoryW(L"");
 

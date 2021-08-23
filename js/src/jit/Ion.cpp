@@ -1858,14 +1858,6 @@ static bool ScriptIsTooLarge(JSContext* cx, JSScript* script) {
 }
 
 bool CanIonCompileScript(JSContext* cx, JSScript* script) {
-#ifdef XP_WIN
-  // For now Ion compilation is disabled on windows when recording/replaying due
-  // to crashes.
-  if (mozilla::recordreplay::IsRecordingOrReplaying()) {
-    return false;
-  }
-#endif
-
   if (!script->canIonCompile()) {
     return false;
   }
