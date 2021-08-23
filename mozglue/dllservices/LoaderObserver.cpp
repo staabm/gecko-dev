@@ -9,6 +9,7 @@
 #include "mozilla/AutoProfilerLabel.h"
 #include "mozilla/BaseProfilerMarkers.h"
 #include "mozilla/glue/WindowsUnicode.h"
+#include "mozilla/RecordReplay.h"
 #include "mozilla/StackWalk_windows.h"
 
 namespace {
@@ -60,6 +61,12 @@ bool LoaderObserver::SubstituteForLSP(PCUNICODE_STRING aLSPLeafName,
 
 void LoaderObserver::OnEndDllLoad(void* aContext, NTSTATUS aNtStatus,
                                   ModuleLoadInfo&& aModuleLoadInfo) {
+  // LoaderObserver functionality is suppressed for now when recording/replaying,
+  // as DLL load events will not be triggered when replaying.
+  if (mozilla::recordreplay::IsRecordingOrReplaying()) {
+    return;
+  }
+
 #ifdef _M_AMD64
   DesuppressStackWalking();
 #endif
@@ -110,6 +117,10 @@ void LoaderObserver::Forward(nt::LoaderObserver* aNext) {
 }
 
 void LoaderObserver::Forward(detail::DllServicesBase* aNext) {
+  if (mozilla::recordreplay::IsRecordingOrReplaying()) {
+    return;
+  }
+
   MOZ_ASSERT(aNext);
   if (!aNext) {
     return;

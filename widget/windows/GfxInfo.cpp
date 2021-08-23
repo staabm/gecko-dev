@@ -1874,6 +1874,18 @@ nsresult GfxInfo::GetFeatureStatusImpl(
     return NS_OK;
   }
 
+  // For now we disable the GPU process completely on Windows, to match what is
+  // used on other platforms and to avoid issues when recording/replaying where the
+  // GPU process isn't readily distinguished from content processes.
+  switch (aFeature) {
+    case nsIGfxInfo::FEATURE_GPU_PROCESS:
+      aFailureId = "RECORD_REPLAY_DISABLED";
+      *aStatus = FEATURE_BLOCKED_DEVICE;
+      break;
+    default:
+      break;
+  }
+
   // Don't evaluate special cases if we're checking the downloaded blocklist.
   if (!aDriverInfo.Length()) {
     nsAutoString adapterVendorID;

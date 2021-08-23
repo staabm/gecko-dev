@@ -249,11 +249,16 @@ static void* ReserveProcessExecutableMemory(size_t bytes) {
 #  endif
 
   void* p = nullptr;
-  for (size_t i = 0; i < 10; i++) {
-    void* randomAddr = ComputeRandomAllocationAddress();
-    p = VirtualAlloc(randomAddr, bytes, MEM_RESERVE, PAGE_NOACCESS);
-    if (p) {
-      break;
+
+  // Disabled when recording/replaying, as VirtualAlloc at arbitrary addresses
+  // is disallowed when replaying, causing behavior here to diverge.
+  if (!mozilla::recordreplay::IsRecordingOrReplaying()) {
+    for (size_t i = 0; i < 10; i++) {
+      void* randomAddr = ComputeRandomAllocationAddress();
+      p = VirtualAlloc(randomAddr, bytes, MEM_RESERVE, PAGE_NOACCESS);
+      if (p) {
+        break;
+      }
     }
   }
 

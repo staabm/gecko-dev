@@ -1876,7 +1876,7 @@ set_config("MOZ_HARDENING_LDFLAGS_JS", security_hardening_cflags.js_ldflags)
 def frame_pointer_flags(compiler):
     if compiler.type == "clang-cl":
         return namespace(
-            enable=["-Oy-"],
+            enable=["-Oy-", "-clang:-fno-omit-frame-pointer"],
             disable=["-Oy"],
         )
     return namespace(

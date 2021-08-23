@@ -17,18 +17,23 @@
 #include "mozilla/StaticMutex.h"
 #include "mozilla/VsyncDispatcher.h"
 #include "nsAppRunner.h"
+#include "nsNSSComponent.h"
 #include "pratom.h"
 #include "nsPrintfCString.h"
 
-#include <dlfcn.h>
 #include <fcntl.h>
-#include <unistd.h>
-
 #include <sys/stat.h>
-#include <sys/time.h>
 
 #ifdef XP_MACOSX
 #include "mozilla/MacLaunchHelper.h"
+#endif
+
+#ifndef XP_WIN
+#include <dlfcn.h>
+#include <sys/time.h>
+#include <unistd.h>
+#else
+#include <libloaderapi.h>
 #endif
 
 extern "C" void RecordReplayOrderDefaultTimeZoneMutex();
@@ -96,7 +101,6 @@ static bool (*gRecordReplayIsReplaying)();
 static int (*gCreateOrderedLock)(const char* aName);
 static void (*gOrderedLock)(int aLock);
 static void (*gOrderedUnlock)(int aLock);
-static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
 static void (*gOnMouseEvent)(const char* aKind, size_t aClientX, size_t aClientY);
 static void (*gOnKeyEvent)(const char* aKind, const char* aKey);
 static void (*gOnNavigationEvent)(const char* aKind, const char* aUrl);
@@ -106,10 +110,22 @@ static void (*gSetCrashReasonCallback)(const char* (*aCallback)());
 static void (*gInvalidateRecording)(const char* aFormat, ...);
 static void (*gSetCrashNote)(const char* aNote);
 
-static void* gDriverHandle;
+#ifndef XP_WIN
+static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
+typedef void* DriverHandle;
+#else
+static void (*gAddOrderedSRWLock)(const char* aName, void* aLock);
+typedef HMODULE DriverHandle;
+#endif
+
+static DriverHandle gDriverHandle;
 
 void LoadSymbolInternal(const char* name, void** psym, bool aOptional) {
+#ifndef XP_WIN
   *psym = dlsym(gDriverHandle, name);
+#else
+  *psym = BitwiseCast<void*>(GetProcAddress(gDriverHandle, name));
+#endif
   if (!*psym && !aOptional) {
     fprintf(stderr, "Could not find %s in Record Replay driver, crashing.\n", name);
     MOZ_CRASH();
@@ -133,6 +149,11 @@ static void ConfigureGecko() {
 
   // Order statically allocated mutex in intl code.
   RecordReplayOrderDefaultTimeZoneMutex();
+
+#ifdef XP_WIN
+  // Make sure NSS is always initialized in case it gets used while generating paint data.
+  EnsureNSSInitializedChromeOrContent();
+#endif
 }
 
 static const char* GetPlatformKind() {
@@ -140,6 +161,8 @@ static const char* GetPlatformKind() {
   return "macOS";
 #elif defined(XP_LINUX)
   return "linux";
+#elif defined(XP_WIN)
+  return "windows";
 #else
   return "unknown";
 #endif
@@ -148,11 +171,12 @@ static const char* GetPlatformKind() {
 extern char gRecordReplayDriver[];
 extern int gRecordReplayDriverSize;
 
-static void* OpenDriverHandle() {
+static DriverHandle OpenDriverHandle() {
   const char* driver = getenv("RECORD_REPLAY_DRIVER");
   bool temporaryDriver = false;
 
   if (!driver) {
+#ifndef XP_WIN
     const char* tmpdir = getenv("TMPDIR");
     if (!tmpdir) {
       tmpdir = "/tmp";
@@ -189,16 +213,30 @@ static void* OpenDriverHandle() {
     };
     pid_t pid;
     LaunchChildMac(4, args, &pid);
-#endif
+#endif // XP_MACOSX
+#else // XP_WIN
+    fprintf(stderr, "Creating temporary driver NYI on windows.\n");
+    return nullptr;
+#endif // XP_WIN
   }
 
-  void* handle = dlopen(driver, RTLD_LAZY);
+#ifndef XP_WIN
+  DriverHandle handle = dlopen(driver, RTLD_LAZY);
+#else
+  DriverHandle handle = LoadLibraryA(driver);
+#endif
 
   if (temporaryDriver) {
     unlink(driver);
   }
 
   return handle;
+}
+
+static void FreeCallback(void* aPtr) {
+  // This may be calling into jemalloc, which won't happen on all platforms
+  // if the driver tries to call free() directly.
+  free(aPtr);
 }
 
 bool gRecordAllContent;
@@ -270,7 +308,6 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol("RecordReplayCreateOrderedLock", gCreateOrderedLock);
   LoadSymbol("RecordReplayOrderedLock", gOrderedLock);
   LoadSymbol("RecordReplayOrderedUnlock", gOrderedUnlock);
-  LoadSymbol("RecordReplayAddOrderedPthreadMutex", gAddOrderedPthreadMutex);
   LoadSymbol("RecordReplayOnMouseEvent", gOnMouseEvent);
   LoadSymbol("RecordReplayOnKeyEvent", gOnKeyEvent);
   LoadSymbol("RecordReplayOnNavigationEvent", gOnNavigationEvent);
@@ -283,6 +320,12 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   if (apiKey) {
     gSetApiKey(apiKey->c_str());
   }
+
+#ifndef XP_WIN
+  LoadSymbol("RecordReplayAddOrderedPthreadMutex", gAddOrderedPthreadMutex);
+#else
+  LoadSymbol("RecordReplayAddOrderedSRWLock", gAddOrderedSRWLock);
+#endif
 
   char buildId[128];
   snprintf(buildId, sizeof(buildId), "%s-gecko-%s", GetPlatformKind(), PlatformBuildID());
@@ -315,6 +358,10 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
     LoadSymbol("RecordReplaySetCrashLogFile", SetCrashLogFile);
     SetCrashLogFile(logFile);
   }
+
+  void (*SetFreeCallback)(void (*aCallback)(void*));
+  LoadSymbol("RecordReplaySetFreeCallback", SetFreeCallback);
+  SetFreeCallback(FreeCallback);
 
   ParseJSFilters("RECORD_REPLAY_RECORD_EXECUTION_ASSERTS", gExecutionAsserts);
   ParseJSFilters("RECORD_REPLAY_RECORD_JS_ASSERTS", gJSAsserts);
@@ -502,10 +549,20 @@ void RecordReplayOrderedUnlock(int aLock) {
   }
 }
 
+#ifndef XP_WIN
+
 MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedPthreadMutex(const char* aName,
                                                                      pthread_mutex_t* aMutex) {
   gAddOrderedPthreadMutex(aName, aMutex);
 }
+
+#else // XP_WIN
+
+MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedSRWLock(const char* aName, void* aLock) {
+  gAddOrderedSRWLock(aName, aLock);
+}
+
+#endif // XP_WIN
 
 static Vector<const char*> gCrashNotes;
 

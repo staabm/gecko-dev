@@ -11,6 +11,7 @@
 #include "base/string_util.h"
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/RandomNum.h"
+#include "mozilla/RecordReplay.h"
 #include "mozilla/WindowsVersion.h"
 #include "nsDebug.h"
 #include "nsString.h"
@@ -37,21 +38,24 @@ typedef ULONG(__stdcall* NtQuerySectionType)(
 // Checks if the section object is safe to map. At the moment this just means
 // it's not an image section.
 bool IsSectionSafeToMap(HANDLE handle) {
-  static NtQuerySectionType nt_query_section_func =
-      reinterpret_cast<NtQuerySectionType>(
-          ::GetProcAddress(::GetModuleHandle(L"ntdll.dll"), "NtQuerySection"));
-  DCHECK(nt_query_section_func);
+  // Avoid calling NtQuerySection when replaying, as intercepting this function
+  // causes crashes inside ntdll when recording for some reason.
+  bool rv = false;
+  if (!mozilla::recordreplay::IsReplaying()) {
+    mozilla::recordreplay::AutoPassThroughThreadEvents pt;
+    static NtQuerySectionType nt_query_section_func =
+        reinterpret_cast<NtQuerySectionType>(
+            ::GetProcAddress(::GetModuleHandle(L"ntdll.dll"), "NtQuerySection"));
+    DCHECK(nt_query_section_func);
 
-  // The handle must have SECTION_QUERY access for this to succeed.
-  SECTION_BASIC_INFORMATION basic_information = {};
-  ULONG status =
-      nt_query_section_func(handle, SectionBasicInformation, &basic_information,
-                            sizeof(basic_information), nullptr);
-  if (status) {
-    return false;
+    // The handle must have SECTION_QUERY access for this to succeed.
+    SECTION_BASIC_INFORMATION basic_information = {};
+    ULONG status =
+        nt_query_section_func(handle, SectionBasicInformation, &basic_information,
+                              sizeof(basic_information), nullptr);
+    rv = status ? false : ((basic_information.Attributes & SEC_IMAGE) != SEC_IMAGE);
   }
-
-  return (basic_information.Attributes & SEC_IMAGE) != SEC_IMAGE;
+  return mozilla::recordreplay::RecordReplayValue("IsSectionSafeToMap", rv);
 }
 
 }  // namespace

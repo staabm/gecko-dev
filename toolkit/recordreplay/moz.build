@@ -4,19 +4,14 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-if CONFIG['OS_ARCH'] == 'WINNT':
-    SOURCES += [
-        'ipc/DisabledIPC.cpp'
-    ]
-else:
-    SOURCES += [
-        'Assembler.cpp',
-        'Graphics.cpp',
-        'HashTable.cpp',
-        'JSControl.cpp',
-        'ProcessRecordReplay.cpp',
-        'RecordReplayDriver.cpp',
-    ]
+SOURCES += [
+    'Assembler.cpp',
+    'Graphics.cpp',
+    'HashTable.cpp',
+    'JSControl.cpp',
+    'ProcessRecordReplay.cpp',
+    'RecordReplayDriver.cpp',
+]
 
 LOCAL_INCLUDES += [
     '!/ipc/ipdl/_ipdlheaders',

@@ -233,6 +233,7 @@ typedef struct tagTHREADNAME_INFO
 void
 _PR_MD_SET_CURRENT_THREAD_NAME(const char *name)
 {
+    /*
 #ifdef _MSC_VER
     THREADNAME_INFO info;
 #endif
@@ -262,6 +263,7 @@ _PR_MD_SET_CURRENT_THREAD_NAME(const char *name)
     } __except(EXCEPTION_CONTINUE_EXECUTION) {
     }
 #endif
+    */
 }
 
 void

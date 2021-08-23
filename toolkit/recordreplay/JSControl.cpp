@@ -23,7 +23,10 @@
 
 #include <fcntl.h>
 #include <sys/stat.h>
+
+#ifndef XP_WIN
 #include <unistd.h>
+#endif
 
 using namespace JS;
 
