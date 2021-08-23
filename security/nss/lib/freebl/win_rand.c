@@ -106,8 +106,9 @@ RNG_SystemInfoForRNG(void)
     dwVal = GetCurrentProcessId(); // process ID (4 bytes)
     RNG_RandomUpdate(&dwVal, sizeof(dwVal));
 
-    dwVal = GetCurrentThreadId(); // thread ID (4 bytes)
-    RNG_RandomUpdate(&dwVal, sizeof(dwVal));
+    // Thread IDs can currently vary when replaying vs. recording.
+    //dwVal = GetCurrentThreadId(); // thread ID (4 bytes)
+    //RNG_RandomUpdate(&dwVal, sizeof(dwVal));
 
     volName[0] = '\0';
     buffer[0] = '\0';
