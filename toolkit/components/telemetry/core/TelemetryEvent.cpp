@@ -284,26 +284,10 @@ bool gCanRecordBase;
 bool gCanRecordExtended;
 
 // The EventName -> EventKey cache map.
-typedef nsClassHashtable<nsCStringHashKey, EventKey> EventNameIDMap;
-static EventNameIDMap& GetEventNameIDMap() {
-  static EventNameIDMap* ptr;
-  if (!ptr) {
-    ptr = new EventNameIDMap(kEventCount);
-  }
-  return *ptr;
-}
-#define gEventNameIDMap GetEventNameIDMap()
+nsClassHashtable<nsCStringHashKey, EventKey> gEventNameIDMap(kEventCount);
 
 // The CategoryName set.
-typedef nsTHashtable<nsCStringHashKey> CategoryNameSet;
-static CategoryNameSet& GetCategoryNames() {
-  static CategoryNameSet* ptr;
-  if (!ptr) {
-    ptr = new CategoryNameSet();
-  }
-  return *ptr;
-}
-#define gCategoryNames GetCategoryNames()
+nsTHashtable<nsCStringHashKey> gCategoryNames;
 
 // This tracks the IDs of the categories for which recording is enabled.
 nsTHashtable<nsCStringHashKey> gEnabledCategories;

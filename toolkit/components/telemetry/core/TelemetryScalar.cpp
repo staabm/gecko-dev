@@ -1198,14 +1198,7 @@ bool gCanRecordBase;
 bool gCanRecordExtended;
 
 // The Name -> ID cache map.
-static ScalarMapType& GetScalarNameIDMap() {
-  static ScalarMapType* ptr;
-  if (!ptr) {
-    ptr = new ScalarMapType(kScalarCount);
-  }
-  return *ptr;
-}
-#define gScalarNameIDMap GetScalarNameIDMap()
+ScalarMapType gScalarNameIDMap(kScalarCount);
 
 // The (Process Id -> (Scalar ID -> Scalar Object)) map. This is a
 // nsClassHashtable, it owns the scalar instances and takes care of deallocating
