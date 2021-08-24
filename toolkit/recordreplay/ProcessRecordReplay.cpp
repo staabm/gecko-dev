@@ -262,14 +262,18 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
 
   Maybe<std::string> apiKey;
   const char* val = getenv("RECORD_REPLAY_API_KEY");
-  if (val) {
+  if (val && val[0]) {
     apiKey.emplace(val);
     // Unsetting the env var will make the variable unavailable via
     // getenv and such, and also mutates the 'environ' global, so
     // by the time gAttach runs, it will have no idea that this value
     // existed and won't capture it in the recording itself, which
     // is ideal for security.
+#ifdef XP_WIN
+    MOZ_RELEASE_ASSERT(!_putenv("RECORD_REPLAY_API_KEY="));
+#else
     MOZ_RELEASE_ASSERT(!unsetenv("RECORD_REPLAY_API_KEY"));
+#endif
   }
 
   gDriverHandle = OpenDriverHandle();
