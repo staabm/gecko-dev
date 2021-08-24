@@ -1475,7 +1475,12 @@ class ContentParent final
   // Return an existing ContentParent if possible. Otherwise, `nullptr`.
   static already_AddRefed<ContentParent> GetUsedBrowserProcess(
       const nsACString& aRemoteType, nsTArray<ContentParent*>& aContentParents,
-      uint32_t aMaxContentParents, bool aPreferUsed);
+      uint32_t aMaxContentParents, bool aPreferUsed,
+      const nsAString& aRecordingDispatchAddress);
+
+  static already_AddRefed<ContentParent> GetUsedBrowserProcessForRecording(
+      const nsACString& aRemoteType, nsTArray<ContentParent*>& aContentParents,
+      const nsAString& aRecordingDispatchAddress);
 
   void AddToPool(nsTArray<ContentParent*>&);
   void RemoveFromPool(nsTArray<ContentParent*>&);
