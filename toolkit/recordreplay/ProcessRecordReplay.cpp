@@ -33,6 +33,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #else
+#include <io.h>
 #include <libloaderapi.h>
 #endif
 
@@ -171,20 +172,36 @@ static const char* GetPlatformKind() {
 extern char gRecordReplayDriver[];
 extern int gRecordReplayDriverSize;
 
+static const char* GetTempDirectory() {
+#ifndef XP_WIN
+  const char* tmpdir = getenv("TMPDIR");
+  return tmpdir ? tmpdir : "/tmp";
+#else
+  return getenv("TEMP");
+#endif
+}
+
 static DriverHandle OpenDriverHandle() {
   const char* driver = getenv("RECORD_REPLAY_DRIVER");
   bool temporaryDriver = false;
 
   if (!driver) {
-#ifndef XP_WIN
-    const char* tmpdir = getenv("TMPDIR");
+    const char* tmpdir = GetTempDirectory();
     if (!tmpdir) {
-      tmpdir = "/tmp";
+      fprintf(stderr, "Can't figure out temporary directory, can't create driver.\n");
+      return nullptr;
     }
 
     char filename[1024];
     snprintf(filename, sizeof(filename), "%s/recordreplay.so-XXXXXX", tmpdir);
+#ifndef XP_WIN
     int fd = mkstemp(filename);
+#else
+    _mktemp(filename);
+    int fd = _open(filename, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY);
+    #define write _write
+    #define close _close
+#endif
     if (fd < 0) {
       fprintf(stderr, "mkstemp failed, can't create driver.\n");
       return nullptr;
@@ -214,10 +231,6 @@ static DriverHandle OpenDriverHandle() {
     pid_t pid;
     LaunchChildMac(4, args, &pid);
 #endif // XP_MACOSX
-#else // XP_WIN
-    fprintf(stderr, "Creating temporary driver NYI on windows.\n");
-    return nullptr;
-#endif // XP_WIN
   }
 
 #ifndef XP_WIN
