@@ -36,6 +36,7 @@ class PreallocatedProcessManager final {
 
  public:
   static PreallocatedProcessManagerImpl* GetPPMImpl();
+  static PreallocatedProcessManagerImpl* GetPPMImplForRecording();
 
   static bool Enabled();
 
@@ -56,6 +57,11 @@ class PreallocatedProcessManager final {
    * another on Idle (AllocateOnIdle()).
    */
   static already_AddRefed<ContentParent> Take(const nsACString& aRemoteType);
+
+  /**
+   * Like (Take()) above, except to take a preallocated recorded process.
+   */
+  static already_AddRefed<ContentParent> TakeForRecording(const nsACString& aRemoteType);
 
   /**
    * Note that a process was shut down, and should no longer be tracked as a
