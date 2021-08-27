@@ -916,8 +916,11 @@ already_AddRefed<ContentParent> ContentParent::GetUsedBrowserProcess(
   // new tabs to not render. There might be a simple fix here but it doesn't
   // seem worth investigating.
   if (aRecordingDispatchAddress.Length() > 0) {
+    /*
     return GetUsedBrowserProcessForRecording(
       aRemoteType, aContentParents, aRecordingDispatchAddress);
+    */
+    return nullptr;
   }
 
 #ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
