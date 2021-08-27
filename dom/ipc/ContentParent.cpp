@@ -916,12 +916,8 @@ already_AddRefed<ContentParent> ContentParent::GetUsedBrowserProcess(
   // new tabs to not render. There might be a simple fix here but it doesn't
   // seem worth investigating.
   if (aRecordingDispatchAddress.Length() > 0) {
-    if (Preferences::GetBool("devtools.recordreplay.usePreallocated")) {
       return GetUsedBrowserProcessForRecording(
         aRemoteType, aContentParents, aRecordingDispatchAddress);
-    } else {
-      return nullptr;
-    }
   }
 
 #ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
@@ -1140,9 +1136,11 @@ ContentParent::GetNewOrUsedLaunchingBrowserProcess(
   }
 
   // Let's try and reuse an existing process.
-  contentParent = GetUsedBrowserProcess(aRemoteType, contentParents,
-                                        maxContentParents, aPreferUsed,
-                                        aRecordingDispatchAddress);
+  if (Preferences::GetBool("devtools.recordreplay.usePreallocated")) {
+    contentParent = GetUsedBrowserProcess(aRemoteType, contentParents,
+                                          maxContentParents, aPreferUsed,
+                                          aRecordingDispatchAddress);
+  }
 
   if (contentParent) {
     // We have located a process. It may not have finished initializing,
