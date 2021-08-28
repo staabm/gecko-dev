@@ -30,6 +30,8 @@ const buildOptions = {
   env: {
     ...process.env,
     RUSTC_BOOTSTRAP: "qcms",
+    // terminal-notifier can hang, so prevent it from running.
+    MOZ_NOSPAM: "1",
   },
 };
 
@@ -38,7 +40,8 @@ if (currentPlatform() == "windows") {
   // scripts for this.
   spawnChecked(".\\windows-build.bat", [], buildOptions);
 } else {
-  spawnChecked("bash", ["./mach", "build"], buildOptions);
+  spawnChecked("./mach", ["build"], buildOptions);
+  spawnChecked("./mach", ["package"], buildOptions);
 }
 
 function spawnChecked(cmd, args, options) {
