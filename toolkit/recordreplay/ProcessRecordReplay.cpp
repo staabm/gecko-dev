@@ -237,6 +237,9 @@ static DriverHandle OpenDriverHandle() {
   DriverHandle handle = dlopen(driver, RTLD_LAZY);
 #else
   DriverHandle handle = LoadLibraryA(driver);
+  if (!handle) {
+    fprintf(stderr, "LoadLibraryA failed %s: %u\n", driver, GetLastError());
+  }
 #endif
 
   if (temporaryDriver) {
