@@ -193,10 +193,11 @@ static DriverHandle OpenDriverHandle() {
     }
 
     char filename[1024];
-    snprintf(filename, sizeof(filename), "%s/recordreplay.so-XXXXXX", tmpdir);
 #ifndef XP_WIN
+    snprintf(filename, sizeof(filename), "%s/recordreplay.so-XXXXXX", tmpdir);
     int fd = mkstemp(filename);
 #else
+    snprintf(filename, sizeof(filename), "%s\\recordreplay.dll-XXXXXX", tmpdir);
     _mktemp(filename);
     int fd = _open(filename, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY);
     #define write _write
