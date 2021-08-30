@@ -298,6 +298,26 @@ static const char* GetRecordingId() {
 // If we are recording all content processes, whether any interesting content was found.
 static bool gHasInterestingContent;
 
+// Call a method exported by the JS module with the given argument.
+static void CallModuleMethod(JSContext* cx, const char* aMethod, const char* aArgument) {
+  JSString* str = JS_NewStringCopyZ(cx, aArgument);
+  MOZ_RELEASE_ASSERT(str);
+
+  JS::RootedValueArray<1> args(cx);
+  args[0].setString(str);
+
+  RootedValue rv(cx);
+  if (!JS_CallFunctionName(cx, *gModuleObject, aMethod, args, &rv)) {
+    MOZ_CRASH("CallModuleMethod");
+  }
+}
+
+void SendRecordingUnsupported(const char* aReason) {
+  AutoSafeJSContext cx;
+  JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
+  CallModuleMethod(cx, "SendRecordingUnsupported", aReason);
+}
+
 // Report the recording as either finished or unusable.
 void SendRecordingFinished() {
   // When recording all content, we don't notify the UI process about the
@@ -322,30 +342,11 @@ void SendRecordingFinished() {
   if (!recordingId) {
     char* reason = gGetUnusableRecordingReason();
     MOZ_RELEASE_ASSERT(reason);
-
-    JSString* str = JS_NewStringCopyZ(cx, reason);
-    MOZ_RELEASE_ASSERT(str);
-
-    JS::RootedValueArray<1> args(cx);
-    args[0].setString(str);
-
-    RootedValue rv(cx);
-    if (!JS_CallFunctionName(cx, *gModuleObject, "SendRecordingUnusable", args, &rv)) {
-      MOZ_CRASH("SendRecordingFinished");
-    }
+    CallModuleMethod(cx, "SendRecordingUnusable", reason);
     return;
   }
 
-  JSString* str = JS_NewStringCopyZ(cx, recordingId);
-  MOZ_RELEASE_ASSERT(str);
-
-  JS::RootedValueArray<1> args(cx);
-  args[0].setString(str);
-
-  RootedValue rv(cx);
-  if (!JS_CallFunctionName(cx, *gModuleObject, "SendRecordingFinished", args, &rv)) {
-    MOZ_CRASH("SendRecordingFinished");
-  }
+  CallModuleMethod(cx, "SendRecordingFinished", recordingId);
 }
 
 void MaybeSendRecordingUnusable() {
