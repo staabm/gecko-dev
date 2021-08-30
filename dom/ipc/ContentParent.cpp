@@ -912,13 +912,16 @@ already_AddRefed<ContentParent> ContentParent::GetUsedBrowserProcess(
     const nsACString& aRemoteType, nsTArray<ContentParent*>& aContentParents,
     uint32_t aMaxContentParents, bool aPreferUsed,
     const nsAString& aRecordingDispatchAddress) {
+  if (aRecordingDispatchAddress.Length() > 0) {
+    return GetUsedBrowserProcessForRecording(
+      aRemoteType, aContentParents, aRecordingDispatchAddress);
+  }
+
   // This code is disabled, as the presence of recording tabs can cause other
   // new tabs to not render. There might be a simple fix here but it doesn't
   // seem worth investigating.
-  if (aRecordingDispatchAddress.Length() > 0) {
-      return GetUsedBrowserProcessForRecording(
-        aRemoteType, aContentParents, aRecordingDispatchAddress);
-  }
+  return nullptr;
+  /*
 
 #ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
   AutoRestore ar(sInProcessSelector);
@@ -1039,6 +1042,7 @@ already_AddRefed<ContentParent> ContentParent::GetUsedBrowserProcess(
   }
 
   return nullptr;
+  */
 }
 
 /*static*/
