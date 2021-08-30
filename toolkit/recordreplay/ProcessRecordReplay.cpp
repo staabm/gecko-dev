@@ -257,10 +257,37 @@ static void FreeCallback(void* aPtr) {
 }
 
 bool gRecordAllContent;
+const char* gRecordingUnsupported;
+
+static const char* GetRecordingUnsupportedReason() {
+#ifdef XP_MACOSX
+  // Using __builtin_available is not currently supported before attaching to
+  // the record/replay driver, as it interacts with the system in mildly
+  // complicated ways. Instead, we use this stupid hack to detect whether we
+  // are replaying, in which case recording is certainly supported.
+  const char* env = getenv("RECORD_REPLAY_DRIVER");
+  if (env && !strcmp(env, "recordreplay-driver")) {
+    return nullptr;
+  }
+
+  if (__builtin_available(macOS 10.14, *)) {
+    return nullptr;
+  }
+
+  return "Recording requires macOS 10.14 or higher";
+#else
+  return nullptr;
+#endif
+}
 
 extern "C" {
 
 MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
+  gRecordingUnsupported = GetRecordingUnsupportedReason();
+  if (gRecordingUnsupported) {
+    return;
+  }
+
   // Parse command line options for the process kind and recording file.
   Maybe<const char*> dispatchAddress;
   int argc = *aArgc;
@@ -679,7 +706,17 @@ bool HasCheckpoint() {
   return gHasCheckpoint;
 }
 
+// Note: This should be called even if we aren't recording/replaying, to report
+// cases where recording is unsupported to the UI process.
 void CreateCheckpoint() {
+  if (!IsRecordingOrReplaying()) {
+    if (gRecordingUnsupported) {
+      js::EnsureModuleInitialized();
+      js::SendRecordingUnsupported(gRecordingUnsupported);
+    }
+    return;
+  }
+
   js::EnsureModuleInitialized();
   js::MaybeSendRecordingUnusable();
 

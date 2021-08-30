@@ -6245,9 +6245,7 @@ void PresShell::Paint(nsView* aViewToPaint, const nsRegion& aDirtyRegion,
   // When recording/replaying, create a checkpoint after every paint. This can
   // cause content JS to run, so must live outside |nojs|.
   auto createCheckpoint = MakeScopeExit([=]() {
-      if (recordreplay::IsRecordingOrReplaying()) {
-        recordreplay::CreateCheckpoint();
-      }
+      recordreplay::CreateCheckpoint();
     });
 
   Maybe<js::AutoAssertNoContentJS> nojs;

@@ -577,6 +577,11 @@ function SendRecordingUnusable(why) {
   Services.cpmm.sendAsyncMessage("RecordingUnusable", { why });
 }
 
+function SendRecordingUnsupported(why) {
+  Services.cpmm.sendAsyncMessage("RecordingStarting");
+  Services.cpmm.sendAsyncMessage("RecordingUnusable", { why });
+}
+
 function OnTestCommand(str) {
   const [_, cmd, arg] = /(.*?) (.*)/.exec(str);
   switch (cmd) {
@@ -639,6 +644,7 @@ function OnProtocolCommand(method, params) {
 const exports = {
   SendRecordingFinished,
   SendRecordingUnusable,
+  SendRecordingUnsupported,
   OnTestCommand,
   OnProtocolCommand,
   ClearPauseData,

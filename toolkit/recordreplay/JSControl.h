@@ -34,6 +34,9 @@ void SendRecordingFinished();
 // Make sure the UI process is notified if the recording is unusable.
 void MaybeSendRecordingUnusable();
 
+// Notify the UI process that recording is unsupported on this machine.
+void SendRecordingUnsupported(const char* aReason);
+
 }  // namespace js
 }  // namespace recordreplay
 }  // namespace mozilla
