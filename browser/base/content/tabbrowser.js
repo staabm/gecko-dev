@@ -29,6 +29,11 @@
         "UrlbarProviderOpenTabs",
         "resource:///modules/UrlbarProviderOpenTabs.jsm"
       );
+      ChromeUtils.defineModuleGetter(
+        this,
+        "ReplayTelemetry",
+        "resource://devtools/server/actors/replay/telemetry.js"
+      );
 
       if (AppConstants.MOZ_CRASHREPORTER) {
         ChromeUtils.defineModuleGetter(
@@ -5530,6 +5535,7 @@
         if (!event.isTrusted) {
           return;
         }
+        ReplayTelemetry.pingTelemetry("browser", "crash");
 
         let browser = event.originalTarget;
 
