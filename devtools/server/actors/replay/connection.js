@@ -20,6 +20,9 @@ const { CryptoUtils } = ChromeUtils.import(
   "resource://services-crypto/utils.js"
 );
 
+const ReplayAuth = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/auth.js"
+);
 const { pingTelemetry } = ChromeUtils.import(
   "resource://devtools/server/actors/replay/telemetry.js"
 );
@@ -266,11 +269,11 @@ class CommandError extends Error {
 const gRecordingCreateWaiters = [];
 
 function isLoggedIn() {
-  return !!Services.prefs.getStringPref("devtools.recordreplay.user-token") || !!gOriginalApiKey;
+  return !!ReplayAuth.getReplayUserToken() || ReplayAuth.hasOriginalApiKey();
 }
 
 async function saveRecordingToken(token) {
-  Services.prefs.setStringPref("devtools.recordreplay.user-token", token || "");
+  ReplayAuth.setReplayUserToken(token);
 }
 
 function isRunningTest() {
@@ -283,9 +286,8 @@ function clearUserToken() {
 
 // If there is an API key, all authentication in the browser uses that
 // key and ignores tokens provided by any logged-in session.
-const gOriginalApiKey = getenv("RECORD_REPLAY_API_KEY");
-if (gOriginalApiKey) {
-  setAccessToken(gOriginalApiKey, true /* isAPIKey */);
+if (ReplayAuth.hasOriginalApiKey()) {
+  setAccessToken(ReplayAuth.getOriginalApiKey(), true /* isAPIKey */);
 } else {
   let gExpirationTimer;
 
@@ -295,12 +297,12 @@ if (gOriginalApiKey) {
       gExpirationTimer = null;
     }
 
-    let token = Services.prefs.getStringPref("devtools.recordreplay.user-token");
+    let token = ReplayAuth.getReplayUserToken();
     if (!token) {
       return;
     }
 
-    const expiration = getTokenExpiration(token);
+    const expiration = ReplayAuth.tokenExpiration(token);
     if (typeof expiration !== "number") {
       ChromeUtils.recordReplayLog(`InvalidJWTExpiration`);
       clearUserToken();
@@ -323,26 +325,6 @@ if (gOriginalApiKey) {
     ensureAccessTokenStateSynchronized();
   });
   ensureAccessTokenStateSynchronized();
-}
-
-function getTokenExpiration(token) {
-  const [header, payload, cypher] = token.split(".", 3);
-
-  if (typeof payload !== "string") {
-    return null;
-  }
-
-  let payloadObject;
-  try {
-    payloadObject = JSON.parse(
-      new TextDecoder().decode(ChromeUtils.base64URLDecode(payload, { padding: "reject" }))
-    );
-  } catch (err) {
-    payloadObject = null;
-  }
-
-  const exp = typeof payloadObject === "object" && payloadObject?.exp;
-  return typeof exp === "number" ? exp * 1000 : null;
 }
 
 const SEEN_MANAGERS = new WeakSet();
