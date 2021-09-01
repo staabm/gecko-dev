@@ -79,13 +79,13 @@ class PreallocatedProcessManagerImpl final : public nsIObserver {
 
   void StartBlockers();
   void EndBlockers();
-  void RefreshPreallocated(RefPtr<ContentParent> ptr);
 
   bool mEnabled;
   static bool sShutdown;
   bool mLaunchInProgress;
   uint32_t mNumberPreallocs;
   nsString mRecordingDispatchAddress;
+  nsString mRecordingUserToken;
   std::deque<RefPtr<ContentParent>> mPreallocatedProcesses;
   // Even if we have multiple PreallocatedProcessManagerImpls, we'll have
   // one blocker counter
@@ -177,6 +177,11 @@ void PreallocatedProcessManagerImpl::Init() {
   Preferences::AddStrongObserver(this,
                                  "dom.ipc.processPrelaunch.fission.number");
 
+  if (mRecordingDispatchAddress.Length() > 0) {
+    Preferences::GetString("devtools.recordreplay.user-token", mRecordingUserToken);
+    Preferences::AddStrongObserver(this, "devtools.recordreplay.user-token");
+  }
+
   nsCOMPtr<nsIObserverService> os = services::GetObserverService();
   MOZ_ASSERT(os);
   for (auto topic : kObserverTopics) {
@@ -219,6 +224,15 @@ PreallocatedProcessManagerImpl::Observe(nsISupports* aSubject,
 }
 
 void PreallocatedProcessManagerImpl::RereadPrefs() {
+  if (mRecordingDispatchAddress.Length() > 0) {
+    nsString userToken;
+    Preferences::GetString("devtools.recordreplay.user-token", userToken);
+    if (!userToken.Equals(mRecordingUserToken)) {
+      mRecordingUserToken = userToken;
+      CloseProcesses();
+      AllocateOnIdle();
+    }
+  }
   if (mozilla::BrowserTabsRemoteAutostart() &&
       Preferences::GetBool("dom.ipc.processPrelaunch.enabled")) {
     int32_t number = 1;
@@ -327,21 +341,6 @@ void PreallocatedProcessManagerImpl::EndBlockers() {
     AllocateAfterDelay();
   }
 }
-void PreallocatedProcessManagerImpl::RefreshPreallocated(
-  RefPtr<ContentParent> aContentParent) {
-  // Erase from preallocated list and shut down the content process.
-  bool erased = Erase(aContentParent.get());
-  if (!erased) {
-    // The ContentParent was taken, don't shut it down.
-    return;
-  }
-
-  aContentParent->ShutDownProcess(ContentParent::CLOSE_CHANNEL);
-
-  // Allocate another process on idle.
-  AllocateOnIdle();
-}
-
 bool PreallocatedProcessManagerImpl::CanAllocate() {
   return mEnabled && sNumBlockers == 0 &&
          mPreallocatedProcesses.size() < mNumberPreallocs && !sShutdown &&
@@ -409,17 +408,6 @@ void PreallocatedProcessManagerImpl::AllocateNow() {
                     ("Preallocated = %lu of %d processes",
                      (unsigned long)mPreallocatedProcesses.size(),
                      mNumberPreallocs));
-
-            // For preallocated recording browsers, kick off a timer
-            // that will shut down and create a new recording browser
-            // at fixed intervals.  This is to avoid preallocated
-            // recording browsers having their API keys go stale.
-            NS_DelayedDispatchToCurrentThread(
-              NewRunnableMethod<RefPtr<ContentParent>>(
-                "PreallocatedProcessManagerImpl::RefreshPreallocated", this,
-                &PreallocatedProcessManagerImpl::RefreshPreallocated, process),
-              // 1 minute.
-              1 * 60 * 1000);
 
             // Continue prestarting processes if needed
             if (mPreallocatedProcesses.size() < mNumberPreallocs) {
