@@ -41,7 +41,7 @@ class PreallocatedProcessManagerImpl final : public nsIObserver {
   static void AddBlocker();
   static void RemoveBlocker();
   already_AddRefed<ContentParent> Take(const nsACString& aRemoteType);
-  void Erase(ContentParent* aParent);
+  bool Erase(ContentParent* aParent);
 
  private:
   static const char* const kObserverTopics[];
@@ -72,12 +72,14 @@ class PreallocatedProcessManagerImpl final : public nsIObserver {
   void Disable();
   void CloseProcesses();
 
+
   bool IsEmpty() const {
     return mPreallocatedProcesses.empty() && !mLaunchInProgress;
   }
 
   void StartBlockers();
   void EndBlockers();
+  void RefreshPreallocated(RefPtr<ContentParent> ptr);
 
   bool mEnabled;
   static bool sShutdown;
@@ -257,15 +259,16 @@ already_AddRefed<ContentParent> PreallocatedProcessManagerImpl::Take(
   return process.forget();
 }
 
-void PreallocatedProcessManagerImpl::Erase(ContentParent* aParent) {
+bool PreallocatedProcessManagerImpl::Erase(ContentParent* aParent) {
   // Ensure this ContentParent isn't cached
   for (auto it = mPreallocatedProcesses.begin();
        it != mPreallocatedProcesses.end(); it++) {
     if (*it == aParent) {
       mPreallocatedProcesses.erase(it);
-      break;
+      return true;
     }
   }
+  return false;
 }
 
 void PreallocatedProcessManagerImpl::Enable(uint32_t aProcesses) {
@@ -323,6 +326,20 @@ void PreallocatedProcessManagerImpl::EndBlockers() {
   if (IsEmpty()) {
     AllocateAfterDelay();
   }
+}
+void PreallocatedProcessManagerImpl::RefreshPreallocated(
+  RefPtr<ContentParent> aContentParent) {
+  // Erase from preallocated list and shut down the content process.
+  bool erased = Erase(aContentParent.get());
+  if (!erased) {
+    // The ContentParent was taken, don't shut it down.
+    return;
+  }
+
+  aContentParent->ShutDownProcess(ContentParent::CLOSE_CHANNEL);
+
+  // Allocate another process on idle.
+  AllocateOnIdle();
 }
 
 bool PreallocatedProcessManagerImpl::CanAllocate() {
@@ -392,6 +409,17 @@ void PreallocatedProcessManagerImpl::AllocateNow() {
                     ("Preallocated = %lu of %d processes",
                      (unsigned long)mPreallocatedProcesses.size(),
                      mNumberPreallocs));
+
+            // For preallocated recording browsers, kick off a timer
+            // that will shut down and create a new recording browser
+            // at fixed intervals.  This is to avoid preallocated
+            // recording browsers having their API keys go stale.
+            NS_DelayedDispatchToCurrentThread(
+              NewRunnableMethod<RefPtr<ContentParent>>(
+                "PreallocatedProcessManagerImpl::RefreshPreallocated", this,
+                &PreallocatedProcessManagerImpl::RefreshPreallocated, process),
+              // 1 minute.
+              1 * 60 * 1000);
 
             // Continue prestarting processes if needed
             if (mPreallocatedProcesses.size() < mNumberPreallocs) {
