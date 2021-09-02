@@ -11,21 +11,8 @@ function pingTelemetry(source, name, data) {
 
   if (!enabled || !url) return;
 
-  // fetch the user info to send in the `browserUser` field.
-  let browserUser = "unknown";
-  if (ReplayAuth.hasOriginalApiKey()) {
-    browserUser = "fixed-api-key";
-  } else {
-    const token = ReplayAuth.getReplayUserToken();
-    const tokenInfo = token ? ReplayAuth.tokenInfo(token) : null;
-    if (tokenInfo) {
-      browserUser = tokenInfo.payload.sub || "no-user-field";
-    } else if (token) {
-      browserUser = "invalid-json";
-    } else {
-      browserUser = "no-user-token";
-    }
-  }
+  // fetch the user info to send in `Authorization` header.
+  const auth = ReplayAuth.getOriginalApiKey() || ReplayAuth.getReplayUserToken();
 
   // Collect info to send for `browserSettings` field.
   const usePreallocated = Services.prefs.getBoolPref("devtools.recordreplay.usePreallocated");
@@ -33,6 +20,7 @@ function pingTelemetry(source, name, data) {
 
   fetch(url, {
     method: 'POST',
+    headers: auth ? { Authorization: `Bearer ${auth}` } : undefined,
     body: JSON.stringify({
       ...data,
       event: 'Gecko',
@@ -40,7 +28,6 @@ function pingTelemetry(source, name, data) {
       ts: Date.now(),
       source,
       name,
-      browserUser,
       browserSettings,
     })
   }).catch(console.error);
