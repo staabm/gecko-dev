@@ -168,8 +168,7 @@ bool RealmInstrumentation::setActive(JSContext* cx,
 
   RootedObject holder(cx, global->getInstrumentationHolder());
   if (!holder) {
-    JS_ReportErrorASCII(cx, "Global does not have instrumentation specified");
-    return false;
+    return true;
   }
 
   RealmInstrumentation* instrumentation = GetInstrumentation(holder);
