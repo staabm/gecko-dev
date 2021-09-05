@@ -626,10 +626,12 @@ bool DebuggerEnvironment::getVariable(JSContext* cx,
   // declarative environments may contain internal JSFunction objects, which
   // we shouldn't expose to the user.
   if (result.isObject()) {
+    mozilla::recordreplay::Diagnostic("DebuggerEnvironment::getVariable #1 %p", &result.toObject());
     RootedObject obj(cx, &result.toObject());
     if (obj->is<JSFunction>() &&
         IsInternalFunctionObject(obj->as<JSFunction>()))
       result.setMagic(JS_OPTIMIZED_OUT);
+    mozilla::recordreplay::Diagnostic("DebuggerEnvironment::getVariable #2");
   }
 
   return dbg->wrapDebuggeeValue(cx, result);

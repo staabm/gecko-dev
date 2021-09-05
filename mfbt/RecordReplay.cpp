@@ -75,6 +75,8 @@ namespace recordreplay {
         (aData, aSize))                                                        \
   Macro(InternalPrintLog, (const char* aFormat, va_list aArgs),                \
         (aFormat, aArgs))                                                      \
+  Macro(InternalDiagnostic, (const char* aFormat, va_list aArgs),              \
+        (aFormat, aArgs))                                                      \
   Macro(InternalRegisterThing, (void* aThing), (aThing))                       \
   Macro(InternalUnregisterThing, (void* aThing), (aThing))                     \
   Macro(InternalOrderedLock, (int aLock), (aLock))                             \

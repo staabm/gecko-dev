@@ -412,6 +412,17 @@ static inline void PrintLog(const char* aFormat, ...) {
   }
 }
 
+MFBT_API void InternalDiagnostic(const char* aFormat, va_list aArgs);
+
+static inline void Diagnostic(const char* aFormat, ...) {
+  if (IsRecordingOrReplaying()) {
+    va_list ap;
+    va_start(ap, aFormat);
+    InternalDiagnostic(aFormat, ap);
+    va_end(ap);
+  }
+}
+
 }  // namespace recordreplay
 }  // namespace mozilla
 

@@ -79,6 +79,7 @@ static void (*gRecordCommandLineArguments)(int*, char***);
 static uintptr_t (*gRecordReplayValue)(const char* why, uintptr_t value);
 static void (*gRecordReplayBytes)(const char* why, void* buf, size_t size);
 static void (*gPrintVA)(const char* format, va_list args);
+static void (*gDiagnosticVA)(const char* format, va_list args);
 static void (*gRegisterPointer)(void* ptr);
 static void (*gUnregisterPointer)(void* ptr);
 static int (*gPointerId)(void* ptr);
@@ -333,6 +334,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol("RecordReplayValue", gRecordReplayValue);
   LoadSymbol("RecordReplayBytes", gRecordReplayBytes);
   LoadSymbol("RecordReplayPrint", gPrintVA);
+  LoadSymbol("RecordReplayDiagnostic", gDiagnosticVA);
   LoadSymbol("RecordReplaySaveRecording", gSaveRecording);
   LoadSymbol("RecordReplayFinishRecording", gFinishRecording);
   LoadSymbol("RecordReplayRegisterPointer", gRegisterPointer);
@@ -514,6 +516,11 @@ MOZ_EXPORT bool RecordReplayInterface_ShouldEmitRecordReplayAssert(const char* a
 MOZ_EXPORT void RecordReplayInterface_InternalPrintLog(const char* aFormat,
                                                        va_list aArgs) {
   gPrintVA(aFormat, aArgs);
+}
+
+MOZ_EXPORT void RecordReplayInterface_InternalDiagnostic(const char* aFormat,
+                                                         va_list aArgs) {
+  gDiagnosticVA(aFormat, aArgs);
 }
 
 MOZ_EXPORT ProgressCounter* RecordReplayInterface_ExecutionProgressCounter() {
