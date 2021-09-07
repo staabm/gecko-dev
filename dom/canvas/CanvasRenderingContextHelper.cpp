@@ -175,6 +175,7 @@ already_AddRefed<nsISupports> CanvasRenderingContextHelper::GetContext(
     if (contextType == CanvasContextType::WebGL1 ||
         contextType == CanvasContextType::WebGL2 ||
         contextType == CanvasContextType::WebGPU) {
+      recordreplay::ReportUnsupportedFeature("WebGL", 58);
       return nullptr;
     }
   }

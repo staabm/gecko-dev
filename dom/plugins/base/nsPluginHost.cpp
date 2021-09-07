@@ -627,8 +627,8 @@ nsresult nsPluginHost::InstantiatePluginInstance(
   }
 
   // Plugins are not supported when recording or replaying executions.
-  // See bug 1483232.
   if (recordreplay::IsRecordingOrReplaying()) {
+    recordreplay::ReportUnsupportedFeature("LoadPlugin", 500);
     return NS_ERROR_FAILURE;
   }
 

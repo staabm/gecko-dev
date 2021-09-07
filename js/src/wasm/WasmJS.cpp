@@ -3861,6 +3861,7 @@ static bool EnsureStreamSupport(JSContext* cx) {
   // JS helper threads. These interact with the recording, and are not currently
   // supported.
   if (mozilla::recordreplay::IsRecordingOrReplaying()) {
+    mozilla::recordreplay::ReportUnsupportedFeature("WasmStreaming", 501);
     JS_ReportErrorASCII(cx,
                         "WebAssembly streaming not supported when recording/replaying");
     return false;

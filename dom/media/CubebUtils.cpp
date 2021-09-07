@@ -458,7 +458,8 @@ cubeb* GetCubebContextUnlocked() {
     return nullptr;
   }
   if (recordreplay::IsRecordingOrReplaying()) {
-    // Media is not supported when recording or replaying. See bug 1304146.
+    // Media is not supported when recording or replaying.
+    recordreplay::ReportUnsupportedFeature("MediaPlayback", 54);
     return nullptr;
   }
   if (sCubebState != CubebState::Uninitialized) {

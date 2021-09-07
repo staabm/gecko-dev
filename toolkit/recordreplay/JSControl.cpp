@@ -230,6 +230,8 @@ void OnTestCommand(const char* aString) {
   }
 }
 
+static void SendUnsupportedFeature(const char* aFeature, int aIssueNumber);
+
 extern "C" {
 
 MOZ_EXPORT void RecordReplayInterface_BeginContentParse(
@@ -253,6 +255,10 @@ MOZ_EXPORT void RecordReplayInterface_AddContentParseData16(
 MOZ_EXPORT void RecordReplayInterface_EndContentParse(const void* aToken) {
   MOZ_RELEASE_ASSERT(IsRecordingOrReplaying());
   MOZ_RELEASE_ASSERT(aToken);
+}
+
+MOZ_EXPORT void RecordReplayInterface_ReportUnsupportedFeature(const char* aFeature, int aIssueNumber) {
+  SendUnsupportedFeature(aFeature, aIssueNumber);
 }
 
 }  // extern "C"
@@ -299,12 +305,13 @@ static const char* GetRecordingId() {
 static bool gHasInterestingContent;
 
 // Call a method exported by the JS module with the given argument.
-static void CallModuleMethod(JSContext* cx, const char* aMethod, const char* aArgument) {
+static void CallModuleMethod(JSContext* cx, const char* aMethod, const char* aArgument, int aArgument2 = 0) {
   JSString* str = JS_NewStringCopyZ(cx, aArgument);
   MOZ_RELEASE_ASSERT(str);
 
-  JS::RootedValueArray<1> args(cx);
+  JS::RootedValueArray<2> args(cx);
   args[0].setString(str);
+  args[1].setInt32(aArgument2);
 
   RootedValue rv(cx);
   if (!JS_CallFunctionName(cx, *gModuleObject, aMethod, args, &rv)) {
@@ -316,6 +323,16 @@ void SendRecordingUnsupported(const char* aReason) {
   AutoSafeJSContext cx;
   JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
   CallModuleMethod(cx, "SendRecordingUnsupported", aReason);
+}
+
+static void SendUnsupportedFeature(const char* aFeature, int aIssueNumber) {
+  if (!IsModuleInitialized()) {
+    return;
+  }
+
+  AutoSafeJSContext cx;
+  JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
+  CallModuleMethod(cx, "SendUnsupportedFeature", aFeature, aIssueNumber);
 }
 
 // Report the recording as either finished or unusable.

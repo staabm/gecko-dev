@@ -92,6 +92,8 @@ namespace recordreplay {
         (const void* aToken, const char16_t* aBuffer, size_t aLength),         \
         (aToken, aBuffer, aLength))                                            \
   Macro(EndContentParse, (const void* aToken), (aToken))                       \
+  Macro(ReportUnsupportedFeature,                                              \
+        (const char* aFeature, int aIssueNumber), (aFeature, aIssueNumber))    \
   Macro(AdvanceExecutionProgressCounter, (), ())                               \
   Macro(SetExecutionProgressCallback, (void (*aCallback)(uint64_t)), (aCallback)) \
   Macro(ExecutionProgressReached, (), ())                                      \

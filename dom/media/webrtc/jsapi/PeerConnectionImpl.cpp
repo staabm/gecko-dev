@@ -963,6 +963,7 @@ already_AddRefed<TransceiverImpl> PeerConnectionImpl::CreateTransceiverImpl(
     ErrorResult& aRv) {
   // WebRTC is disabled when recording/replaying.
   if (recordreplay::IsRecordingOrReplaying()) {
+    recordreplay::ReportUnsupportedFeature("WebRTC", 56);
     aRv.Throw(NS_ERROR_FAILURE);
     return already_AddRefed<TransceiverImpl>();
   }

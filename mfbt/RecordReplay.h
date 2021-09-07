@@ -312,6 +312,11 @@ static inline void NoteContentParse(const void* aToken, const char* aURL,
 // Add a record/replay assertion for the current JS caller.
 static inline void AssertScriptedCaller(const char* aWhy);
 
+// Report that the current recording/replaying process is using an unsupported
+// browser feature, and message the user to notify them the page might not work right.
+// Issue numbers are from https://github.com/RecordReplay/gecko-dev/issues
+MFBT_API void ReportUnsupportedFeature(const char* aFeature, int aIssueNumber);
+
 ///////////////////////////////////////////////////////////////////////////////
 // API inline function implementation
 ///////////////////////////////////////////////////////////////////////////////

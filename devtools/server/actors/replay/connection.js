@@ -350,6 +350,9 @@ class Recording extends EventEmitter {
     this._pmm.addMessageListener("RecordingUnusable", {
       receiveMessage: msg => this._onUnusable(msg.data),
     });
+    this._pmm.addMessageListener("RecordingUnsupportedFeature", {
+      receiveMessage: msg => this._onUnsupportedFeature(msg.data)
+    });
   }
 
   get osPid() {
@@ -453,6 +456,10 @@ class Recording extends EventEmitter {
     this._unlockRecording();
 
     this.emit("unusable", data);
+  }
+
+  _onUnsupportedFeature(data) {
+    this.emit("unsupportedFeature", data);
   }
 }
 
@@ -763,6 +770,34 @@ function handleRecordingStarted(pmm) {
 
     ChromeUtils.recordReplayLog(`SavedRecording ${recordingId}`);
   });
+
+  recording.on("unsupportedFeature", function(name, data) {
+    const browser = getBrowser();
+    showUnsupportedFeatureNotification(browser, data.feature, data.issueNumber);
+  });
+}
+
+function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
+  // FIXME how do we get from the browser to the associated window?
+  const window = Services.wm.getMostRecentWindow("navigator:browser");
+
+  const notificationBox = window.gHighPriorityNotificationBox;
+  let notification = notificationBox.getNotificationWithValue(
+    "unsupported-feature"
+  );
+  if (notification) {
+    return;
+  }
+
+  const message = `This page uses a feature (${feature}) that is not yet supported while recording, and might not work right.  See https://github.com/recordreplay/gecko-dev/issues/${issueNumber}`;
+
+  notificationBox.appendNotification(
+    message,
+    "unsupported-feature",
+    "chrome://browser/content/aboutRobots-icon.png",
+    notificationBox.PRIORITY_WARNING_HIGH,
+    []
+  );
 }
 
 function uploadSourceMap(

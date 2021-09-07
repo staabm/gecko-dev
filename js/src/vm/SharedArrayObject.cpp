@@ -232,6 +232,13 @@ bool SharedArrayBufferObject::class_constructor(JSContext* cx, unsigned argc,
 SharedArrayBufferObject* SharedArrayBufferObject::New(JSContext* cx,
                                                       BufferSize length,
                                                       HandleObject proto) {
+  // SharedArrayBuffer is not supported when recording/replaying.
+  if (mozilla::recordreplay::IsRecordingOrReplaying()) {
+    mozilla::recordreplay::ReportUnsupportedFeature("SharedArrayBuffer", 499);
+    JS_ReportErrorASCII(cx, "Creating SharedArrayBuffer is not supported when recording/replaying");
+    return nullptr;
+  }
+
   SharedArrayRawBuffer* buffer =
       SharedArrayRawBuffer::Allocate(length, Nothing(), Nothing());
   if (!buffer) {
