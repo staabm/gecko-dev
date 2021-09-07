@@ -1139,8 +1139,8 @@ ContentParent::GetNewOrUsedLaunchingBrowserProcess(
                                                /*aPreferUsed =*/false);
   }
 
-  // Let's try and reuse an existing process.
-  if (Preferences::GetBool("devtools.recordreplay.usePreallocated")) {
+  // Let's try and reuse an existing process, if that's not disabled.
+  if (!Preferences::GetBool("devtools.recordreplay.disablePreallocated")) {
     contentParent = GetUsedBrowserProcess(aRemoteType, contentParents,
                                           maxContentParents, aPreferUsed,
                                           aRecordingDispatchAddress);
