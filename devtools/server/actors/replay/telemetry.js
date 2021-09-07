@@ -15,8 +15,10 @@ function pingTelemetry(source, name, data) {
   const auth = ReplayAuth.getOriginalApiKey() || ReplayAuth.getReplayUserToken();
 
   // Collect info to send for `browserSettings` field.
-  const usePreallocated = Services.prefs.getBoolPref("devtools.recordreplay.usePreallocated");
-  const browserSettings = { usePreallocated };
+  const disablePreallocated = Services.prefs.getBoolPref(
+    "devtools.recordreplay.disablePreallocated"
+  );
+  const browserSettings = { usePreallocated: !disablePreallocated };
 
   fetch(url, {
     method: 'POST',
