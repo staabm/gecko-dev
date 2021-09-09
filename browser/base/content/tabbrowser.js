@@ -17,6 +17,10 @@
       "chrome://browser/skin/privatebrowsing/favicon.svg",
   };
 
+  const ReplayTelemetry = ChromeUtils.import(
+    "resource://devtools/server/actors/replay/telemetry.js"
+  );
+
   window._gBrowser = {
     init() {
       ChromeUtils.defineModuleGetter(
@@ -28,11 +32,6 @@
         this,
         "UrlbarProviderOpenTabs",
         "resource:///modules/UrlbarProviderOpenTabs.jsm"
-      );
-      ChromeUtils.defineModuleGetter(
-        this,
-        "ReplayTelemetry",
-        "resource://devtools/server/actors/replay/telemetry.js"
       );
 
       if (AppConstants.MOZ_CRASHREPORTER) {
