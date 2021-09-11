@@ -258,7 +258,12 @@ MOZ_EXPORT void RecordReplayInterface_EndContentParse(const void* aToken) {
 }
 
 MOZ_EXPORT void RecordReplayInterface_ReportUnsupportedFeature(const char* aFeature, int aIssueNumber) {
-  SendUnsupportedFeature(aFeature, aIssueNumber);
+  if (NS_IsMainThread()) {
+    SendUnsupportedFeature(aFeature, aIssueNumber);
+  } else {
+    NS_DispatchToMainThread(NS_NewRunnableFunction("ReportUnsupportedFeature",
+                            [=]() { SendUnsupportedFeature(aFeature, aIssueNumber); }));
+  }
 }
 
 }  // extern "C"
