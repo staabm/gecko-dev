@@ -28,12 +28,14 @@ namespace mozilla { extern void RecordReplayTickRefreshDriver(); }
 namespace mozilla::recordreplay {
 
 static void (*gOnPaint)();
+static void (*gOnRepaintNeeded)();
 static bool (*gSetPaintCallback)(char* (*aCallback)(const char* aMimeType, int aJPEGQuality));
 
 static char* PaintCallback(const char* aMimeType, int aJPEGQuality);
 
 void InitializeGraphics() {
   LoadSymbol("RecordReplayOnPaint", gOnPaint);
+  LoadSymbol("RecordReplayOnRepaintNeeded", gOnRepaintNeeded);
   LoadSymbol("RecordReplaySetPaintCallback", gSetPaintCallback);
 
   gSetPaintCallback(PaintCallback);
@@ -118,6 +120,14 @@ void OnPaint() {
   MaybeCreatePaintFile();
 
   gOnPaint();
+}
+
+void OnRepaintNeeded() {
+  if (!HasCheckpoint() || HasDivergedFromRecording()) {
+    return;
+  }
+
+  gOnRepaintNeeded();
 }
 
 void SendNewCompositable(LayerTransactionChild* aChild,

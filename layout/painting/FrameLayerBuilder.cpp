@@ -74,6 +74,8 @@ MOZ_DECLARE_RELOCATE_USING_MOVE_CONSTRUCTOR(mozilla::PaintedLayerData);
 
 namespace mozilla {
 
+namespace recordreplay { extern void OnRepaintNeeded(); }
+
 class PaintedDisplayItemLayerUserData;
 
 static nsTHashtable<nsPtrHashKey<DisplayItemData>>* sAliveDisplayItemDatas;
@@ -2302,6 +2304,8 @@ void FrameLayerBuilder::RemoveFrameFromLayerManager(
             pixelRgn.ScaleRoundOut(paintedData->mXScale, paintedData->mYScale);
 
         pixelRgn.MoveBy(-GetTranslationForPaintedLayer(t));
+
+        recordreplay::OnRepaintNeeded();
 
         paintedData->mRegionToInvalidate.Or(paintedData->mRegionToInvalidate,
                                             pixelRgn);
