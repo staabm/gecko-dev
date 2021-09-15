@@ -6,7 +6,7 @@ const gecko = __dirname;
 
 // Download the latest record/replay driver.
 const driverFile = `${currentPlatform()}-recordreplay.${driverExtension()}`;
-spawnChecked("curl", [`https://replay.io/downloads/${driverFile}`, "-o", driverFile], { stdio: "inherit" });
+spawnChecked("curl", [`https://static.replay.io/downloads/${driverFile}`, "-o", driverFile], { stdio: "inherit" });
 
 // Embed the driver in the source.
 const driverContents = fs.readFileSync(driverFile);
