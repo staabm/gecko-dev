@@ -157,6 +157,9 @@ static inline ULONGLONG PerformanceCounter() {
   LARGE_INTEGER pc;
   ::QueryPerformanceCounter(&pc);
 
+  // Disabled, this can cause problems when recording/replaying due to using
+  // data which may have been written by other threads without ordering.
+  /*
   // QueryPerformanceCounter may slightly jitter (not be 100% monotonic.)
   // This is a simple go-backward protection for such a faulty hardware.
   AutoCriticalSection lock(&sTimeStampLock);
@@ -166,6 +169,8 @@ static inline ULONGLONG PerformanceCounter() {
     return last * 1000ULL;
   }
   last = pc.QuadPart;
+  */
+
   return pc.QuadPart * 1000ULL;
 }
 

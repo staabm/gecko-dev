@@ -117,12 +117,7 @@ static mozilla::nt::LoaderObserver* gLoaderObserver = &gDefaultObserver;
 namespace mozilla {
 namespace freestanding {
 
-// Note: For now we avoid the non-trivial initializer for gLoaderPrivateAPI
-// with this helper, to workaround issues calling the main initialization
-// routine in windows executables when replaying.
-LoaderPrivateAPI& gLoaderPrivateAPI() {
-  return gPrivateAPI;
-}
+LoaderPrivateAPI& gLoaderPrivateAPI = gPrivateAPI;
 
 void DefaultLoaderObserver::OnEndDllLoad(void* aContext, NTSTATUS aNtStatus,
                                          ModuleLoadInfo&& aModuleLoadInfo) {

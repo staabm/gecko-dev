@@ -414,7 +414,8 @@ void* MapAlignedPages(size_t length, size_t alignment) {
 
 #ifdef JS_64BIT
   // Use the scattershot allocator if the address range is large enough.
-  if (UsingScattershotAllocator()) {
+  if (UsingScattershotAllocator() &&
+      !mozilla::recordreplay::IsRecordingOrReplaying()) {
     void* region = MapAlignedPagesRandom(length, alignment);
 
     MOZ_RELEASE_ASSERT(!IsInvalidRegion(region, length));

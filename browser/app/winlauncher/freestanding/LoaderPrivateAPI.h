@@ -54,8 +54,7 @@ class NS_NO_VTABLE LoaderPrivateAPI : public nt::LoaderAPI {
  */
 void EnsureInitialized();
 
-extern LoaderPrivateAPI& gLoaderPrivateAPI();
-// #define gLoaderPrivateAPI LoaderPrivateAPI()
+extern LoaderPrivateAPI& gLoaderPrivateAPI;
 
 }  // namespace freestanding
 }  // namespace mozilla

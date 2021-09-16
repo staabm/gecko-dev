@@ -1171,6 +1171,19 @@ XPCJSContext* XPCJSContext::Get() {
 
 #ifdef XP_WIN
 static size_t GetWindowsStackSize() {
+  // Workaround VirtualQuery not being supported when replaying.
+  if (mozilla::recordreplay::IsRecordingOrReplaying()) {
+    using GetCurrentThreadStackLimitsFn = void(WINAPI*)(PULONG_PTR LowLimit,
+                                                        PULONG_PTR HighLimit);
+    static const StaticDynamicallyLinkedFunctionPtr<
+        GetCurrentThreadStackLimitsFn>
+        sGetStackLimits(L"kernel32.dll", "GetCurrentThreadStackLimits");
+    MOZ_RELEASE_ASSERT(sGetStackLimits);
+    ULONG_PTR stackBottom, stackTop;
+    sGetStackLimits(&stackBottom, &stackTop);
+    return stackTop - stackBottom;
+  }
+
   // First, get the stack base. Because the stack grows down, this is the top
   // of the stack.
   const uint8_t* stackTop;
