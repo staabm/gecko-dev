@@ -836,5 +836,29 @@ bool DefineRecordReplayControlObject(JSContext* aCx, JS::HandleObject object) {
   return true;
 }
 
+static ProgressCounter gLastRepaintNeededProgress;
+
+// Add annotations to the recording to indicate places where the screen becomes
+// dirty. These are currently used to stress test repainting and other DOM
+// commands.
+void OnRepaintNeeded(const char* aWhy) {
+  if (!HasCheckpoint() || HasDivergedFromRecording() || !NS_IsMainThread()) {
+    return;
+  }
+
+  // Ignore repaints triggered when there hasn't been any execution since the
+  // last repaint was triggered.
+  if (*ExecutionProgressCounter() == gLastRepaintNeededProgress) {
+    return;
+  }
+
+  nsPrintfCString contents("{\"why\":\"%s\"}", aWhy);
+  js::gOnAnnotation("repaint-needed", contents.get());
+
+  // Measure this after calling RecordReplayOnAnnotation, as the latter can
+  // update the progress counter.
+  gLastRepaintNeededProgress = *ExecutionProgressCounter();
+}
+
 }  // namespace recordreplay
 }  // namespace mozilla
