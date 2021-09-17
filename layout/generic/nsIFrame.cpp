@@ -493,6 +493,8 @@ nsIFrame* NS_NewEmptyFrame(PresShell* aPresShell, ComputedStyle* aStyle) {
 }
 
 nsIFrame::~nsIFrame() {
+  recordreplay::UnregisterThing(this);
+
   MOZ_COUNT_DTOR(nsIFrame);
 
   MOZ_ASSERT(GetVisibility() != Visibility::ApproximatelyVisible,

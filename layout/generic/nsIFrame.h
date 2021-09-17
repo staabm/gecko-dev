@@ -57,6 +57,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/EventForwards.h"
 #include "mozilla/Maybe.h"
+#include "mozilla/RecordReplay.h"
 #include "mozilla/RelativeTo.h"
 #include "mozilla/Result.h"
 #include "mozilla/SmallPointerArray.h"
@@ -694,6 +695,7 @@ class nsIFrame : public nsQueryFrame {
         mHasColumnSpanSiblings(false),
         mDescendantMayDependOnItsStaticPosition(false),
         mShouldGenerateComputedInfo(false) {
+    mozilla::recordreplay::RegisterThing(this);
     MOZ_ASSERT(mComputedStyle);
     MOZ_ASSERT(mPresContext);
     mozilla::PodZero(&mOverflow);
