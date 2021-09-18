@@ -1061,7 +1061,10 @@ void CycleCollectedJSRuntime::GCSliceCallback(JSContext* aContext,
 #endif
 
   if (aProgress == JS::GC_CYCLE_END &&
-      JS::dbg::FireOnGarbageCollectionHookRequired(aContext)) {
+      JS::dbg::FireOnGarbageCollectionHookRequired(aContext) &&
+      // GCs happen at non-deterministic points, so we can't consistently
+      // inform the debugger when a GC has occurred.
+      !recordreplay::IsRecordingOrReplaying()) {
     JS::GCReason reason = aDesc.reason_;
     Unused << NS_WARN_IF(
         NS_FAILED(DebuggerOnGCRunnable::Enqueue(aContext, aDesc)) &&
