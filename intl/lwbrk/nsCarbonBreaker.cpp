@@ -6,6 +6,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <stdint.h>
 #include "nsDebug.h"
+#include "nsINode.h"
 #include "nscore.h"
 #include "mozilla/RecordReplay.h"
 
@@ -21,7 +22,7 @@ void NS_GetComplexLineBreaks(const char16_t* aText, uint32_t aLength,
   // which follows some spaces.
   if (mozilla::recordreplay::HasDivergedFromRecording()) {
     for (size_t i = 1; i < aLength; i++) {
-      if (isspace(aText[i - 1]) && !isspace(aText[i])) {
+      if (mozilla::dom::IsSpaceCharacter(aText[i - 1]) && !mozilla::dom::IsSpaceCharacter(aText[i])) {
         aBreakBefore[i] = true;
       }
     }
