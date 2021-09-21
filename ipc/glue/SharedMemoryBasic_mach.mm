@@ -472,6 +472,12 @@ void SharedMemoryBasic::CleanupForPid(pid_t pid) {
 
 bool SharedMemoryBasic::SendMachMessage(pid_t pid, MachSendMessage& message,
                                         MachReceiveMessage* response) {
+  if (recordreplay::HasDivergedFromRecording() && !response) {
+    // If we don't need to wait for a response, just pretend the send happened
+    // so we don't make system calls below.
+    return true;
+  }
+
   StaticMutexAutoLock smal(gMutex);
   ipc::MemoryPorts* ports = GetMemoryPortsForPid(pid);
   if (!ports) {
