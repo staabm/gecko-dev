@@ -480,11 +480,19 @@ function getRecordingBrowser(key) {
   return key.ownerElement;
 }
 
+function updateRecordingState(key, state) {
+  const current = recordings.get(key);
+  const timestamps = current && current.timestamps || {};
+  timestamps[state] = Date.now();
+
+  return recordings.set(key, { state, timestamps });
+}
+
 function setRecordingState(key, state) {
   if (state === RecordingState.READY) {
     recordings.delete(key);
   } else {
-    recordings.set(key, { state });
+    updateRecordingState(key, state);
   }
 
   Services.obs.notifyObservers({
@@ -497,6 +505,19 @@ function getRecordingState(browser) {
   const {state} = recordings.get(getRecordingKey(browser)) || {state: RecordingState.READY};
 
   return state;
+}
+
+// Returns the time, in ms, since the browser entered `state`. If the duration
+// can't be calculated because a prior timestamp value isn't available for the
+// given browser, returns -1.
+function getRecordingStateDuration(key, state) {
+  const now = Date.now();
+  const stateObj = recordings.get(key);
+  const ts = stateObj && stateObj.timestamps[state];
+
+  if (!ts) return -1;
+
+  return now - ts;
 }
 
 // If an action invalidates the key (like updateBrowserRemoteness), we need to
@@ -528,20 +549,18 @@ function toggleRecording(browser) {
   if (recordings.has(key)) {
     state = recordings.get(key).state;
   } else {
-    recordings.set(key, {
-      state: RecordingState.READY
-    });
+    updateRecordingState(key, RecordingState.READY);
   }
 
   // Some sort of delay seems required to allow the chrome to update the
   // button to show the spinner. It might be possible to lower the timeout
   // but < 50ms was never enough but 100ms seems to be always enough.
   if (state === RecordingState.READY) {
-    pingTelemetry('recording', 'start');
+    pingTelemetry("recording", "start", { action: "click", recordingState: state });
     setRecordingState(key, RecordingState.STARTING);
     setTimeout(() => startRecording(browser), 100);
   } else if (state === RecordingState.RECORDING) {
-    pingTelemetry('recording', 'stop');
+    pingTelemetry("recording", "stop", { action: "click", recordingState: state });
     setRecordingState(key, RecordingState.STOPPING);
     setTimeout(() => stopRecording(browser), 100);
   }
@@ -553,6 +572,7 @@ async function startRecording(browser) {
 
   if (!browser || state !== RecordingState.STARTING) {
     setRecordingState(key, RecordingState.READY);
+    pingTelemetry("recording", "start-failed", { why: browser ? "invalid recording state" : "browser undefined", recordingState: state });
     return;
   }
 
@@ -594,6 +614,7 @@ async function startRecording(browser) {
   // in which case the parent may not have initialized the session fully yet.
   await TabStateFlusher.flush(browser);
 
+  pingTelemetry("recording", "start", { action: "updateBrowserRemoteness", recordingState: state, duration: getRecordingStateDuration(key, RecordingState.STARTING)});
   const tabState = SessionStore.getTabState(tab);
   tabbrowser.updateBrowserRemoteness(browser, {
     recordExecution: getDispatchServer(url),
@@ -608,6 +629,7 @@ async function startRecording(browser) {
 
   key = remapRecordingState(browser, key);
   setRecordingState(key, RecordingState.RECORDING);
+  pingTelemetry("recording", "start", { action: "complete", recordingState: state, duration: getRecordingStateDuration(key, RecordingState.STARTING) });
 }
 
 function stopRecording(browser) {
@@ -615,21 +637,25 @@ function stopRecording(browser) {
   const {state} = recordings.get(key) || {};
 
   if (!browser || state !== RecordingState.STOPPING)  {
+    pingTelemetry("recording", "stop-failed", { why: browser ? "invalid recording state" : "browser undefined", recordingState: state, duration: getRecordingStateDuration(key, RecordingState.STOPPING) });
     setRecordingState(key, RecordingState.READY);
     return;
   }
 
   const remoteTab = browser.frameLoader.remoteTab;
   if (!remoteTab || !remoteTab.finishRecording()) {
+    pingTelemetry("recording", "stop-failed", { why: remoteTab ? "finishRecording failed" : "remoteTab undefined", recordingState: state, duration: getRecordingStateDuration(key, RecordingState.STOPPING) });
     setRecordingState(key, RecordingState.READY);
     return;
   }
 
+  pingTelemetry("recording", "stop", { action: "complete", duration: getRecordingStateDuration(key, RecordingState.STOPPING) }); 
   ChromeUtils.recordReplayLog(`WaitForFinishedRecording`);
 }
 
 function setRecordingFinished(browser, url) {
   const key = getRecordingKey(browser);
+  const recordingState = getRecordingState(browser);
 
   if (isRecordingAllTabs()) {
     return;
@@ -639,6 +665,7 @@ function setRecordingFinished(browser, url) {
   const tab = tabbrowser.getTabForBrowser(browser);
   const contentPrincipal = browser.contentPrincipal;
 
+  pingTelemetry("recording", "finished", { action: "updateBrowserRemoteness", recordingState });
   const state = SessionStore.getTabState(tab);
   tabbrowser.updateBrowserRemoteness(browser, {
     recordExecution: undefined,
@@ -649,6 +676,7 @@ function setRecordingFinished(browser, url) {
   if (!url) {
     const contentUrl = browser.currentURI.spec;
 
+    pingTelemetry("recording", "finished", { action: "reloadContentUrl", recordingState });
     browser.loadURI(contentUrl, { triggeringPrincipal: contentPrincipal });
   }
 
@@ -663,6 +691,7 @@ function setRecordingFinished(browser, url) {
   }
 
   remapRecordingState(browser, key);
+  pingTelemetry("recording", "finished", { action: "complete", recordingState });
 }
 
 function setRecordingSaved(browser, recordingId) {
@@ -698,7 +727,7 @@ function setRecordingSaved(browser, recordingId) {
   tabbrowser.selectedTab = tab;
 
   // defer setting the state until the end so that the new tab has opened before the spinner disappears.
-  setRecordingState(key, RecordingState.READY);
+  setRecordingState(key, RecordingState.READY, {duration: getRecordingStateDuration(key, RecordingState.STOPPING)});
 }
 
 function handleRecordingStarted(pmm) {
@@ -718,7 +747,7 @@ function handleRecordingStarted(pmm) {
   }
 
   recording.on("unusable", function(name, data) {
-    pingTelemetry('recording', 'unusable', data);
+    pingTelemetry("recording", "unusable", data);
 
     // Log the reason so we can see in our CI logs when something went wrong.
     console.error("Unstable recording: " + data.why);
@@ -731,7 +760,7 @@ function handleRecordingStarted(pmm) {
   recording.on("finished", function(name, data) {
     const recordingId = data.id;
 
-    pingTelemetry('recording', 'finished', {...data, recordingId});
+    pingTelemetry("recording", "finished", {...data, recordingId});
 
     try {
       const browser = getBrowser();
@@ -750,7 +779,7 @@ function handleRecordingStarted(pmm) {
 
       setRecordingFinished(browser, url);
     } catch (e) {
-      pingTelemetry('recording', 'finished-error', {...data, recordingId, error: e});
+      pingTelemetry("recording", "finished-error", {...data, recordingId, error: e});
     }
 
     ChromeUtils.recordReplayLog(`FinishedRecording ${recordingId}`);
@@ -759,13 +788,13 @@ function handleRecordingStarted(pmm) {
   recording.on("saved", function(name, data) {
     const recordingId = data.id;
 
-    pingTelemetry('recording', 'saved', {...data, recordingId});
+    pingTelemetry("recording", "saved", {...data, recordingId});
 
     try {
       const browser = getBrowser();
       setRecordingSaved(browser, recordingId);
     } catch (e) {
-      pingTelemetry('recording', 'save-error', {...data, recordingId, error: e});
+      pingTelemetry("recording", "save-error", {...data, recordingId, error: e});
     }
 
     ChromeUtils.recordReplayLog(`SavedRecording ${recordingId}`);
