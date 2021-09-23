@@ -95,7 +95,7 @@ GPUParent::~GPUParent() { sGPUParent = nullptr; }
 
 /* static */
 GPUParent* GPUParent::GetSingleton() {
-  MOZ_DIAGNOSTIC_ASSERT(sGPUParent);
+  // MOZ_DIAGNOSTIC_ASSERT(sGPUParent);
   return sGPUParent;
 }
 

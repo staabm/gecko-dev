@@ -26,6 +26,8 @@
 #include "mozilla/layers/LayersTypes.h"
 #include "mozilla/layers/MemoryPressureObserver.h"
 
+#include "mozilla/RecordReplay.h"
+
 class gfxASurface;
 class gfxFont;
 class gfxFontGroup;
