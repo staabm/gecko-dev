@@ -315,7 +315,13 @@ if (ReplayAuth.hasOriginalApiKey()) {
       return;
     }
 
-    gExpirationTimer = setTimeout(clearUserToken, timeToExpiration);
+    gExpirationTimer = setTimeout(
+      () => {
+        pingTelemetry("browser", "auth-expired");
+        clearUserToken();
+      },
+      timeToExpiration
+    );
 
     setenv("RECORD_REPLAY_API_KEY", token);
     setAccessToken(token);
