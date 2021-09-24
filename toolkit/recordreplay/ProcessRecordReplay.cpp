@@ -611,6 +611,12 @@ MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedPthreadMutex(const char*
   gAddOrderedPthreadMutex(aName, aMutex);
 }
 
+void RecordReplayAddOrderedPthreadMutexFromC(const char* aName, pthread_mutex_t* aMutex) {
+  if (IsRecordingOrReplaying()) {
+    gAddOrderedPthreadMutex(aName, aMutex);
+  }
+}
+
 #else // XP_WIN
 
 MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedSRWLock(const char* aName, void* aLock) {
