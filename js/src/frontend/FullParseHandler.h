@@ -1088,6 +1088,12 @@ class FullParseHandler {
     return nullptr;
   }
 
+  bool disableWarnings() const {
+    // Full parsing occurs at non-deterministic points when recording/replaying,
+    // so warnings are not emitted.
+    return mozilla::recordreplay::IsRecordingOrReplaying();
+  }
+
   bool canSkipLazyInnerFunctions() { return !!lazyOuterFunction_; }
   bool canSkipLazyClosedOverBindings() { return !!lazyOuterFunction_; }
   bool canSkipRegexpSyntaxParse() { return !!lazyOuterFunction_; }
