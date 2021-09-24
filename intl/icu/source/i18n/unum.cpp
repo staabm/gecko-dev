@@ -18,6 +18,7 @@
 
 #include "unicode/unum.h"
 
+#include "mozilla/RecordReplay.h"
 #include "unicode/uloc.h"
 #include "unicode/numfmt.h"
 #include "unicode/decimfmt.h"
@@ -585,6 +586,12 @@ unum_setAttribute(    UNumberFormat*          fmt,
     else if (attr == UNUM_ROUNDING_MODE) {
         return nf->setRoundingMode((NumberFormat::ERoundingMode)newValue);
     }
+
+    // Using dynamic_cast isn't currently supported after diverging from the
+    // recording.
+    if (mozilla::recordreplay::HasDivergedFromRecording()) {
+        return;
+     }
 
     // The remaining attributes are only supported for DecimalFormat
     DecimalFormat* df = dynamic_cast<DecimalFormat*>(nf);
