@@ -644,6 +644,7 @@ bool JitRuntime::generateVMWrappers(JSContext* cx, MacroAssembler& masm,
     IdT id = IdT(i);
     const VMFunctionData& fun = GetVMFunction(id);
 
+/*
 #ifdef DEBUG
     // Assert the list is sorted by name.
     if (lastName) {
@@ -652,6 +653,7 @@ bool JitRuntime::generateVMWrappers(JSContext* cx, MacroAssembler& masm,
     }
     lastName = fun.name();
 #endif
+*/
 
     JitSpew(JitSpew_Codegen, "# VM function wrapper (%s)", fun.name());
 
