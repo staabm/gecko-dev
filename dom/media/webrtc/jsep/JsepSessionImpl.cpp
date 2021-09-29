@@ -53,7 +53,10 @@ static std::bitset<128> GetForbiddenSdpPayloadTypes() {
 }
 
 static std::string GetRandomHex(size_t words) {
-  std::ostringstream os;
+  // Note: For now avoid using ostringstream, to workaround problems replaying
+  // these calls on windows.
+  //std::ostringstream os;
+  std::string result;
 
   for (size_t i = 0; i < words; ++i) {
     uint32_t rand;
@@ -64,9 +67,14 @@ static std::string GetRandomHex(size_t words) {
       return "";
     }
 
-    os << std::hex << std::setfill('0') << std::setw(8) << rand;
+    char buf[50];
+    snprintf(buf, sizeof(buf), "%08x", rand);
+    result += buf;
+
+    //os << std::hex << std::setfill('0') << std::setw(8) << rand;
   }
-  return os.str();
+  return result;
+  //return os.str();
 }
 
 nsresult JsepSessionImpl::Init() {

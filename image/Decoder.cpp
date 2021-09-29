@@ -340,6 +340,8 @@ RawAccessFrameRef Decoder::AllocateFrameInternal(
     const gfx::IntSize& aOutputSize, SurfaceFormat aFormat,
     const Maybe<AnimationParams>& aAnimParams,
     RawAccessFrameRef&& aPreviousFrame) {
+  recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal Start");
+
   if (HasError()) {
     return RawAccessFrameRef();
   }
@@ -396,7 +398,9 @@ RawAccessFrameRef Decoder::AllocateFrameInternal(
       // animation parameters elsewhere. For now we just drop it.
       bool blocked = ref.get() == mRestoreFrame.get();
       if (!blocked) {
+        recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal #10");
         blocked = NS_FAILED(ref->InitForDecoderRecycle(aAnimParams.ref()));
+        recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal #11");
       }
 
       if (blocked) {
@@ -414,11 +418,14 @@ RawAccessFrameRef Decoder::AllocateFrameInternal(
 
     bool nonPremult = bool(mSurfaceFlags & SurfaceFlags::NO_PREMULTIPLY_ALPHA);
     auto frame = MakeNotNull<RefPtr<imgFrame>>();
+    recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal #12");
     if (NS_FAILED(frame->InitForDecoder(aOutputSize, aFormat, nonPremult,
                                         aAnimParams, bool(mFrameRecycler)))) {
+      recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal #13");
       NS_WARNING("imgFrame::Init should succeed");
       return RawAccessFrameRef();
     }
+    recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal #14");
 
     ref = frame->RawAccessRef();
     if (!ref) {
