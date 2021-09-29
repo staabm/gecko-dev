@@ -62,6 +62,7 @@ already_AddRefed<PlatformDecoderModule> WMFDecoderModule::Create() {
 }
 
 WMFDecoderModule::~WMFDecoderModule() {
+  recordreplay::RecordReplayAssert("WMFDecoderModule::~WMFDecoderModule %d", mWMFInitialized);
   if (mWMFInitialized) {
     DebugOnly<HRESULT> hr = wmf::MFShutdown();
     NS_ASSERTION(SUCCEEDED(hr), "MFShutdown failed");
