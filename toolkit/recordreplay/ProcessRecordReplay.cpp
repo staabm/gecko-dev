@@ -116,6 +116,7 @@ static void (*gSetCrashNote)(const char* aNote);
 static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
 typedef void* DriverHandle;
 #else
+static void (*gAddOrderedCriticalSection)(const char* aName, void* aCS);
 static void (*gAddOrderedSRWLock)(const char* aName, void* aLock);
 typedef HMODULE DriverHandle;
 #endif
@@ -374,6 +375,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
 #ifndef XP_WIN
   LoadSymbol("RecordReplayAddOrderedPthreadMutex", gAddOrderedPthreadMutex);
 #else
+  LoadSymbol("RecordReplayAddOrderedCriticalSection", gAddOrderedCriticalSection);
   LoadSymbol("RecordReplayAddOrderedSRWLock", gAddOrderedSRWLock);
 #endif
 
@@ -618,6 +620,10 @@ void RecordReplayAddOrderedPthreadMutexFromC(const char* aName, pthread_mutex_t*
 }
 
 #else // XP_WIN
+
+MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedCriticalSection(const char* aName, void* aCS) {
+  gAddOrderedCriticalSection(aName, aCS);
+}
 
 MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedSRWLock(const char* aName, void* aLock) {
   gAddOrderedSRWLock(aName, aLock);

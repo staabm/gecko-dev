@@ -37,6 +37,7 @@ class AutoSelectFont  // select a font into the given DC, and auto-restore
     if (mFont) {
       mOwnsFont = true;
       mDC = aDC;
+      recordreplay::RecordReplayAssert("AutoSelectFont %p %p", aDC, mFont);
       mOldFont = (HFONT)::SelectObject(aDC, mFont);
     } else {
       mOldFont = nullptr;

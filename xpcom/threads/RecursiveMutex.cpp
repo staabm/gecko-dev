@@ -39,8 +39,8 @@ RecursiveMutex::RecursiveMutex(const char* aName, bool aOrdered)
   BOOL r =
       InitializeCriticalSectionEx(NativeHandle(mMutex), sLockSpinCount, flags);
   MOZ_RELEASE_ASSERT(r);
-  if (aOrdered && recordreplay::IsRecordingOrReplaying()) {
-    //fprintf(stderr, "RecursiveMutex::RecursiveMutex FIXME\n");
+  if (aOrdered) {
+    recordreplay::AddOrderedCriticalSection(aName, NativeHandle(mMutex));
   }
 #else
   pthread_mutexattr_t attr;

@@ -749,7 +749,9 @@ bool TaskController::DoExecuteNextTaskOnlyMainThreadInternal(
 
         {
           LogTask::Run log(task);
+          recordreplay::RecordReplayAssert("TaskController::DoExecuteNextTaskOnlyMainThreadInternal RunTask Start");
           result = task->Run();
+          recordreplay::RecordReplayAssert("TaskController::DoExecuteNextTaskOnlyMainThreadInternal RunTask Done");
         }
 
         // Task itself should keep manager alive.
