@@ -8,6 +8,7 @@
 
 #include "mozilla/FontPropertyTypes.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/RecordReplay.h"
 #include "gfxWindowsPlatform.h"
 #include "gfxPlatformFontList.h"
 #include "nsGkAtoms.h"
