@@ -91,11 +91,9 @@ void RecursiveMutex::UnlockInternal() {
 #endif
 }
 
-#ifndef XP_WIN
 PR_BEGIN_EXTERN_C
   NSPR_API(void) PR_RecordReplayOrderMonitor(const char* name, PRMonitor* mon);
 PR_END_EXTERN_C
-#endif
 
 void RecordReplayAddOrderedMonitor(const char* aName, PRMonitor* aMonitor) {
   PR_RecordReplayOrderMonitor(aName, aMonitor);
