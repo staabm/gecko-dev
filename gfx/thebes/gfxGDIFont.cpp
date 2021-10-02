@@ -412,6 +412,8 @@ uint32_t gfxGDIFont::GetGlyph(uint32_t aUnicode, uint32_t aVarSelector) {
 }
 
 int32_t gfxGDIFont::GetGlyphWidth(uint16_t aGID) {
+  recordreplay::RecordReplayAssert("gfxGDIFont::GetGlyphWidth %u", aGID);
+
   if (!mGlyphWidths) {
     mGlyphWidths = MakeUnique<nsDataHashtable<nsUint32HashKey, int32_t>>(128);
   }
@@ -437,6 +439,8 @@ int32_t gfxGDIFont::GetGlyphWidth(uint16_t aGID) {
 }
 
 bool gfxGDIFont::GetGlyphBounds(uint16_t aGID, gfxRect* aBounds, bool aTight) {
+  recordreplay::RecordReplayAssert("gfxGDIFont::GetGlyphBounds %u", aGID);
+
   DCForMetrics dc;
   AutoSelectFont fs(dc, GetHFONT());
 
