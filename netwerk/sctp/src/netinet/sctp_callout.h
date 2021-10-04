@@ -66,7 +66,11 @@ __FBSDID("$FreeBSD$");
 #define SCTP_TIMERQ_LOCK()          (void)pthread_mutex_lock(&SCTP_BASE_VAR(timer_mtx))
 #define SCTP_TIMERQ_UNLOCK()        (void)pthread_mutex_unlock(&SCTP_BASE_VAR(timer_mtx))
 #endif
-#define SCTP_TIMERQ_LOCK_INIT()     (void)pthread_mutex_init(&SCTP_BASE_VAR(timer_mtx), &SCTP_BASE_VAR(mtx_attr))
+#define SCTP_TIMERQ_LOCK_INIT() \
+  do { \
+    pthread_mutex_init(&SCTP_BASE_VAR(timer_mtx), &SCTP_BASE_VAR(mtx_attr)); \
+    RecordReplayAddOrderedPthreadMutexFromC("sctp_timerq", &SCTP_BASE_VAR(timer_mtx)); \
+  } while (0)
 #define SCTP_TIMERQ_LOCK_DESTROY()  (void)pthread_mutex_destroy(&SCTP_BASE_VAR(timer_mtx))
 #endif
 #endif

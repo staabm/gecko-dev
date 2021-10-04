@@ -562,6 +562,10 @@ class MOZ_STACK_CLASS PerHandlerParser : public ParserBase {
   //   Do nothing.
   inline void clearAbortedSyntaxParse();
 
+  bool disableWarnings() const override {
+    return handler_.disableWarnings();
+  }
+
  public:
   NameNodeType newPropertyName(const ParserName* key, const TokenPos& pos) {
     return handler_.newPropertyName(key, pos);

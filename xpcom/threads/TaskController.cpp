@@ -308,6 +308,8 @@ void TaskController::RunPoolThread() {
 }
 
 void TaskController::AddTask(already_AddRefed<Task>&& aTask) {
+  recordreplay::RecordReplayAssert("TaskController::AddTask Start");
+
   RefPtr<Task> task(aTask);
 
   if (!task->IsMainThreadOnly()) {
@@ -332,6 +334,7 @@ void TaskController::AddTask(already_AddRefed<Task>&& aTask) {
   }
 
 #ifdef MOZ_GECKO_PROFILER
+  recordreplay::RecordReplayAssert("TaskController::AddTask #1");
   task->mInsertionTime = TimeStamp::Now();
 #endif
 
@@ -746,7 +749,9 @@ bool TaskController::DoExecuteNextTaskOnlyMainThreadInternal(
 
         {
           LogTask::Run log(task);
+          recordreplay::RecordReplayAssert("TaskController::DoExecuteNextTaskOnlyMainThreadInternal RunTask Start");
           result = task->Run();
+          recordreplay::RecordReplayAssert("TaskController::DoExecuteNextTaskOnlyMainThreadInternal RunTask Done");
         }
 
         // Task itself should keep manager alive.

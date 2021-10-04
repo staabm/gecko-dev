@@ -218,6 +218,12 @@ void TextureSync::UpdateTextureLocks(base::ProcessId aProcessId) {
 
 bool TextureSync::WaitForTextures(base::ProcessId aProcessId,
                                   const nsTArray<uint64_t>& textureIds) {
+  // When diverged from the recording, don't send messages to another process
+  // and then synchronously wait for a reply that won't come.
+  if (recordreplay::HasDivergedFromRecording()) {
+    return true;
+  }
+
   if (aProcessId == base::GetCurrentProcId()) {
     bool success = WaitForTextureIdsToUnlock(aProcessId, Span(textureIds));
     if (!success) {

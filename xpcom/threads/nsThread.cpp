@@ -1485,6 +1485,8 @@ PerformanceCounterState::Snapshot PerformanceCounterState::RunnableWillRun(
 }
 
 void PerformanceCounterState::RunnableDidRun(Snapshot&& aSnapshot) {
+  recordreplay::RecordReplayAssert("PerformanceCounterState::RunnableDidRun Start");
+
   // First thing: Restore our mCurrentEventLoopDepth so we can use
   // IsNestedRunnable().
   mCurrentEventLoopDepth = aSnapshot.mOldEventLoopDepth;
@@ -1493,6 +1495,7 @@ void PerformanceCounterState::RunnableDidRun(Snapshot&& aSnapshot) {
   // don't.
   TimeStamp now;
   if (mCurrentPerformanceCounter || mIsMainThread || IsNestedRunnable()) {
+    recordreplay::RecordReplayAssert("PerformanceCounterState::RunnableDidRun #1");
     now = TimeStamp::Now();
   }
   if (mCurrentPerformanceCounter || mIsMainThread) {

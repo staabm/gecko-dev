@@ -269,7 +269,7 @@ toolbar[brighttext] {
     transform: rotate(0);
   }
   100% {
-    transform: rotate(360deg);
+    transform: rotate(-360deg);
   }
 }
 
@@ -292,6 +292,10 @@ toolbar[brighttext] {
   background-repeat: no-repeat;
   background-position: center;
   animation: spinner 1s linear infinite reverse;
+}
+
+html[lwthemetextcolor="bright"] #record-button.waiting {
+  background-image: url("chrome://devtools/skin/images/command-record-wait-dark.svg");
 }
 
 #record-button.hidden {

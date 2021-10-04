@@ -1063,10 +1063,16 @@ Result<Completion> js::DebuggerGenericEval(
   RootedValue rval(cx);
   AbstractFramePtr frame = iter ? iter->abstractFramePtr() : NullFramePtr();
 
+  const char* filename = options.filename() ? options.filename() : "debugger eval code";
+  mozilla::recordreplay::RecordReplayAssert("DebuggerGenericEval %s", filename);
+
   bool ok = EvaluateInEnv(
       cx, env, frame, chars,
-      options.filename() ? options.filename() : "debugger eval code",
+      filename,
       options.lineno(), &rval);
+
+  mozilla::recordreplay::RecordReplayAssert("DebuggerGenericEval Done %d", ok);
+
   Rooted<Completion> completion(cx, Completion::fromJSResult(cx, ok, rval));
   ar.reset();
   return completion.get();
