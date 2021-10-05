@@ -1319,6 +1319,8 @@ nsPipeInputStream::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
                                 uint32_t aCount, uint32_t* aReadCount) {
   LOG(("III ReadSegments [this=%p count=%u]\n", this, aCount));
 
+  recordreplay::RecordReplayAssert("nsPipeInputStream::ReadSegments Start");
+
   nsresult rv = NS_OK;
 
   *aReadCount = 0;
@@ -1373,6 +1375,8 @@ nsPipeInputStream::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
       mLogicalOffset += writeCount;
     }
   }
+
+  recordreplay::RecordReplayAssert("nsPipeInputStream::ReadSegments Done %d", rv);
 
   return rv;
 }

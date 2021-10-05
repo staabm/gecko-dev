@@ -415,6 +415,8 @@ class nsAStreamCopier : public nsIInputStreamCallback,
 
   // continuation event handler
   NS_IMETHOD Run() override {
+    recordreplay::RecordReplayAssert("nsAStreamCopier::Run Start");
+
     Process();
 
     // clear "in process" flag and post any pending continuation event
@@ -425,6 +427,7 @@ class nsAStreamCopier : public nsIInputStreamCallback,
       PostContinuationEvent_Locked();
     }
 
+    recordreplay::RecordReplayAssert("nsAStreamCopier::Run Done");
     return NS_OK;
   }
 

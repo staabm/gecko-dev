@@ -194,6 +194,8 @@ struct MOZ_RAII AutoOrderedLock {
 static inline void AddOrderedPthreadMutex(const char* aName,
                                           pthread_mutex_t* aMutex);
 #else
+static inline void AddOrderedCriticalSection(const char* aName,
+                                             /*PCRITICAL_SECTION*/ void* aCS);
 static inline void AddOrderedSRWLock(const char* aName,
                                      /*PSRWLOCK*/ void* aLock);
 #endif
@@ -387,6 +389,9 @@ MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AddOrderedPthreadMutex,
                                     (const char* aName, pthread_mutex_t* aMutex),
                                     (aName, aMutex));
 #else
+MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AddOrderedCriticalSection,
+                                    (const char* aName, void* aCS),
+                                    (aName, aCS));
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AddOrderedSRWLock,
                                     (const char* aName, void* aLock),
                                     (aName, aLock));

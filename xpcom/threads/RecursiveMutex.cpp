@@ -39,8 +39,8 @@ RecursiveMutex::RecursiveMutex(const char* aName, bool aOrdered)
   BOOL r =
       InitializeCriticalSectionEx(NativeHandle(mMutex), sLockSpinCount, flags);
   MOZ_RELEASE_ASSERT(r);
-  if (aOrdered && recordreplay::IsRecordingOrReplaying()) {
-    //fprintf(stderr, "RecursiveMutex::RecursiveMutex FIXME\n");
+  if (aOrdered) {
+    recordreplay::AddOrderedCriticalSection(aName, NativeHandle(mMutex));
   }
 #else
   pthread_mutexattr_t attr;
@@ -91,21 +91,12 @@ void RecursiveMutex::UnlockInternal() {
 #endif
 }
 
-#ifndef XP_WIN
 PR_BEGIN_EXTERN_C
-  NSPR_API(pthread_mutex_t*) PR_MonitorMutex(PRMonitor* mon);
+  NSPR_API(void) PR_RecordReplayOrderMonitor(const char* name, PRMonitor* mon);
 PR_END_EXTERN_C
-#endif
 
 void RecordReplayAddOrderedMonitor(const char* aName, PRMonitor* aMonitor) {
-#ifndef XP_WIN
-  pthread_mutex_t* mutex = PR_MonitorMutex(aMonitor);
-  recordreplay::AddOrderedPthreadMutex(aName, mutex);
-#else
-  if (recordreplay::IsRecordingOrReplaying()) {
-    //fprintf(stderr, "RecordReplayAddOrderedMonitor FIXME\n");
-  }
-#endif
+  PR_RecordReplayOrderMonitor(aName, aMonitor);
 }
 
 }  // namespace mozilla

@@ -49,6 +49,9 @@ class ErrorReportMixin : public StrictModeGetter {
   // Returns the current context.
   virtual JSContext* getContext() const = 0;
 
+  // Whether to disable warning reporting.
+  virtual bool disableWarnings() const { return false; }
+
   // A variant class for the offset of the error or warning.
   struct Current {};
   struct NoOffset {};
@@ -307,6 +310,9 @@ class ErrorReportMixin : public StrictModeGetter {
   MOZ_MUST_USE bool compileWarning(ErrorMetadata&& metadata,
                                    UniquePtr<JSErrorNotes> notes,
                                    unsigned errorNumber, va_list* args) {
+    if (disableWarnings()) {
+      return true;
+    }
     return ReportCompileWarning(getContext(), std::move(metadata),
                                 std::move(notes), errorNumber, args);
   }

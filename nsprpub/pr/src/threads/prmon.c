@@ -110,6 +110,21 @@ PR_IMPLEMENT(PRMonitor*) PR_NewNamedMonitor(const char* name)
     return mon;
 }
 
+PR_IMPLEMENT(void) PR_RecordReplayOrderMonitor(const char* name, PRMonitor* mon) {
+    HMODULE module = GetModuleHandleA("xul.dll");
+    if (!module) {
+        return;
+    }
+    void* ptr = GetProcAddress(module, "RecordReplayAddOrderedCriticalSectionFromC");
+    if (!ptr) {
+        return;
+    }
+
+    ((void (*)(const char*, PCRITICAL_SECTION))ptr)(name, &mon->lock.ilock.mutex);
+    ((void (*)(const char*, PCRITICAL_SECTION))ptr)("monitor entry queue", &mon->entryCV.ilock.mutex);
+    ((void (*)(const char*, PCRITICAL_SECTION))ptr)("monitor wait queue", &mon->waitCV.ilock.mutex);
+}
+
 /*
 ** Destroy a monitor. There must be no thread waiting on the monitor's
 ** condition variable. The caller is responsible for guaranteeing that the

@@ -48,6 +48,8 @@ namespace recordreplay {
         (const char* aName, pthread_mutex_t* aMutex), (aName, aMutex))
 #else
 #define FOR_EACH_PLATFORM_INTERFACE_VOID(Macro)                                \
+  Macro(InternalAddOrderedCriticalSection,                                     \
+        (const char* aName, void* aCS), (aName, aCS))                          \
   Macro(InternalAddOrderedSRWLock,                                             \
         (const char* aName, void* aLock), (aName, aLock))
 #endif
