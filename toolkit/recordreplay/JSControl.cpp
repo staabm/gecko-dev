@@ -270,11 +270,7 @@ MOZ_EXPORT void RecordReplayInterface_ReportUnsupportedFeature(const char* aFeat
 
 static bool IsRecordingUnusable() {
   if (IsRecording()) {
-    char* reason = gGetUnusableRecordingReason();
-    if (reason) {
-      free(reason);
-      return true;
-    }
+    return gGetUnusableRecordingReason() != nullptr;
   }
   return false;
 }
