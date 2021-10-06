@@ -547,7 +547,7 @@ error1:
 }  /* PR_NewMonitor */
 
 PR_IMPLEMENT(void) PR_RecordReplayOrderMonitor(const char* name, PRMonitor* mon) {
-    void* ptr = dlsym(RTLD_DEFAULT, "RecordReplayAddOrderedPthreadMutexFromC");
+    void* ptr = dlsym(RTLD_DEFAULT, "RecordReplayAddOrderedPthreadMutex");
     if (ptr) {
         ((void (*)(const char*, pthread_mutex_t*))ptr)(name, &mon->lock);
     }
