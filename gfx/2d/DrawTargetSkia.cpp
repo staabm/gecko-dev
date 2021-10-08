@@ -217,6 +217,30 @@ static bool VerifyRGBXCorners(uint8_t* aData, const IntSize& aSize,
 }
 #endif
 
+// Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+static void RecordReplayPrintDataSurfaceDiagnostics(const char* aWhy, DataSourceSurface* aSurface) {
+  if (!recordreplay::HasDivergedFromRecording()) {
+    return;
+  }
+
+  int numPixels = 0;
+  uint8_t* data = aSurface->GetData();
+  for (int i = 0; i < aSurface->GetSize().height; i++) {
+    uint8_t* row = data + i * aSurface->Stride();
+    for (int j = 0; j < std::min<int>(aSurface->GetSize().width * 4, aSurface->Stride()); j++) {
+      if (row[j]) {
+        numPixels++;
+      }
+    }
+  }
+
+  recordreplay::PrintLog("%s Rect %d %d %d %d Size %d %d Format %d Pixels %d",
+                         aWhy, aSurface->GetRect().x, aSurface->GetRect().y,
+                         aSurface->GetRect().width, aSurface->GetRect().height,
+                         aSurface->GetSize().width, aSurface->GetSize().height,
+                         (int)aSurface->GetFormat(), numPixels);
+}
+
 static sk_sp<SkImage> GetSkImageForSurface(SourceSurface* aSurface,
                                            Maybe<MutexAutoLock>* aLock,
                                            const Rect* aBounds = nullptr,
@@ -224,6 +248,11 @@ static sk_sp<SkImage> GetSkImageForSurface(SourceSurface* aSurface,
   if (!aSurface) {
     gfxDebug() << "Creating null Skia image from null SourceSurface";
     return nullptr;
+  }
+
+  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+  if (recordreplay::HasDivergedFromRecording()) {
+    recordreplay::PrintLog("Diverged GetSkImageForSurface Type %d", (int)aSurface->GetType());
   }
 
   if (aSurface->GetType() == SurfaceType::CAPTURE) {
@@ -238,6 +267,9 @@ static sk_sp<SkImage> GetSkImageForSurface(SourceSurface* aSurface,
   }
 
   if (aSurface->GetType() == SurfaceType::SKIA) {
+    // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+    RecordReplayPrintDataSurfaceDiagnostics("Diverged GetSkImageForSurface #1",
+                                            static_cast<SourceSurfaceSkia*>(aSurface));
     return static_cast<SourceSurfaceSkia*>(aSurface)->GetImage(aLock);
   }
 
@@ -246,6 +278,9 @@ static sk_sp<SkImage> GetSkImageForSurface(SourceSurface* aSurface,
     gfxWarning() << "Failed getting DataSourceSurface for Skia image";
     return nullptr;
   }
+
+  RecordReplayPrintDataSurfaceDiagnostics("Diverged GetSkImageForSurface #2",
+                                          static_cast<SourceSurfaceSkia*>(aSurface));
 
   // Skia doesn't support RGBX surfaces so ensure that the alpha value is opaque
   // white.
@@ -409,6 +444,11 @@ static bool ExtractAlphaBitmap(const sk_sp<SkImage>& aImage,
 
 static sk_sp<SkImage> ExtractAlphaForSurface(SourceSurface* aSurface,
                                              Maybe<MutexAutoLock>& aLock) {
+  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+  if (recordreplay::HasDivergedFromRecording()) {
+    recordreplay::PrintLog("Diverged ExtractAlphaForSurface");
+  }
+
   sk_sp<SkImage> image = GetSkImageForSurface(aSurface, &aLock);
   if (!image) {
     return nullptr;
@@ -544,6 +584,15 @@ static void SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern,
       break;
     }
     case PatternType::SURFACE: {
+      // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+      if (recordreplay::HasDivergedFromRecording()) {
+        recordreplay::PrintLog("Diverged SetPaintPattern SURFACE Bounds %.2f %.2f %.2f %.2f",
+                               aBounds ? aBounds->x : -1,
+                               aBounds ? aBounds->y : -1,
+                               aBounds ? aBounds->width : -1,
+                               aBounds ? aBounds->height : -1);
+      }
+
       const SurfacePattern& pat = static_cast<const SurfacePattern&>(aPattern);
       sk_sp<SkImage> image =
           GetSkImageForSurface(pat.mSurface, &aLock, aBounds, &pat.mMatrix);
@@ -670,6 +719,12 @@ void DrawTargetSkia::DrawSurface(SourceSurface* aSurface, const Rect& aDest,
     return;
   }
 
+  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+  if (recordreplay::HasDivergedFromRecording()) {
+    recordreplay::PrintLog("Diverged DrawTargetSkia::DrawSurface Bounds %.2f %.2f %.2f %.2f",
+                           aDest.x, aDest.y, aDest.width, aDest.height);
+  }
+
   MarkChanged();
 
   Maybe<MutexAutoLock> lock;
@@ -709,6 +764,12 @@ void DrawTargetSkia::DrawSurfaceWithShadow(SourceSurface* aSurface,
                                            CompositionOp aOperator) {
   if (aSurface->GetSize().IsEmpty()) {
     return;
+  }
+
+  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+  if (recordreplay::HasDivergedFromRecording()) {
+    recordreplay::PrintLog("Diverged DrawTargetSkia::DrawSurfaceWithShadow Dest %.2f %.2f",
+                           aDest.x, aDest.y);
   }
 
   MarkChanged();
@@ -1452,6 +1513,11 @@ bool DrawTarget::Draw3DTransformedSurface(SourceSurface* aSurface,
   // Offset the matrix by the transformed origin.
   fullMat.PostTranslate(-xformBounds.X(), -xformBounds.Y(), 0);
 
+  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+  if (recordreplay::HasDivergedFromRecording()) {
+    recordreplay::PrintLog("Diverged DrawTarget::Draw3DTransformedSurface");
+  }
+
   // Read in the source data.
   Maybe<MutexAutoLock> lock;
   sk_sp<SkImage> srcImage = GetSkImageForSurface(aSurface, &lock);
@@ -1512,6 +1578,11 @@ bool DrawTargetSkia::Draw3DTransformedSurface(SourceSurface* aSurface,
                                               const Matrix4x4& aMatrix) {
   if (aMatrix.IsSingular()) {
     return false;
+  }
+
+  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+  if (recordreplay::HasDivergedFromRecording()) {
+    recordreplay::PrintLog("Diverged DrawTargetSkia::Draw3DTransformedSurface");
   }
 
   MarkChanged();
@@ -1654,6 +1725,13 @@ void DrawTargetSkia::CopySurface(SourceSurface* aSurface,
                                  const IntRect& aSourceRect,
                                  const IntPoint& aDestination) {
   MarkChanged();
+
+  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+  if (recordreplay::HasDivergedFromRecording()) {
+    recordreplay::PrintLog("Diverged DrawTargetSkia::CopySurface Source %d %d %d %d Dest %d %d",
+                           aSourceRect.x, aSourceRect.y, aSourceRect.width, aSourceRect.height,
+                           aDestination.x, aDestination.y);
+  }
 
   Maybe<MutexAutoLock> lock;
   sk_sp<SkImage> image = GetSkImageForSurface(aSurface, &lock);
@@ -1888,6 +1966,11 @@ void DrawTargetSkia::PushLayerWithBlend(bool aOpaque, Float aOpacity,
     } else {
       bounds.setEmpty();
     }
+  }
+
+  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+  if (recordreplay::HasDivergedFromRecording() && aMask) {
+    recordreplay::PrintLog("Diverged DrawTargetSkia::PushLayerWithBlend");
   }
 
   // We don't pass a lock object to GetSkImageForSurface here, to force a
