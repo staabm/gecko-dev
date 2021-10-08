@@ -14,6 +14,7 @@
 #include "primpl.h"
 #include "obsolete/prsem.h"
 
+#include <dlfcn.h>
 #include <string.h>
 #include <pthread.h>
 #include <sys/time.h>
@@ -545,8 +546,11 @@ error1:
     return NULL;
 }  /* PR_NewMonitor */
 
-PR_IMPLEMENT(pthread_mutex_t*) PR_MonitorMutex(PRMonitor* mon) {
-    return &mon->lock;
+PR_IMPLEMENT(void) PR_RecordReplayOrderMonitor(const char* name, PRMonitor* mon) {
+    void* ptr = dlsym(RTLD_DEFAULT, "RecordReplayAddOrderedPthreadMutex");
+    if (ptr) {
+        ((void (*)(const char*, pthread_mutex_t*))ptr)(name, &mon->lock);
+    }
 }
 
 PR_IMPLEMENT(PRMonitor*) PR_NewNamedMonitor(const char* name)

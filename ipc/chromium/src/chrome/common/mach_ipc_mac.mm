@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include "base/logging.h"
+#include "mozilla/RecordReplay.h"
 
 //==============================================================================
 MachSendMessage::MachSendMessage(int32_t message_id) : MachMessage() { Initialize(message_id); }
@@ -180,6 +181,8 @@ mach_port_t MachMessage::GetTranslatedPort(int n) {
 //==============================================================================
 // create a new mach port for receiving messages and register a name for it
 ReceivePort::ReceivePort(const char* receive_port_name) {
+  mozilla::recordreplay::RecordReplayAssert("ReceivePort::ReceivePort #1 %s", receive_port_name);
+
   mach_port_t current_task = mach_task_self();
 
   init_result_ = mach_port_allocate(current_task, MACH_PORT_RIGHT_RECEIVE, &port_);
@@ -198,6 +201,8 @@ ReceivePort::ReceivePort(const char* receive_port_name) {
 //==============================================================================
 // create a new mach port for receiving messages
 ReceivePort::ReceivePort() {
+  mozilla::recordreplay::RecordReplayAssert("ReceivePort::ReceivePort #2");
+
   mach_port_t current_task = mach_task_self();
 
   init_result_ = mach_port_allocate(current_task, MACH_PORT_RIGHT_RECEIVE, &port_);

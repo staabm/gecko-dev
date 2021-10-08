@@ -9,6 +9,7 @@
 
 #include "mozilla/Base64.h"
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPtr.h"
 #include "js/CharacterEncoding.h"
 #include "js/Conversions.h"
@@ -22,12 +23,44 @@
 
 #include <fcntl.h>
 #include <sys/stat.h>
+
+#ifndef XP_WIN
 #include <unistd.h>
+#endif
 
 using namespace JS;
 
 namespace mozilla {
 namespace recordreplay {
+
+// We remember various operations performed by the recording process and add
+// them to the vector below, so that JS can get the complete set and send it
+// up to the UI process for including in metadata about the recording.
+//
+// This is used for operations that could be considered security sensitive,
+// and is currently targeted at times when the recording accesses existing
+// information from the user's profile like cookies and local storage.
+struct RecordingOperation {
+  nsCString mKind;
+  nsCString mValue;
+
+  RecordingOperation(const char* aKind, const char* aValue)
+    : mKind(aKind), mValue(aValue) {}
+};
+static StaticInfallibleVector<RecordingOperation> gRecordingOperations;
+static StaticMutex gRecordingOperationsMutex;
+
+void AddRecordingOperation(const char* aKind, const char* aValue) {
+  if (!recordreplay::IsRecordingOrReplaying()) {
+    return;
+  }
+
+  RecordReplayAssert("AddRecordingOperation %s %s", aKind, aValue);
+
+  StaticMutexAutoLock lock(gRecordingOperationsMutex);
+  gRecordingOperations.append(RecordingOperation(aKind, aValue));
+}
+
 namespace js {
 
 static void (*gOnNewSource)(const char* aId, const char* aKind, const char* aUrl);
@@ -197,6 +230,8 @@ void OnTestCommand(const char* aString) {
   }
 }
 
+static void SendUnsupportedFeature(const char* aFeature, int aIssueNumber);
+
 extern "C" {
 
 MOZ_EXPORT void RecordReplayInterface_BeginContentParse(
@@ -222,15 +257,20 @@ MOZ_EXPORT void RecordReplayInterface_EndContentParse(const void* aToken) {
   MOZ_RELEASE_ASSERT(aToken);
 }
 
+MOZ_EXPORT void RecordReplayInterface_ReportUnsupportedFeature(const char* aFeature, int aIssueNumber) {
+  if (NS_IsMainThread()) {
+    SendUnsupportedFeature(aFeature, aIssueNumber);
+  } else {
+    NS_DispatchToMainThread(NS_NewRunnableFunction("ReportUnsupportedFeature",
+                            [=]() { SendUnsupportedFeature(aFeature, aIssueNumber); }));
+  }
+}
+
 }  // extern "C"
 
 static bool IsRecordingUnusable() {
   if (IsRecording()) {
-    char* reason = gGetUnusableRecordingReason();
-    if (reason) {
-      free(reason);
-      return true;
-    }
+    return gGetUnusableRecordingReason() != nullptr;
   }
   return false;
 }
@@ -265,6 +305,37 @@ static const char* GetRecordingId() {
 // If we are recording all content processes, whether any interesting content was found.
 static bool gHasInterestingContent;
 
+// Call a method exported by the JS module with the given argument.
+static void CallModuleMethod(JSContext* cx, const char* aMethod, const char* aArgument, int aArgument2 = 0) {
+  JSString* str = JS_NewStringCopyZ(cx, aArgument);
+  MOZ_RELEASE_ASSERT(str);
+
+  JS::RootedValueArray<2> args(cx);
+  args[0].setString(str);
+  args[1].setInt32(aArgument2);
+
+  RootedValue rv(cx);
+  if (!JS_CallFunctionName(cx, *gModuleObject, aMethod, args, &rv)) {
+    MOZ_CRASH("CallModuleMethod");
+  }
+}
+
+void SendRecordingUnsupported(const char* aReason) {
+  AutoSafeJSContext cx;
+  JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
+  CallModuleMethod(cx, "SendRecordingUnsupported", aReason);
+}
+
+static void SendUnsupportedFeature(const char* aFeature, int aIssueNumber) {
+  if (!IsModuleInitialized()) {
+    return;
+  }
+
+  AutoSafeJSContext cx;
+  JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
+  CallModuleMethod(cx, "SendUnsupportedFeature", aFeature, aIssueNumber);
+}
+
 // Report the recording as either finished or unusable.
 void SendRecordingFinished() {
   // When recording all content, we don't notify the UI process about the
@@ -289,30 +360,11 @@ void SendRecordingFinished() {
   if (!recordingId) {
     char* reason = gGetUnusableRecordingReason();
     MOZ_RELEASE_ASSERT(reason);
-
-    JSString* str = JS_NewStringCopyZ(cx, reason);
-    MOZ_RELEASE_ASSERT(str);
-
-    JS::RootedValueArray<1> args(cx);
-    args[0].setString(str);
-
-    RootedValue rv(cx);
-    if (!JS_CallFunctionName(cx, *gModuleObject, "SendRecordingUnusable", args, &rv)) {
-      MOZ_CRASH("SendRecordingFinished");
-    }
+    CallModuleMethod(cx, "SendRecordingUnusable", reason);
     return;
   }
 
-  JSString* str = JS_NewStringCopyZ(cx, recordingId);
-  MOZ_RELEASE_ASSERT(str);
-
-  JS::RootedValueArray<1> args(cx);
-  args[0].setString(str);
-
-  RootedValue rv(cx);
-  if (!JS_CallFunctionName(cx, *gModuleObject, "SendRecordingFinished", args, &rv)) {
-    MOZ_CRASH("SendRecordingFinished");
-  }
+  CallModuleMethod(cx, "SendRecordingFinished", recordingId);
 }
 
 void MaybeSendRecordingUnusable() {
@@ -635,6 +687,46 @@ static bool Method_AddMetadata(JSContext* aCx, unsigned aArgc, Value* aVp) {
   return true;
 }
 
+static bool Method_RecordingOperations(JSContext* aCx, unsigned aArgc, Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  StaticMutexAutoLock lock(gRecordingOperationsMutex);
+
+  RootedObject rv(aCx, NewArrayObject(aCx, gRecordingOperations.length()));
+  if (!rv) {
+    return false;
+  }
+
+  for (size_t i = 0; i < gRecordingOperations.length(); i++) {
+    RootedString kind(aCx, JS_NewStringCopyZ(aCx, gRecordingOperations[i].mKind.get()));
+    if (!kind) {
+      return false;
+    }
+
+    RootedString value(aCx, JS_NewStringCopyZ(aCx, gRecordingOperations[i].mValue.get()));
+    if (!value) {
+      return false;
+    }
+
+    RootedObject elem(aCx, JS_NewObject(aCx, nullptr));
+    if (!elem) {
+      return false;
+    }
+
+    RootedValue kindVal(aCx, StringValue(kind));
+    RootedValue valueVal(aCx, StringValue(value));
+
+    if (!JS_SetProperty(aCx, elem, "kind", kindVal) ||
+        !JS_SetProperty(aCx, elem, "value", valueVal) ||
+        !JS_SetElement(aCx, rv, i, elem)) {
+      return false;
+    }
+  }
+
+  args.rval().setObject(*rv);
+  return true;
+}
+
 static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("log", Method_Log, 1, 0),
   JS_FN("onNewSource", Method_OnNewSource, 3, 0),
@@ -649,6 +741,7 @@ static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("onAnnotation", Method_OnAnnotation, 2, 0),
   JS_FN("recordingId", Method_RecordingId, 0, 0),
   JS_FN("addMetadata", Method_AddMetadata, 1, 0),
+  JS_FN("recordingOperations", Method_RecordingOperations, 0, 0),
   JS_FS_END
 };
 
@@ -737,6 +830,30 @@ bool DefineRecordReplayControlObject(JSContext* aCx, JS::HandleObject object) {
   }
 
   return true;
+}
+
+static ProgressCounter gLastRepaintNeededProgress;
+
+// Add annotations to the recording to indicate places where the screen becomes
+// dirty. These are currently used to stress test repainting and other DOM
+// commands.
+void OnRepaintNeeded(const char* aWhy) {
+  if (!HasCheckpoint() || HasDivergedFromRecording() || !NS_IsMainThread()) {
+    return;
+  }
+
+  // Ignore repaints triggered when there hasn't been any execution since the
+  // last repaint was triggered.
+  if (*ExecutionProgressCounter() == gLastRepaintNeededProgress) {
+    return;
+  }
+
+  nsPrintfCString contents("{\"why\":\"%s\"}", aWhy);
+  js::gOnAnnotation("repaint-needed", contents.get());
+
+  // Measure this after calling RecordReplayOnAnnotation, as the latter can
+  // update the progress counter.
+  gLastRepaintNeededProgress = *ExecutionProgressCounter();
 }
 
 }  // namespace recordreplay

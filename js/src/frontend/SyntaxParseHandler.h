@@ -717,6 +717,11 @@ class SyntaxParseHandler {
     return nullptr;
   }
 
+  bool disableWarnings() const {
+    // Syntax parsing always occurs at deterministic points.
+    return false;
+  }
+
   bool canSkipLazyInnerFunctions() { return false; }
   bool canSkipLazyClosedOverBindings() { return false; }
   JSAtom* nextLazyClosedOverBinding() {

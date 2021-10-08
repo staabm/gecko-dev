@@ -17,6 +17,10 @@
       "chrome://browser/skin/privatebrowsing/favicon.svg",
   };
 
+  const ReplayTelemetry = ChromeUtils.import(
+    "resource://devtools/server/actors/replay/telemetry.js"
+  );
+
   window._gBrowser = {
     init() {
       ChromeUtils.defineModuleGetter(
@@ -5530,6 +5534,7 @@
         if (!event.isTrusted) {
           return;
         }
+        ReplayTelemetry.pingTelemetry("browser", "crash");
 
         let browser = event.originalTarget;
 

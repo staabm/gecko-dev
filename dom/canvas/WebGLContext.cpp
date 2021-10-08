@@ -260,6 +260,7 @@ bool WebGLContext::CreateAndInitGL(
 
   // WebGL can't be used when recording/replaying.
   if (recordreplay::IsRecordingOrReplaying()) {
+    recordreplay::ReportUnsupportedFeature("WebGL", 58);
     FailureReason reason;
     reason.info =
         "Can't use WebGL when recording or replaying "

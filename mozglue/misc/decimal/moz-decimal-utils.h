@@ -70,15 +70,28 @@ String mozToString(double aNum) {
 }
 
 String mozToString(int64_t aNum) {
+  // Note: For now avoid using ostringstream, to workaround problems replaying
+  // these calls on windows.
+  char buf[50];
+  snprintf(buf, sizeof(buf), "%lld", aNum);
+  return String(buf);
+  /*
   std::ostringstream o;
   o << std::setprecision(std::numeric_limits<int64_t>::digits10) << aNum;
   return o.str();
+  */
 }
 
 String mozToString(uint64_t aNum) {
+  // See above.
+  char buf[50];
+  snprintf(buf, sizeof(buf), "%llu", aNum);
+  return String(buf);
+  /*
   std::ostringstream o;
   o << std::setprecision(std::numeric_limits<uint64_t>::digits10) << aNum;
   return o.str();
+  */
 }
 
 namespace moz_decimal_utils {

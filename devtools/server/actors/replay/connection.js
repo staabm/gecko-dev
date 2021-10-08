@@ -20,12 +20,89 @@ const { CryptoUtils } = ChromeUtils.import(
   "resource://services-crypto/utils.js"
 );
 
+const ReplayAuth = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/auth.js"
+);
+const { pingTelemetry } = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/telemetry.js"
+);
+
+ChromeUtils.defineModuleGetter(
+  this,
+  "TabStateFlusher",
+  "resource:///modules/sessionstore/TabStateFlusher.jsm"
+);
+ChromeUtils.defineModuleGetter(
+  this,
+  "SessionStore",
+  "resource:///modules/sessionstore/SessionStore.jsm"
+);
+
 XPCOMUtils.defineLazyModuleGetters(this, {
   AppUpdater: "resource:///modules/AppUpdater.jsm",
+  E10SUtils: "resource://gre/modules/E10SUtils.jsm",
 });
 
 let updateStatusCallback = null;
 let connectionStatus = "cloudConnecting.label";
+
+function getenv(name) {
+  const env = Cc["@mozilla.org/process/environment;1"].getService(
+    Ci.nsIEnvironment
+  );
+  return env.get(name);
+}
+
+function setenv(name, value) {
+  const env = Cc["@mozilla.org/process/environment;1"].getService(
+    Ci.nsIEnvironment
+  );
+  return env.set(name, value);
+}
+
+// Return whether all tabs are automatically being recorded.
+function isRecordingAllTabs() {
+  return getenv("RECORD_ALL_CONTENT")
+      || Services.prefs.getBoolPref("devtools.recordreplay.alwaysRecord");
+}
+
+// See also GetRecordReplayDispatchServer in ContentParent.cpp
+function getDispatchServer() {
+  const address = getenv("RECORD_REPLAY_SERVER");
+  if (address) {
+    return address;
+  }
+  return Services.prefs.getStringPref("devtools.recordreplay.cloudServer");
+}
+
+function openInNewTab(browser, url) {
+  const tabbrowser = browser.getTabBrowser();
+  const currentTabIndex = tabbrowser.visibleTabs.indexOf(tabbrowser.selectedTab);
+  const triggeringPrincipal = Services.scriptSecurityManager.getSystemPrincipal();
+  const tab = tabbrowser.addTab(
+    url,
+    { triggeringPrincipal, index: currentTabIndex === -1 ? undefined : currentTabIndex + 1}
+  );
+  tabbrowser.selectedTab = tab;
+}
+
+function getViewURL(path) {
+  let viewHost = "https://app.replay.io";
+
+  // For testing, allow overriding the host for the view page.
+  const hostOverride = getenv("RECORD_REPLAY_VIEW_HOST");
+  if (hostOverride) {
+    viewHost = hostOverride;
+  }
+
+  const url = new URL(viewHost);
+
+  if (path) {
+    url.pathname = path;
+  }
+
+  return url;
+}
 
 function setConnectionStatusChangeCallback(callback) {
   updateStatusCallback = callback;
@@ -36,77 +113,242 @@ function getConnectionStatus() {
 }
 
 const gWorker = new Worker("connection-worker.js");
-gWorker.addEventListener("message", (evt) => {
+gWorker.addEventListener("message", ({ data }) => {
   try {
-    onMessage(evt);
+    switch (data.kind) {
+      case "stateChange": {
+        const { channelId, state } = data;
+        gSockets.get(channelId)?._onStateChange(state);
+        break;
+      }
+      case "commandResponse": {
+        const { channelId, commandId, result, error } = data;
+        gSockets.get(channelId)?._onCommandResponse(commandId, result, error);
+        break;
+      }
+    }
   } catch (e) {
     ChromeUtils.recordReplayLog(`RecordReplaySocketError ${e} ${e.stack}`);
   }
 });
 
-let address = Services.prefs.getStringPref(
-  "devtools.recordreplay.cloudServer"
-);
+let gChannelId = 1;
+const gSockets = new Map();
 
-const override = getenv("RECORD_REPLAY_SERVER");
-if (override) {
-  address = override;
-}
+class ProtocolSocket {
+  constructor(address) {
+    this._channelId = gChannelId++;
+    this._state = "connecting";
+    this._onStateChangeCallback = null;
+    this._commandId = 1;
+    this._handlers = new Map();
 
-const gMainChannelId = 1;
-gWorker.postMessage({ kind: "openChannel", id: gMainChannelId, address });
+    gWorker.postMessage({ kind: "openChannel", channelId: this._channelId, address });
+    gSockets.set(this._channelId, this);
+  }
 
-function onMessage(evt) {
-  switch (evt.data.kind) {
-    case "updateStatus":
-      connectionStatus = evt.data.status;
-      if (updateStatusCallback) {
-        updateStatusCallback(connectionStatus);
-      }
-      break;
-    case "commandResponse":
-      onCommandResponse(evt.data.msg);
-      break;
+  get onStateChange() {
+    return this._onStateChangeCallback;
+  }
+
+  set onStateChange(callback) {
+    this._onStateChangeCallback = callback;
+    this._notifyStateChange();
+  }
+
+  _onStateChange(state) {
+    this._state = state;
+    this._notifyStateChange();
+  }
+  _notifyStateChange() {
+    this._onStateChangeCallback?.(this._state);
+  }
+
+  _onCommandResponse(commandId, result, error) {
+    const resolve = this._handlers.get(commandId);
+    this._handlers.delete(commandId);
+    resolve({ result, error });
+  }
+
+  async sendCommand(method, params) {
+    const commandId = this._commandId++;
+    gWorker.postMessage({ kind: "sendCommand", channelId: this._channelId, commandId, method, params });
+    const response = await new Promise(resolve => this._handlers.set(commandId, resolve));
+
+    if (response.error) {
+      throw new CommandError(response.error.message, response.error.code);
+    }
+
+    return response.result;
+  }
+
+  setAccessToken(token) {
+    if (!token) {
+      throw new Error("Token must be truthy");
+    }
+    gWorker.postMessage({ kind: "setAccessToken", channelId: this._channelId, token });
+  }
+
+  close() {
+    gSockets.delete(this._channelId);
+    gWorker.postMessage({ kind: "closeChannel", channelId: this._channelId });
   }
 }
 
-function getenv(name) {
-  const env = Cc["@mozilla.org/process/environment;1"].getService(
-    Ci.nsIEnvironment
-  );
-  return env.get(name);
+const gCommandSocket = new ProtocolSocket(getDispatchServer());
+gCommandSocket.onStateChange = state => {
+  let label;
+  switch (state) {
+    case "open":
+      label = "";
+      break;
+    case "connecting":
+      label = "cloudConnecting.label";
+      break;
+    case "error":
+      label = "cloudError.label";
+      break;
+    case "close":
+      label = "";
+      break;
+  }
+
+  connectionStatus = label;
+  if (updateStatusCallback) {
+    updateStatusCallback(connectionStatus);
+  }
 }
 
-// Map recording process ID to information about its upload progress.
-const gRecordings = new Map();
+let gTokenChangeCallbacks = null;
+function setAccessToken(token, isAPIKey) {
+  gCommandSocket.setAccessToken(token);
 
-let gNextMessageId = 1;
+  // If we're working with an API key, there's no way for us to get a new
+  // key to try again, so we can bail early and let the retry code figure
+  // out what it wants to do.
+  if (isAPIKey) {
+    if (gTokenChangeCallbacks) {
+      throw new Error("Unexpected API key");
+    }
+    return;
+  }
+  for (const callback of gTokenChangeCallbacks || []) {
+    callback();
+  }
+  gTokenChangeCallbacks = new Set();
+}
 
-function sendCommand(method, params = {}) {
-  const id = gNextMessageId++;
-  gWorker.postMessage({
-    kind: "sendCommand",
-    id: gMainChannelId,
-    command: { id, method, params },
-  });
-  return waitForCommandResult(id);
+const AUTHENTICATION_REQUIRED_CODE = 49;
+
+async function sendCommand(method, params) {
+  const tokenCallbacks = gTokenChangeCallbacks;
+  try {
+    return await gCommandSocket.sendCommand(method, params);
+  } catch (err) {
+    if (!(err instanceof CommandError) || err.code !== AUTHENTICATION_REQUIRED_CODE) {
+      throw err;
+    }
+
+    // If there was no set of token callbacks to begin with, we can assume that
+    // we'll either have hidden the record button in the first place, or are working
+    // with an API key that can't be renewed and thus don't have anything to wait for.
+    if (!tokenCallbacks) {
+      throw err;
+    }
+
+    // If the token hasn't been changed since the first attempt was dispatched,
+    // we can let the user know and wait for them to sign in again.
+    if (tokenCallbacks === gTokenChangeCallbacks) {
+      clearUserToken();
+      if (gTokenChangeCallbacks.size === 0) {
+        alert("Your Replay session has expired while recording. \nPlease sign in to see your new recording.");
+      }
+
+      await new Promise(resolve => {
+        gTokenChangeCallbacks.add(function handler(value) {
+          gTokenChangeCallbacks.delete(handler);
+          resolve(value);
+        });
+      });
+    }
+
+    return await gCommandSocket.sendCommand(method, params);
+  }
+}
+
+class CommandError extends Error {
+  constructor(message, code) {
+    super(message);
+    this.code = code;
+  }
 }
 
 // Resolve hooks for promises waiting on a recording to be created.
 const gRecordingCreateWaiters = [];
 
-function isAuthenticationEnabled() {
-  // Authentication is controlled by a preference but can be disabled by an
-  // environment variable.
-  return (
-    Services.prefs.getBoolPref(
-      "devtools.recordreplay.authentication-enabled"
-    ) && !getenv("RECORD_REPLAY_DISABLE_AUTHENTICATION")
-  );
+function isLoggedIn() {
+  return !!ReplayAuth.getReplayUserToken() || ReplayAuth.hasOriginalApiKey();
+}
+
+async function saveRecordingToken(token) {
+  ReplayAuth.setReplayUserToken(token);
 }
 
 function isRunningTest() {
   return !!getenv("RECORD_REPLAY_TEST_SCRIPT");
+}
+
+function clearUserToken() {
+  saveRecordingToken(null);
+}
+
+// If there is an API key, all authentication in the browser uses that
+// key and ignores tokens provided by any logged-in session.
+if (ReplayAuth.hasOriginalApiKey()) {
+  setAccessToken(ReplayAuth.getOriginalApiKey(), true /* isAPIKey */);
+} else {
+  let gExpirationTimer;
+
+  const ensureAccessTokenStateSynchronized = function() {
+    if (gExpirationTimer) {
+      clearTimeout(gExpirationTimer);
+      gExpirationTimer = null;
+    }
+
+    let token = ReplayAuth.getReplayUserToken();
+    if (!token) {
+      return;
+    }
+
+    const expiration = ReplayAuth.tokenExpiration(token);
+    if (typeof expiration !== "number") {
+      ChromeUtils.recordReplayLog(`InvalidJWTExpiration`);
+      clearUserToken();
+      return;
+    }
+
+    const timeToExpiration = expiration - Date.now();
+    if (timeToExpiration <= 0) {
+      clearUserToken();
+      return;
+    }
+
+    gExpirationTimer = setTimeout(
+      () => {
+        pingTelemetry("browser", "auth-expired");
+        clearUserToken();
+      },
+      timeToExpiration
+    );
+
+    setenv("RECORD_REPLAY_API_KEY", token);
+    setAccessToken(token);
+  }
+
+  Services.prefs.addObserver("devtools.recordreplay.user-token", () => {
+    ensureAccessTokenStateSynchronized();
+  });
+  ensureAccessTokenStateSynchronized();
 }
 
 const SEEN_MANAGERS = new WeakSet();
@@ -131,6 +373,9 @@ class Recording extends EventEmitter {
     });
     this._pmm.addMessageListener("RecordingUnusable", {
       receiveMessage: msg => this._onUnusable(msg.data),
+    });
+    this._pmm.addMessageListener("RecordingUnsupportedFeature", {
+      receiveMessage: msg => this._onUnsupportedFeature(msg.data)
     });
   }
 
@@ -184,19 +429,23 @@ class Recording extends EventEmitter {
   }
 
   async _onFinished(data) {
+    const recordingMetadata = {
+      id: data.id,
+      url: data.url,
+      title: data.title,
+      duration: data.duration,
+    };
     try {
-      const authId = getLoggedInUserAuthId();
-
-      this.emit("finished", data);
+      this.emit("finished", recordingMetadata);
 
       // Upload the metadata without the screenshot earlier to unblock the
       // upload screen
       await sendCommand("Internal.setRecordingMetadata", {
-        authId,
+        authId: undefined,
         recordingData: {...data, lastScreenData: "", lastScreenMimeType: ""},
       });
 
-      this.emit("saved", data);
+      this.emit("saved", recordingMetadata);
 
       // If we locked the recording because of sourcemaps, we should wait
       // that the lock to be initialized before emitting the event so that
@@ -204,7 +453,7 @@ class Recording extends EventEmitter {
       await this._recordingResourcesUpload;
 
       await sendCommand("Internal.setRecordingMetadata", {
-        authId,
+        authId: undefined,
         recordingData: data,
       });
     } catch (err) {
@@ -232,6 +481,376 @@ class Recording extends EventEmitter {
 
     this.emit("unusable", data);
   }
+
+  _onUnsupportedFeature(data) {
+    this.emit("unsupportedFeature", data);
+  }
+}
+
+const RecordingState = {
+  READY: 0,
+  STARTING: 1,
+  RECORDING: 2,
+  STOPPING: 3
+};
+
+const recordings = new Map();
+
+function getRecordingKey(browser) {
+  return browser.frameLoader;
+}
+
+function getRecordingBrowser(key) {
+  return key.ownerElement;
+}
+
+function updateRecordingState(key, state) {
+  const current = recordings.get(key);
+  const timestamps = current && current.timestamps || {};
+  timestamps[state] = Date.now();
+
+  return recordings.set(key, { state, timestamps });
+}
+
+function setRecordingState(key, state) {
+  if (state === RecordingState.READY) {
+    recordings.delete(key);
+  } else {
+    updateRecordingState(key, state);
+  }
+
+  Services.obs.notifyObservers({
+    browser: getRecordingBrowser(key),
+    state
+  }, "recordreplay-recording-changed");
+}
+
+function getRecordingState(browser) {
+  const {state} = recordings.get(getRecordingKey(browser)) || {state: RecordingState.READY};
+
+  return state;
+}
+
+// Returns the time, in ms, since the browser entered `state`. If the duration
+// can't be calculated because a prior timestamp value isn't available for the
+// given browser, returns -1.
+function getRecordingStateDuration(key, state) {
+  const now = Date.now();
+  const stateObj = recordings.get(key);
+  const ts = stateObj && stateObj.timestamps[state];
+
+  if (!ts) return -1;
+
+  return now - ts;
+}
+
+// If an action invalidates the key (like updateBrowserRemoteness), we need to
+// remap the state from the old key to the new key.
+function remapRecordingState(browser, key) {
+  const newKey = getRecordingKey(browser);
+
+  if (recordings.has(key)) {
+    const entry = recordings.get(key);
+    recordings.delete(key);
+    recordings.set(newKey, entry);
+  }
+
+  return newKey;
+}
+
+function isRecording(browser) {
+  const {state} = getRecordingState(getRecordingKey(browser));
+
+  return state === RecordingState.RECORDING || browser.hasAttribute(
+    "recordExecution"
+  ) || isRecordingAllTabs();
+}
+
+function toggleRecording(browser) {
+  const key = getRecordingKey(browser);
+
+  let state = RecordingState.READY;
+  if (recordings.has(key)) {
+    state = recordings.get(key).state;
+  } else {
+    updateRecordingState(key, RecordingState.READY);
+  }
+
+  // Some sort of delay seems required to allow the chrome to update the
+  // button to show the spinner. It might be possible to lower the timeout
+  // but < 50ms was never enough but 100ms seems to be always enough.
+  if (state === RecordingState.READY) {
+    pingTelemetry("recording", "start", { action: "click", recordingState: state });
+    setRecordingState(key, RecordingState.STARTING);
+    setTimeout(() => startRecording(browser), 100);
+  } else if (state === RecordingState.RECORDING) {
+    pingTelemetry("recording", "stop", { action: "click", recordingState: state });
+    setRecordingState(key, RecordingState.STOPPING);
+    setTimeout(() => stopRecording(browser), 100);
+  }
+}
+
+async function startRecording(browser) {
+  let key = getRecordingKey(browser);
+  const {state} = recordings.get(key) || {};
+
+  if (!browser || state !== RecordingState.STARTING) {
+    setRecordingState(key, RecordingState.READY);
+    pingTelemetry("recording", "start-failed", { why: browser ? "invalid recording state" : "browser undefined", recordingState: state });
+    return;
+  }
+
+  const tabbrowser = browser.getTabBrowser();
+  const tab = tabbrowser.selectedTab;
+
+  let url = browser.currentURI.spec;
+
+  // Don't preprocess recordings if we will be submitting them for testing.
+  try {
+    if (
+      Services.prefs.getBoolPref("devtools.recordreplay.submitTestRecordings")
+    ) {
+      setenv("RECORD_REPLAY_DONT_PROCESS_RECORDINGS", "1");
+    }
+  } catch (e) {}
+
+  // The recording process uses this env var when printing out the recording ID.
+  setenv("RECORD_REPLAY_URL", url);
+
+  let remoteType = E10SUtils.getRemoteTypeForURI(
+    url,
+    /* aMultiProcess */ true,
+    /* aRemoteSubframes */ false,
+    /* aPreferredRemoteType */ undefined,
+    /* aCurrentUri */ null
+  );
+  if (
+    remoteType != E10SUtils.WEB_REMOTE_TYPE &&
+    remoteType != E10SUtils.FILE_REMOTE_TYPE
+  ) {
+    url = "about:blank";
+    remoteType = E10SUtils.WEB_REMOTE_TYPE;
+  }
+
+  // Before reading the tab state, we need to be sure that the parent process
+  // has full session state. The user (or more likely automated tests), could
+  // easily have begun recording while the initial page was still loading,
+  // in which case the parent may not have initialized the session fully yet.
+  await TabStateFlusher.flush(browser);
+
+  pingTelemetry("recording", "start", { action: "updateBrowserRemoteness", recordingState: state, duration: getRecordingStateDuration(key, RecordingState.STARTING)});
+  const tabState = SessionStore.getTabState(tab);
+  tabbrowser.updateBrowserRemoteness(browser, {
+    recordExecution: getDispatchServer(url),
+    newFrameloader: true,
+    remoteType,
+  });
+
+  // Creating a new frameloader will destroy the tab's session history so we
+  // need to restore it. This also instructs the new child proocess to load
+  // the target URL, which would otherwise require a browser.loadURI() call.
+  SessionStore.setTabState(tab, tabState);
+
+  key = remapRecordingState(browser, key);
+  setRecordingState(key, RecordingState.RECORDING);
+  pingTelemetry("recording", "start", { action: "complete", recordingState: state, duration: getRecordingStateDuration(key, RecordingState.STARTING) });
+}
+
+function stopRecording(browser) {
+  const key = getRecordingKey(browser);
+  const {state} = recordings.get(key) || {};
+
+  if (!browser || state !== RecordingState.STOPPING)  {
+    pingTelemetry("recording", "stop-failed", { why: browser ? "invalid recording state" : "browser undefined", recordingState: state, duration: getRecordingStateDuration(key, RecordingState.STOPPING) });
+    setRecordingState(key, RecordingState.READY);
+    return;
+  }
+
+  const remoteTab = browser.frameLoader.remoteTab;
+  if (!remoteTab || !remoteTab.finishRecording()) {
+    pingTelemetry("recording", "stop-failed", { why: remoteTab ? "finishRecording failed" : "remoteTab undefined", recordingState: state, duration: getRecordingStateDuration(key, RecordingState.STOPPING) });
+    setRecordingState(key, RecordingState.READY);
+    return;
+  }
+
+  pingTelemetry("recording", "stop", { action: "complete", duration: getRecordingStateDuration(key, RecordingState.STOPPING) }); 
+  ChromeUtils.recordReplayLog(`WaitForFinishedRecording`);
+}
+
+function setRecordingFinished(browser, url) {
+  const key = getRecordingKey(browser);
+  const recordingState = getRecordingState(browser);
+
+  if (isRecordingAllTabs()) {
+    return;
+  }
+
+  const tabbrowser = browser.getTabBrowser();
+  const tab = tabbrowser.getTabForBrowser(browser);
+  const contentPrincipal = browser.contentPrincipal;
+
+  pingTelemetry("recording", "finished", { action: "updateBrowserRemoteness", recordingState });
+  const state = SessionStore.getTabState(tab);
+  tabbrowser.updateBrowserRemoteness(browser, {
+    recordExecution: undefined,
+    newFrameloader: true,
+    remoteType: E10SUtils.WEB_REMOTE_TYPE,
+  });
+
+  if (!url) {
+    const contentUrl = browser.currentURI.spec;
+
+    pingTelemetry("recording", "finished", { action: "reloadContentUrl", recordingState });
+    browser.loadURI(contentUrl, { triggeringPrincipal: contentPrincipal });
+  }
+
+  // Creating a new frameloader will destroy the tab's session history so we
+  // need to restore it.
+  SessionStore.setTabState(tab, state);
+
+  if (url) {
+    browser.loadURI(url, {
+      triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
+    });
+  }
+
+  remapRecordingState(browser, key);
+  pingTelemetry("recording", "finished", { action: "complete", recordingState });
+}
+
+function setRecordingSaved(browser, recordingId) {
+  // suppress launching new tab for test recordings
+  if (Services.prefs.getBoolPref("devtools.recordreplay.submitTestRecordings")) {
+    return;
+  }
+
+  // Find the dispatcher to connect to.
+  const dispatchAddress = getDispatchServer();
+  const key = getRecordingKey(browser);
+
+  const url = getViewURL(`/recording/${recordingId}`);
+
+  // Specify the dispatch address if it is not the default.
+  if (dispatchAddress != "wss://dispatch.replay.io") {
+    url.searchParams.set('dispatch', dispatchAddress);
+  }
+
+  // For testing, allow specifying a test script to load in the tab.
+  const localTest = getenv("RECORD_REPLAY_LOCAL_TEST");
+  if (localTest) {
+    url.searchParams.set('test', localTest);
+  }
+
+  openInNewTab(browser, url.toString());
+
+  // defer setting the state until the end so that the new tab has opened before the spinner disappears.
+  setRecordingState(key, RecordingState.READY, {duration: getRecordingStateDuration(key, RecordingState.STOPPING)});
+}
+
+function handleRecordingStarted(pmm) {
+  const recording = new Recording(pmm);
+
+  // There can occasionally be times when the browser isn't found when the
+  // recording begins, so we lazily look it up the first time it is needed.
+  let _browser = null;
+  function getBrowser() {
+    for (let frameLoader of recordings.keys()) {
+      if (frameLoader.remoteTab && frameLoader.remoteTab.osPid === pmm.osPid) {
+        _browser = frameLoader.ownerElement;
+        break;
+      }
+    }
+    return _browser;
+  }
+
+  recording.on("unusable", function(name, data) {
+    pingTelemetry("recording", "unusable", data);
+
+    // Log the reason so we can see in our CI logs when something went wrong.
+    console.error("Unstable recording: " + data.why);
+    const browser = getBrowser();
+
+    const url = getViewURL('/browser/error');
+    url.searchParams.set("message", data.why);
+    setRecordingFinished(browser, url.toString());
+    setRecordingState(getRecordingKey(browser), RecordingState.READY);
+  });
+
+  recording.on("finished", function(name, data) {
+    const recordingId = data.id;
+
+    pingTelemetry("recording", "finished", {...data, recordingId});
+
+    try {
+      const browser = getBrowser();
+      let url;
+
+      // When the submitTestRecordings pref is set we don't load the viewer,
+      // but show a simple page that the recording was submitted, to make things
+      // simpler for QA and provide feedback that the pref was set correctly.
+      if (
+        Services.prefs.getBoolPref("devtools.recordreplay.submitTestRecordings")
+      ) {
+        fetch(`https://test-inbox.replay.io/${recordingId}:${browser.currentURI.spec}`);
+        const why = `Test recording added: ${recordingId}`;
+        url = `about:replay?submitted=${why}`;
+      }
+
+      setRecordingFinished(browser, url);
+    } catch (e) {
+      pingTelemetry("recording", "finished-error", {...data, recordingId, error: e});
+    }
+
+    ChromeUtils.recordReplayLog(`FinishedRecording ${recordingId}`);
+  });
+
+  recording.on("saved", function(name, data) {
+    const recordingId = data.id;
+
+    pingTelemetry("recording", "saved", {...data, recordingId});
+
+    try {
+      const browser = getBrowser();
+      setRecordingSaved(browser, recordingId);
+    } catch (e) {
+      pingTelemetry("recording", "save-error", {...data, recordingId, error: e});
+    }
+
+    ChromeUtils.recordReplayLog(`SavedRecording ${recordingId}`);
+  });
+
+  recording.on("unsupportedFeature", function(name, data) {
+    const browser = getBrowser();
+    showUnsupportedFeatureNotification(browser, data.feature, data.issueNumber);
+  });
+}
+
+function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
+  // FIXME how do we get from the browser to the associated window?
+  const window = Services.wm.getMostRecentWindow("navigator:browser");
+
+  const notificationBox = window.gHighPriorityNotificationBox;
+  let notification = notificationBox.getNotificationWithValue(
+    "unsupported-feature"
+  );
+  if (notification) {
+    return;
+  }
+
+  const message = `${feature} is not currently supported.`;
+
+  notificationBox.appendNotification(
+    message,
+    "unsupported-feature",
+    undefined,
+    notificationBox.PRIORITY_WARNING_HIGH,
+    [{
+      label: "Learn More",
+      callback: () => {
+        openInNewTab(browser, `https://github.com/recordreplay/gecko-dev/issues/${issueNumber}`);
+      }
+    }],
+  );
 }
 
 function uploadSourceMap(
@@ -448,52 +1067,23 @@ async function withUploadedResource(text, callback) {
   return callback(await uploadResource(text));
 }
 
-function getLoggedInUserAuthId() {
-  if (isRunningTest()) {
-    return "auth0|5f6e41315c863800757cdf74";
-  }
-
-  const userPref = Services.prefs.getStringPref("devtools.recordreplay.user");
-  if (userPref == "") {
-    return;
-  }
-
-  const user = JSON.parse(userPref);
-  return user == "" ? "" : user.sub;
-}
-
-const gResultWaiters = new Map();
-
-function waitForCommandResult(id) {
-  return new Promise((resolve, reject) => gResultWaiters.set(id, { resolve, reject }));
-}
-
-function onCommandResponse(msg) {
-  const { id } = msg;
-  if (gResultWaiters.has(id)) {
-    const { resolve, reject } = gResultWaiters.get(id);
-    gResultWaiters.delete(id);
-
-    if (msg.error) {
-      reject(new CommandError(msg.error.message, msg.error.code));
-    } else {
-      resolve(msg.result);
-    }
-  }
-}
-
-class CommandError extends Error {
-  constructor(message, code) {
-    super(message);
-    this.code = code;
-  }
-}
-
 Services.ppmm.addMessageListener("RecordingStarting", {
   receiveMessage(msg) {
-    Services.obs.notifyObservers(new Recording(msg.target), "recordreplay-recording-started");
+    handleRecordingStarted(msg.target);
   },
 });
 
 // eslint-disable-next-line no-unused-vars
-var EXPORTED_SYMBOLS = ["setConnectionStatusChangeCallback", "getConnectionStatus"];
+var EXPORTED_SYMBOLS = [
+  "setConnectionStatusChangeCallback",
+  "getConnectionStatus",
+  "getDispatchServer",
+  "isRecordingAllTabs",
+  "isRecording",
+  "toggleRecording",
+  "getRecordingState",
+  "RecordingState",
+  "isLoggedIn",
+  "saveRecordingToken",
+  "isRunningTest",
+];

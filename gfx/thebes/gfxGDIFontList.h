@@ -8,6 +8,7 @@
 
 #include "mozilla/FontPropertyTypes.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/RecordReplay.h"
 #include "gfxWindowsPlatform.h"
 #include "gfxPlatformFontList.h"
 #include "nsGkAtoms.h"
@@ -37,6 +38,7 @@ class AutoSelectFont  // select a font into the given DC, and auto-restore
     if (mFont) {
       mOwnsFont = true;
       mDC = aDC;
+      mozilla::recordreplay::RecordReplayAssert("AutoSelectFont %p %p", aDC, mFont);
       mOldFont = (HFONT)::SelectObject(aDC, mFont);
     } else {
       mOldFont = nullptr;

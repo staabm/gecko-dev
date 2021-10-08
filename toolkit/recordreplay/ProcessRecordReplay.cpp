@@ -17,18 +17,24 @@
 #include "mozilla/StaticMutex.h"
 #include "mozilla/VsyncDispatcher.h"
 #include "nsAppRunner.h"
+#include "nsNSSComponent.h"
 #include "pratom.h"
 #include "nsPrintfCString.h"
 
-#include <dlfcn.h>
 #include <fcntl.h>
-#include <unistd.h>
-
 #include <sys/stat.h>
-#include <sys/time.h>
 
 #ifdef XP_MACOSX
 #include "mozilla/MacLaunchHelper.h"
+#endif
+
+#ifndef XP_WIN
+#include <dlfcn.h>
+#include <sys/time.h>
+#include <unistd.h>
+#else
+#include <io.h>
+#include <libloaderapi.h>
 #endif
 
 extern "C" void RecordReplayOrderDefaultTimeZoneMutex();
@@ -68,10 +74,12 @@ static InfallibleVector<JSFilter> gExecutionAsserts;
 static InfallibleVector<JSFilter> gJSAsserts;
 
 static void (*gAttach)(const char* dispatch, const char* buildId);
+static void (*gSetApiKey)(const char* apiKey);
 static void (*gRecordCommandLineArguments)(int*, char***);
 static uintptr_t (*gRecordReplayValue)(const char* why, uintptr_t value);
 static void (*gRecordReplayBytes)(const char* why, void* buf, size_t size);
 static void (*gPrintVA)(const char* format, va_list args);
+static void (*gDiagnosticVA)(const char* format, va_list args);
 static void (*gRegisterPointer)(void* ptr);
 static void (*gUnregisterPointer)(void* ptr);
 static int (*gPointerId)(void* ptr);
@@ -95,18 +103,32 @@ static bool (*gRecordReplayIsReplaying)();
 static int (*gCreateOrderedLock)(const char* aName);
 static void (*gOrderedLock)(int aLock);
 static void (*gOrderedUnlock)(int aLock);
-static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
 static void (*gOnMouseEvent)(const char* aKind, size_t aClientX, size_t aClientY);
+static void (*gOnKeyEvent)(const char* aKind, const char* aKey);
+static void (*gOnNavigationEvent)(const char* aKind, const char* aUrl);
 static void (*gSetRecordingIdCallback)(void (*aCallback)(const char*));
 static void (*gProcessRecording)();
 static void (*gSetCrashReasonCallback)(const char* (*aCallback)());
 static void (*gInvalidateRecording)(const char* aFormat, ...);
 static void (*gSetCrashNote)(const char* aNote);
 
-static void* gDriverHandle;
+#ifndef XP_WIN
+static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
+typedef void* DriverHandle;
+#else
+static void (*gAddOrderedCriticalSection)(const char* aName, void* aCS);
+static void (*gAddOrderedSRWLock)(const char* aName, void* aLock);
+typedef HMODULE DriverHandle;
+#endif
+
+static DriverHandle gDriverHandle;
 
 void LoadSymbolInternal(const char* name, void** psym, bool aOptional) {
+#ifndef XP_WIN
   *psym = dlsym(gDriverHandle, name);
+#else
+  *psym = BitwiseCast<void*>(GetProcAddress(gDriverHandle, name));
+#endif
   if (!*psym && !aOptional) {
     fprintf(stderr, "Could not find %s in Record Replay driver, crashing.\n", name);
     MOZ_CRASH();
@@ -130,6 +152,11 @@ static void ConfigureGecko() {
 
   // Order statically allocated mutex in intl code.
   RecordReplayOrderDefaultTimeZoneMutex();
+
+#ifdef XP_WIN
+  // Make sure NSS is always initialized in case it gets used while generating paint data.
+  EnsureNSSInitializedChromeOrContent();
+#endif
 }
 
 static const char* GetPlatformKind() {
@@ -137,6 +164,8 @@ static const char* GetPlatformKind() {
   return "macOS";
 #elif defined(XP_LINUX)
   return "linux";
+#elif defined(XP_WIN)
+  return "windows";
 #else
   return "unknown";
 #endif
@@ -145,19 +174,37 @@ static const char* GetPlatformKind() {
 extern char gRecordReplayDriver[];
 extern int gRecordReplayDriverSize;
 
-static void* OpenDriverHandle() {
+static const char* GetTempDirectory() {
+#ifndef XP_WIN
+  const char* tmpdir = getenv("TMPDIR");
+  return tmpdir ? tmpdir : "/tmp";
+#else
+  return getenv("TEMP");
+#endif
+}
+
+static DriverHandle OpenDriverHandle() {
   const char* driver = getenv("RECORD_REPLAY_DRIVER");
   bool temporaryDriver = false;
 
   if (!driver) {
-    const char* tmpdir = getenv("TMPDIR");
+    const char* tmpdir = GetTempDirectory();
     if (!tmpdir) {
-      tmpdir = "/tmp";
+      fprintf(stderr, "Can't figure out temporary directory, can't create driver.\n");
+      return nullptr;
     }
 
     char filename[1024];
+#ifndef XP_WIN
     snprintf(filename, sizeof(filename), "%s/recordreplay.so-XXXXXX", tmpdir);
     int fd = mkstemp(filename);
+#else
+    snprintf(filename, sizeof(filename), "%s\\recordreplay.dll-XXXXXX", tmpdir);
+    _mktemp(filename);
+    int fd = _open(filename, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY);
+    #define write _write
+    #define close _close
+#endif
     if (fd < 0) {
       fprintf(stderr, "mkstemp failed, can't create driver.\n");
       return nullptr;
@@ -186,10 +233,17 @@ static void* OpenDriverHandle() {
     };
     pid_t pid;
     LaunchChildMac(4, args, &pid);
-#endif
+#endif // XP_MACOSX
   }
 
-  void* handle = dlopen(driver, RTLD_LAZY);
+#ifndef XP_WIN
+  DriverHandle handle = dlopen(driver, RTLD_LAZY);
+#else
+  DriverHandle handle = LoadLibraryA(driver);
+  if (!handle) {
+    fprintf(stderr, "LoadLibraryA failed %s: %u\n", driver, GetLastError());
+  }
+#endif
 
   if (temporaryDriver) {
     unlink(driver);
@@ -198,11 +252,44 @@ static void* OpenDriverHandle() {
   return handle;
 }
 
+static void FreeCallback(void* aPtr) {
+  // This may be calling into jemalloc, which won't happen on all platforms
+  // if the driver tries to call free() directly.
+  free(aPtr);
+}
+
 bool gRecordAllContent;
+const char* gRecordingUnsupported;
+
+static const char* GetRecordingUnsupportedReason() {
+#ifdef XP_MACOSX
+  // Using __builtin_available is not currently supported before attaching to
+  // the record/replay driver, as it interacts with the system in mildly
+  // complicated ways. Instead, we use this stupid hack to detect whether we
+  // are replaying, in which case recording is certainly supported.
+  const char* env = getenv("RECORD_REPLAY_DRIVER");
+  if (env && !strcmp(env, "recordreplay-driver")) {
+    return nullptr;
+  }
+
+  if (__builtin_available(macOS 10.14, *)) {
+    return nullptr;
+  }
+
+  return "Recording requires macOS 10.14 or higher";
+#else
+  return nullptr;
+#endif
+}
 
 extern "C" {
 
 MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
+  gRecordingUnsupported = GetRecordingUnsupportedReason();
+  if (gRecordingUnsupported) {
+    return;
+  }
+
   // Parse command line options for the process kind and recording file.
   Maybe<const char*> dispatchAddress;
   int argc = *aArgc;
@@ -219,6 +306,22 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   }
   MOZ_RELEASE_ASSERT(dispatchAddress.isSome());
 
+  Maybe<std::string> apiKey;
+  const char* val = getenv("RECORD_REPLAY_API_KEY");
+  if (val && val[0]) {
+    apiKey.emplace(val);
+    // Unsetting the env var will make the variable unavailable via
+    // getenv and such, and also mutates the 'environ' global, so
+    // by the time gAttach runs, it will have no idea that this value
+    // existed and won't capture it in the recording itself, which
+    // is ideal for security.
+#ifdef XP_WIN
+    MOZ_RELEASE_ASSERT(!_putenv("RECORD_REPLAY_API_KEY="));
+#else
+    MOZ_RELEASE_ASSERT(!unsetenv("RECORD_REPLAY_API_KEY"));
+#endif
+  }
+
   gDriverHandle = OpenDriverHandle();
   if (!gDriverHandle) {
     fprintf(stderr, "Loading driver failed, crashing.\n");
@@ -226,11 +329,13 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   }
 
   LoadSymbol("RecordReplayAttach", gAttach);
+  LoadSymbol("RecordReplaySetApiKey", gSetApiKey);
   LoadSymbol("RecordReplayRecordCommandLineArguments",
              gRecordCommandLineArguments);
   LoadSymbol("RecordReplayValue", gRecordReplayValue);
   LoadSymbol("RecordReplayBytes", gRecordReplayBytes);
   LoadSymbol("RecordReplayPrint", gPrintVA);
+  LoadSymbol("RecordReplayDiagnostic", gDiagnosticVA);
   LoadSymbol("RecordReplaySaveRecording", gSaveRecording);
   LoadSymbol("RecordReplayFinishRecording", gFinishRecording);
   LoadSymbol("RecordReplayRegisterPointer", gRegisterPointer);
@@ -254,13 +359,25 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol("RecordReplayCreateOrderedLock", gCreateOrderedLock);
   LoadSymbol("RecordReplayOrderedLock", gOrderedLock);
   LoadSymbol("RecordReplayOrderedUnlock", gOrderedUnlock);
-  LoadSymbol("RecordReplayAddOrderedPthreadMutex", gAddOrderedPthreadMutex);
   LoadSymbol("RecordReplayOnMouseEvent", gOnMouseEvent);
+  LoadSymbol("RecordReplayOnKeyEvent", gOnKeyEvent);
+  LoadSymbol("RecordReplayOnNavigationEvent", gOnNavigationEvent);
   LoadSymbol("RecordReplaySetRecordingIdCallback", gSetRecordingIdCallback);
   LoadSymbol("RecordReplayProcessRecording", gProcessRecording);
   LoadSymbol("RecordReplaySetCrashReasonCallback", gSetCrashReasonCallback);
   LoadSymbol("RecordReplayInvalidateRecording", gInvalidateRecording);
   LoadSymbol("RecordReplaySetCrashNote", gSetCrashNote, /* aOptional */ true);
+
+  if (apiKey) {
+    gSetApiKey(apiKey->c_str());
+  }
+
+#ifndef XP_WIN
+  LoadSymbol("RecordReplayAddOrderedPthreadMutex", gAddOrderedPthreadMutex);
+#else
+  LoadSymbol("RecordReplayAddOrderedCriticalSection", gAddOrderedCriticalSection);
+  LoadSymbol("RecordReplayAddOrderedSRWLock", gAddOrderedSRWLock);
+#endif
 
   char buildId[128];
   snprintf(buildId, sizeof(buildId), "%s-gecko-%s", GetPlatformKind(), PlatformBuildID());
@@ -293,6 +410,10 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
     LoadSymbol("RecordReplaySetCrashLogFile", SetCrashLogFile);
     SetCrashLogFile(logFile);
   }
+
+  void (*SetFreeCallback)(void (*aCallback)(void*));
+  LoadSymbol("RecordReplaySetFreeCallback", SetFreeCallback);
+  SetFreeCallback(FreeCallback);
 
   ParseJSFilters("RECORD_REPLAY_RECORD_EXECUTION_ASSERTS", gExecutionAsserts);
   ParseJSFilters("RECORD_REPLAY_RECORD_JS_ASSERTS", gJSAsserts);
@@ -399,6 +520,11 @@ MOZ_EXPORT void RecordReplayInterface_InternalPrintLog(const char* aFormat,
   gPrintVA(aFormat, aArgs);
 }
 
+MOZ_EXPORT void RecordReplayInterface_InternalDiagnostic(const char* aFormat,
+                                                         va_list aArgs) {
+  gDiagnosticVA(aFormat, aArgs);
+}
+
 MOZ_EXPORT ProgressCounter* RecordReplayInterface_ExecutionProgressCounter() {
   return gProgressCounter();
 }
@@ -480,10 +606,36 @@ void RecordReplayOrderedUnlock(int aLock) {
   }
 }
 
+#ifndef XP_WIN
+
 MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedPthreadMutex(const char* aName,
                                                                      pthread_mutex_t* aMutex) {
   gAddOrderedPthreadMutex(aName, aMutex);
 }
+
+MOZ_EXPORT void RecordReplayAddOrderedPthreadMutexFromC(const char* aName, pthread_mutex_t* aMutex) {
+  if (IsRecordingOrReplaying()) {
+    gAddOrderedPthreadMutex(aName, aMutex);
+  }
+}
+
+#else // XP_WIN
+
+MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedCriticalSection(const char* aName, void* aCS) {
+  gAddOrderedCriticalSection(aName, aCS);
+}
+
+MOZ_EXPORT void RecordReplayAddOrderedCriticalSectionFromC(const char* aName, PCRITICAL_SECTION aCS) {
+  if (IsRecordingOrReplaying()) {
+    gAddOrderedCriticalSection(aName, aCS);
+  }
+}
+
+MOZ_EXPORT void RecordReplayInterface_InternalAddOrderedSRWLock(const char* aName, void* aLock) {
+  gAddOrderedSRWLock(aName, aLock);
+}
+
+#endif // XP_WIN
 
 static Vector<const char*> gCrashNotes;
 
@@ -570,7 +722,7 @@ static bool FilterMatches(const InfallibleVector<JSFilter>& aFilters,
 }
 
 const char* CurrentFirefoxVersion() {
-  return "74.0a1";
+  return "86.0";
 }
 
 static bool gHasCheckpoint = false;
@@ -579,7 +731,17 @@ bool HasCheckpoint() {
   return gHasCheckpoint;
 }
 
+// Note: This should be called even if we aren't recording/replaying, to report
+// cases where recording is unsupported to the UI process.
 void CreateCheckpoint() {
+  if (!IsRecordingOrReplaying()) {
+    if (gRecordingUnsupported) {
+      js::EnsureModuleInitialized();
+      js::SendRecordingUnsupported(gRecordingUnsupported);
+    }
+    return;
+  }
+
   js::EnsureModuleInitialized();
   js::MaybeSendRecordingUnusable();
 
@@ -617,7 +779,7 @@ bool IsTearingDownProcess() {
   return gTearingDown;
 }
 
-void OnWidgetEvent(dom::BrowserChild* aChild, const WidgetMouseEvent& aEvent) {
+void OnMouseEvent(dom::BrowserChild* aChild, const WidgetMouseEvent& aEvent) {
   if (!gHasCheckpoint) {
     return;
   }
@@ -632,6 +794,79 @@ void OnWidgetEvent(dom::BrowserChild* aChild, const WidgetMouseEvent& aEvent) {
   if (kind) {
     gOnMouseEvent(kind, aEvent.mRefPoint.x, aEvent.mRefPoint.y);
   }
+}
+
+void OnKeyboardEvent(dom::BrowserChild* aChild, const WidgetKeyboardEvent& aEvent) {
+  if (!gHasCheckpoint) {
+    return;
+  }
+
+  const char* kind = nullptr;
+  if (aEvent.mMessage == eKeyPress) {
+    kind = "keypress";
+  } else if (aEvent.mMessage == eKeyDown) {
+    kind = "keydown";
+  } else if (aEvent.mMessage == eKeyUp) {
+    kind = "keyup";
+  }
+
+  if (kind) {
+    nsAutoString key;
+    aEvent.GetDOMKeyName(key);
+
+    gOnKeyEvent(kind, PromiseFlatCString(NS_ConvertUTF16toUTF8(key)).get());
+  }
+}
+
+static nsCString gLastLocationURL;
+
+void OnLocationChange(dom::BrowserChild* aChild, nsIURI* aLocation, uint32_t aFlags) {
+  if (!gHasCheckpoint) {
+    return;
+  }
+
+  nsCString url;
+  if (NS_FAILED(aLocation->GetSpec(url))) {
+    return;
+  }
+
+  // When beginning recording, this function is generally called in the
+  // following pattern:
+  // 1. Session history is applied from previous non-recording process.
+  // 2. An initial about:blank page is loaded into the document
+  // 3. Navigation notifications as you'd expect then begin to happen.
+  //
+  // Since we only care about that third step, we explicitly ignore
+  // all location changes before about:blank, and also ignore about: URLs
+  // entirely.
+  if (gLastLocationURL.IsEmpty()) {
+    if (!url.EqualsLiteral("about:blank")) {
+      return;
+    }
+
+    gLastLocationURL = url;
+  }
+
+  // All browser children load with an initial "about:blank" page before loading
+  // the overall document. There also also cases like "about:neterror" that may
+  // pop up if the browser tries and fails to navigate for some reason.
+  // Rather than restrict specifically those, we broadly reject all about: URLs
+  // since they shouldn't come up often anyway.
+  if (aLocation->SchemeIs("about")) {
+    return;
+  }
+
+  // The browser internally may do replaceState with the same URL, so we want to
+  // filter those out. This means we also won't register location changes for
+  // explicit replaceState calls, but that's probably closer to what users will
+  // expect anyway.
+  if ((aFlags & nsIWebProgressListener::LOCATION_CHANGE_SAME_DOCUMENT) &&
+      gLastLocationURL.Equals(url)) {
+    return;
+  }
+
+  gOnNavigationEvent(nullptr, url.get());
+  gLastLocationURL = url;
 }
 
 static void RecordingIdCallback(const char* aRecordingId) {

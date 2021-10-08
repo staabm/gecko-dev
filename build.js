@@ -1,11 +1,12 @@
 const fs = require("fs");
 const os = require("os");
+const path = require("path");
 const { spawnSync } = require("child_process");
 const gecko = __dirname;
 
 // Download the latest record/replay driver.
-const driverFile = `${currentPlatform()}-recordreplay.so`;
-spawnChecked("wget", [`https://replay.io/downloads/${driverFile}`], { stdio: "inherit" });
+const driverFile = `${currentPlatform()}-recordreplay.${driverExtension()}`;
+spawnChecked("curl", [`https://static.replay.io/downloads/${driverFile}`, "-o", driverFile], { stdio: "inherit" });
 
 // Embed the driver in the source.
 const driverContents = fs.readFileSync(driverFile);
@@ -15,16 +16,33 @@ for (let i = 0; i < driverContents.length; i++) {
   driverString += `\\${driverContents[i].toString(8)}`;
 }
 fs.writeFileSync(
-  `${gecko}/toolkit/recordreplay/RecordReplayDriver.cpp`,
+  path.join(gecko, "toolkit", "recordreplay", "RecordReplayDriver.cpp"),
   `
 namespace mozilla::recordreplay {
   char gRecordReplayDriver[] = "${driverString}";
   int gRecordReplayDriverSize = ${driverContents.length};
 }
-`
+  `
 );
 
-spawnChecked("./mach", ["build"], { stdio: "inherit" });
+const buildOptions = {
+  stdio: "inherit",
+  env: {
+    ...process.env,
+    RUSTC_BOOTSTRAP: "qcms",
+    // terminal-notifier can hang, so prevent it from running.
+    MOZ_NOSPAM: "1",
+  },
+};
+
+if (currentPlatform() == "windows") {
+  // Windows builds need to enter the mozilla-build shell, and uses separate
+  // scripts for this.
+  spawnChecked(".\\windows-build.bat", [], buildOptions);
+} else {
+  spawnChecked("./mach", ["build"], buildOptions);
+  spawnChecked("./mach", ["package"], buildOptions);
+}
 
 function spawnChecked(cmd, args, options) {
   const prettyCmd = [cmd].concat(args).join(" ");
@@ -46,7 +64,13 @@ function currentPlatform() {
       return "macOS";
     case "linux":
       return "linux";
+    case "win32":
+      return "windows";
     default:
       throw new Error(`Platform ${process.platform} not supported`);
   }
+}
+
+function driverExtension() {
+  return currentPlatform() == "windows" ? "dll" : "so";
 }

@@ -42,6 +42,8 @@
 #include <usp10.h>
 #include <objbase.h>
 
+#include "mozilla/RecordReplay.h"
+
 static void (*gEnsureLOGFONTAccessibleProc)(const LOGFONT&);
 
 void SkTypeface_SetEnsureLOGFONTAccessibleProc(void (*proc)(const LOGFONT&)) {
@@ -557,6 +559,11 @@ const void* HDCOffscreen::draw(const SkGlyph& glyph, bool isBW,
     uint16_t glyphID = glyph.getGlyphID();
     BOOL ret = ExtTextOutW(fDC, 0, 0, ETO_GLYPH_INDEX, nullptr, reinterpret_cast<LPCWSTR>(&glyphID), 1, nullptr);
     GdiFlush();
+
+    // For now we record/replay the drawn text manually, instead of handling this
+    // within the recording driver.
+    mozilla::recordreplay::RecordReplayBytes("HDCOffscreen::draw", fBits, size);
+
     if (0 == ret) {
         return nullptr;
     }

@@ -38,3 +38,7 @@ mozilla::detail::MutexImpl::platformData() {
                 "platformData_ is too small");
   return reinterpret_cast<PlatformData*>(platformData_);
 }
+
+/*PSRWLOCK*/void* mozilla::detail::MutexImpl::NativeHandle() {
+  return &platformData()->lock;
+}

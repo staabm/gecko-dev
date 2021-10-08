@@ -171,7 +171,9 @@ using mozilla::layers::GeckoContentController;
 namespace mozilla {
   namespace recordreplay {
     void CreateCheckpoint();
-    void OnWidgetEvent(BrowserChild* aChild, const WidgetMouseEvent& aEvent);
+    void OnMouseEvent(BrowserChild* aChild, const WidgetMouseEvent& aEvent);
+    void OnKeyboardEvent(BrowserChild* aChild, const WidgetKeyboardEvent& aEvent);
+    void OnLocationChange(dom::BrowserChild* aChild, nsIURI* aLocation, uint32_t aFlags);
   }
 }
 
@@ -1128,9 +1130,7 @@ mozilla::ipc::IPCResult BrowserChild::RecvShow(
   // We have now done enough initialization for the record/replay system to
   // create checkpoints. Create a checkpoint now, in case this process never
   // paints later on (the usual place where checkpoints occur).
-  if (recordreplay::IsRecordingOrReplaying()) {
-    recordreplay::CreateCheckpoint();
-  }
+  recordreplay::CreateCheckpoint();
 
   UpdateVisibility();
 
@@ -1550,7 +1550,7 @@ mozilla::ipc::IPCResult BrowserChild::RecvRealMouseMoveEvent(
     const WidgetMouseEvent& aEvent, const ScrollableLayerGuid& aGuid,
     const uint64_t& aInputBlockId) {
   if (recordreplay::IsRecordingOrReplaying()) {
-    recordreplay::OnWidgetEvent(this, aEvent);
+    recordreplay::OnMouseEvent(this, aEvent);
   }
 
   if (mCoalesceMouseMoveEvents && mCoalescedMouseEventFlusher) {
@@ -1623,7 +1623,7 @@ mozilla::ipc::IPCResult BrowserChild::RecvRealMouseButtonEvent(
     const WidgetMouseEvent& aEvent, const ScrollableLayerGuid& aGuid,
     const uint64_t& aInputBlockId) {
   if (recordreplay::IsRecordingOrReplaying()) {
-    recordreplay::OnWidgetEvent(this, aEvent);
+    recordreplay::OnMouseEvent(this, aEvent);
   }
 
   if (mCoalesceMouseMoveEvents && mCoalescedMouseEventFlusher &&
@@ -2015,6 +2015,10 @@ void BrowserChild::UpdateRepeatedKeyEventEndTime(
 
 mozilla::ipc::IPCResult BrowserChild::RecvRealKeyEvent(
     const WidgetKeyboardEvent& aEvent) {
+  if (recordreplay::IsRecordingOrReplaying()) {
+    recordreplay::OnKeyboardEvent(this, aEvent);
+  }
+
   if (SkipRepeatedKeyEvent(aEvent)) {
     return IPC_OK();
   }
@@ -3698,6 +3702,11 @@ NS_IMETHODIMP BrowserChild::OnLocationChange(nsIWebProgress* aWebProgress,
   MOZ_TRY(webNav->GetCanGoForward(&canGoForward));
 
   if (aWebProgress && webProgressData->isTopLevel()) {
+    // Record top-level document navigation in the browser child.
+    if (recordreplay::IsRecordingOrReplaying()) {
+      recordreplay::OnLocationChange(this, aLocation, aFlags);
+    }
+
     locationChangeData.emplace();
 
     document->GetContentType(locationChangeData->contentType());

@@ -47,6 +47,10 @@
 #  include "nsContentUtils.h"  // For assertions.
 #endif
 
+namespace mozilla::recordreplay {
+  extern void AddRecordingOperation(const char* aKind, const char* aValue);
+}
+
 namespace mozilla::dom {
 
 using namespace mozilla::dom::indexedDB;
@@ -587,6 +591,10 @@ RefPtr<IDBOpenDBRequest> IDBFactory::OpenInternal(
     nsCString origin =
         principalInfo.get_ContentPrincipalInfo().originNoSuffix();
     isInternal = QuotaManager::IsOriginInternal(origin);
+
+    if (!isInternal) {
+      recordreplay::AddRecordingOperation("indexedDB", origin.get());
+    }
   }
 
   // Allow storage attributes for add-ons independent of the pref.

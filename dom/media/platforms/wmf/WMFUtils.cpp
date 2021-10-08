@@ -229,6 +229,8 @@ LoadDLLs() {
 
 HRESULT
 MFStartup() {
+  recordreplay::RecordReplayAssert("wmf::MFStartup");
+
   if (IsWin7AndPre2000Compatible()) {
     /*
      * Specific exclude the usage of WMF on Win 7 with compatibility mode
@@ -258,6 +260,7 @@ MFStartup() {
 
 HRESULT
 MFShutdown() {
+  recordreplay::RecordReplayAssert("wmf::MFShutdown");
   ENSURE_FUNCTION_PTR(MFShutdown, Mfplat.dll)
   HRESULT hr = E_FAIL;
   mozilla::mscom::EnsureMTA([&]() -> void { hr = (MFShutdownPtr)(); });

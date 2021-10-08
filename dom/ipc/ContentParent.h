@@ -152,7 +152,8 @@ class ContentParent final
   /**
    * Create a subprocess suitable for use later as a content process.
    */
-  static RefPtr<LaunchPromise> PreallocateProcess();
+  static RefPtr<LaunchPromise> PreallocateProcess(
+    const nsAString& aRecordingDispatchAddress = nsString());
 
   /**
    * Start up the content-process machinery.  This might include
@@ -1474,7 +1475,12 @@ class ContentParent final
   // Return an existing ContentParent if possible. Otherwise, `nullptr`.
   static already_AddRefed<ContentParent> GetUsedBrowserProcess(
       const nsACString& aRemoteType, nsTArray<ContentParent*>& aContentParents,
-      uint32_t aMaxContentParents, bool aPreferUsed);
+      uint32_t aMaxContentParents, bool aPreferUsed,
+      const nsAString& aRecordingDispatchAddress);
+
+  static already_AddRefed<ContentParent> GetUsedBrowserProcessForRecording(
+      const nsACString& aRemoteType, nsTArray<ContentParent*>& aContentParents,
+      const nsAString& aRecordingDispatchAddress);
 
   void AddToPool(nsTArray<ContentParent*>&);
   void RemoveFromPool(nsTArray<ContentParent*>&);

@@ -65,6 +65,8 @@ using namespace mozilla::layers;
 
 namespace mozilla {
 
+namespace recordreplay { extern void OnRepaintNeeded(const char* aWhy); }
+
 RestyleManager::RestyleManager(nsPresContext* aPresContext)
     : mPresContext(aPresContext),
       mRestyleGeneration(1),
@@ -2187,6 +2189,8 @@ void RestyleManager::PostRestyleEvent(Element* aElement,
     // FIXME(emilio): we should assert against this instead.
     return;  // Nothing to do.
   }
+
+  recordreplay::OnRepaintNeeded("RestyleEvent");
 
   // Assuming the restyle hints will invalidate cached style for
   // getComputedStyle, since we don't know if any of the restyling that we do

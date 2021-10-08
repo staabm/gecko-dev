@@ -2211,6 +2211,9 @@ void PresShell::SetIgnoreFrameDestruction(bool aIgnore) {
 }
 
 void PresShell::NotifyDestroyingFrame(nsIFrame* aFrame) {
+  recordreplay::RecordReplayAssert("PresShell::NotifyDestroyingFrame %zu",
+                                   recordreplay::ThingIndex(aFrame));
+
   // We must remove these from FrameLayerBuilder::DisplayItemData::mFrameList
   // here, otherwise the DisplayItemData destructor will use the destroyed frame
   // when it tries to remove it from the (array) value of this property.
@@ -6245,9 +6248,7 @@ void PresShell::Paint(nsView* aViewToPaint, const nsRegion& aDirtyRegion,
   // When recording/replaying, create a checkpoint after every paint. This can
   // cause content JS to run, so must live outside |nojs|.
   auto createCheckpoint = MakeScopeExit([=]() {
-      if (recordreplay::IsRecordingOrReplaying()) {
-        recordreplay::CreateCheckpoint();
-      }
+      recordreplay::CreateCheckpoint();
     });
 
   Maybe<js::AutoAssertNoContentJS> nojs;

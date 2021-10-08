@@ -773,6 +773,8 @@ class SurfaceCacheImpl final : public nsIMemoryReporter {
 
   InsertOutcome Insert(NotNull<ISurfaceProvider*> aProvider, bool aSetAvailable,
                        const OrderedStaticMutexAutoLock& aAutoLock) {
+    recordreplay::RecordReplayAssert("SurfaceCacheImpl::Insert");
+
     // If this is a duplicate surface, refuse to replace the original.
     // XXX(seth): Calling Lookup() and then RemoveEntry() does the lookup
     // twice. We'll make this more efficient in bug 1185137.
@@ -862,6 +864,8 @@ class SurfaceCacheImpl final : public nsIMemoryReporter {
 
   void Remove(NotNull<CachedSurface*> aSurface, bool aStopTracking,
               const OrderedStaticMutexAutoLock& aAutoLock) {
+    recordreplay::RecordReplayAssert("SurfaceCacheImpl::Remove");
+
     ImageKey imageKey = aSurface->GetImageKey();
 
     RefPtr<ImageSurfaceCache> cache = GetImageCache(imageKey);

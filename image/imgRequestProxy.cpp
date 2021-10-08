@@ -120,6 +120,12 @@ imgRequestProxy::imgRequestProxy()
       mHadDispatch(false) {
   /* member initializers and constructor code */
   LOG_FUNC(gImgLog, "imgRequestProxy::imgRequestProxy");
+
+  // For now we always leak imgRequestProxy objects when recording/replaying,
+  // to avoid non-deterministic behavior that can be triggered by the destructor.
+  if (recordreplay::IsRecordingOrReplaying()) {
+    NS_ADDREF(this);
+  }
 }
 
 imgRequestProxy::~imgRequestProxy() {
@@ -517,6 +523,8 @@ bool imgRequestProxy::StartDecodingWithResult(uint32_t aFlags) {
 
 imgIContainer::DecodeResult imgRequestProxy::RequestDecodeWithResult(
     uint32_t aFlags) {
+  recordreplay::RecordReplayAssert("imgRequestProxy::RequestDecodeWithResult");
+
   if (IsValidating()) {
     mDecodeRequested = true;
     return imgIContainer::DECODE_REQUESTED;
@@ -973,6 +981,8 @@ static const char* NotificationTypeToString(int32_t aType) {
 
 void imgRequestProxy::Notify(int32_t aType,
                              const mozilla::gfx::IntRect* aRect) {
+  recordreplay::RecordReplayAssert("imgRequestProxy::Notify");
+
   MOZ_ASSERT(aType != imgINotificationObserver::LOAD_COMPLETE,
              "Should call OnLoadComplete");
 

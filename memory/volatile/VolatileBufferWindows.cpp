@@ -35,12 +35,14 @@ bool VolatileBuffer::Init(size_t aSize, size_t aAlignment) {
   MOZ_ASSERT(!(aAlignment % sizeof(void*)),
              "Alignment must be multiple of pointer size");
 
+  recordreplay::RecordReplayAssert("VolatileBuffer::Init %zu %zu", aSize, aAlignment);
+
   mSize = aSize;
   if (aSize < MIN_VOLATILE_ALLOC_SIZE) {
     goto heap_alloc;
   }
 
-  static bool sUndoSupported = IsWin8OrLater();
+  /*static*/ bool sUndoSupported = IsWin8OrLater();
   if (!sUndoSupported) {
     goto heap_alloc;
   }

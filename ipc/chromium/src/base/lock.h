@@ -19,7 +19,11 @@ class Lock {
   // Optimized wrapper implementation
   Lock(bool ordered = false) : lock_() {
     if (ordered) {
+#ifndef XP_WIN
       mozilla::recordreplay::AddOrderedPthreadMutex("Lock", lock_.native_handle());
+#else
+      mozilla::recordreplay::AddOrderedSRWLock("Lock", lock_.native_handle());
+#endif
     }
   }
   ~Lock() {}

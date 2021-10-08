@@ -8,6 +8,9 @@ const { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 const { XPCOMUtils } = ChromeUtils.import(
   "resource://gre/modules/XPCOMUtils.jsm"
 );
+const { setTimeout } = ChromeUtils.import(
+  "resource://gre/modules/Timer.jsm"
+);
 
 const DIALOG_URL_APP_CHOOSER =
   "chrome://mozapps/content/handling/appChooser.xhtml";
@@ -231,14 +234,46 @@ XPCOMUtils.defineLazyModuleGetters(this, {
   MigrationUtils: "resource:///modules/MigrationUtils.jsm",
 });
 
+const { toggleRecording } = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/connection.js"
+);
+
+// [Replay] - Mapping of replay: URL scheme values to destinations. Can either
+// be a URL or a function which invokes arbitrary browser-chrome functionality
 const replaySchemeMap = {
-  library: 'https://replay.io/view',
+  library: 'https://app.replay.io/',
   migrate: (uri, principal, browsingContext) => {
-    const win = browsingContext.topFrameElement.getTabBrowser().owerGlobal;
+    const win = browsingContext.topFrameElement.getTabBrowser().ownerGlobal;
     MigrationUtils.showMigrationWizard(win, [
       MigrationUtils.MIGRATION_ENTRYPOINT_UNKNOWN,
     ]);
   },
+  record: (url, principal, browsingContext) => {
+    const parts = new URLSearchParams(url.query);
+    const target = parts.get("url");
+    const newtab = parts.has("newtab") ? parts.get("newtab").toLowerCase() === "true" : false;
+
+    if (!target) return;
+
+    const browser = browsingContext.topFrameElement;
+    const tabbrowser = browser.getTabBrowser();
+    if (newtab) {
+      const currentTabIndex = tabbrowser.visibleTabs.indexOf(tabbrowser.selectedTab);
+      const tab = tabbrowser.addTab(
+        target,
+        { triggeringPrincipal: principal, index: currentTabIndex === -1 ? undefined : currentTabIndex + 1}
+      );
+      tabbrowser.selectedTab = tab;
+    } else {
+      tabbrowser.loadURI(target, {
+        triggeringPrincipal: principal
+      });
+    }
+
+    new Promise(resolve => setTimeout(resolve, 500)).then(() => {
+      toggleRecording(browser.ownerDocument.defaultView.gBrowser.selectedBrowser);
+    });
+  }
 };
 
 function mayRedirectToReplayBrowser (aURI, aPrincipal, aBrowsingContext) {

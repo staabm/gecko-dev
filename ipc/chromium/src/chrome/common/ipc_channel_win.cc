@@ -330,6 +330,12 @@ bool Channel::ChannelImpl::ProcessConnection() {
 
 bool Channel::ChannelImpl::ProcessIncomingMessages(
     MessageLoopForIO::IOContext* context, DWORD bytes_read) {
+  // The asynchronous write to the buffer from ReadFile is not currently
+  // handled when replaying.
+  mozilla::recordreplay::RecordReplayBytes("ChannelImpl::ProcessIncomingMessages",
+                                           input_buf_.get() + input_buf_offset_,
+                                           bytes_read);
+
   ASSERT_OWNINGTHREAD(ChannelImpl);
   if (input_state_.is_pending) {
     input_state_.is_pending = false;

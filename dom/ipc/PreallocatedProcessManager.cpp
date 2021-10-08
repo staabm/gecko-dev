@@ -32,22 +32,27 @@ class PreallocatedProcessManagerImpl final : public nsIObserver {
 
  public:
   static PreallocatedProcessManagerImpl* Singleton();
+  static PreallocatedProcessManagerImpl* SingletonForRecording();
 
   NS_DECL_ISUPPORTS
   NS_DECL_NSIOBSERVER
 
   // See comments on PreallocatedProcessManager for these methods.
-  void AddBlocker(ContentParent* aParent);
-  void RemoveBlocker(ContentParent* aParent);
+  static void AddBlocker();
+  static void RemoveBlocker();
   already_AddRefed<ContentParent> Take(const nsACString& aRemoteType);
-  void Erase(ContentParent* aParent);
+  bool Erase(ContentParent* aParent);
 
  private:
   static const char* const kObserverTopics[];
 
   static StaticRefPtr<PreallocatedProcessManagerImpl> sSingleton;
+  static StaticRefPtr<PreallocatedProcessManagerImpl> sSingletonForRecording;
+
+  static nsresult GetReplayDispatchServer(nsAString& dispatchServer);
 
   PreallocatedProcessManagerImpl();
+  PreallocatedProcessManagerImpl(const nsAString& aRecordingDispatchAddress);
   ~PreallocatedProcessManagerImpl();
   PreallocatedProcessManagerImpl(const PreallocatedProcessManagerImpl&) =
       delete;
@@ -67,14 +72,20 @@ class PreallocatedProcessManagerImpl final : public nsIObserver {
   void Disable();
   void CloseProcesses();
 
+
   bool IsEmpty() const {
     return mPreallocatedProcesses.empty() && !mLaunchInProgress;
   }
+
+  void StartBlockers();
+  void EndBlockers();
 
   bool mEnabled;
   static bool sShutdown;
   bool mLaunchInProgress;
   uint32_t mNumberPreallocs;
+  nsString mRecordingDispatchAddress;
+  nsString mRecordingUserToken;
   std::deque<RefPtr<ContentParent>> mPreallocatedProcesses;
   // Even if we have multiple PreallocatedProcessManagerImpls, we'll have
   // one blocker counter
@@ -97,26 +108,63 @@ StaticRefPtr<PreallocatedProcessManagerImpl>
     PreallocatedProcessManagerImpl::sSingleton;
 
 /* static */
+StaticRefPtr<PreallocatedProcessManagerImpl>
+    PreallocatedProcessManagerImpl::sSingletonForRecording;
+
+/* static */
 PreallocatedProcessManagerImpl* PreallocatedProcessManagerImpl::Singleton() {
   MOZ_ASSERT(NS_IsMainThread());
   if (!sSingleton) {
     sSingleton = new PreallocatedProcessManagerImpl;
     sSingleton->Init();
     ClearOnShutdown(&sSingleton);
+
+    // Attempt to create a preallocator for recorded children exactly
+    // once, when the main preallocator singleton is created.
+    MOZ_ASSERT(!sSingletonForRecording);
+    nsString replayServerAddr;
+    nsresult rv = GetReplayDispatchServer(replayServerAddr);
+    if (!NS_FAILED(rv) && replayServerAddr.Length() > 0) {
+      sSingletonForRecording = new PreallocatedProcessManagerImpl(replayServerAddr);
+      sSingletonForRecording->Init();
+      ClearOnShutdown(&sSingletonForRecording);
+    }
   }
   return sSingleton;
   //  PreallocatedProcessManagers live until shutdown
 }
 
+/* static */
+PreallocatedProcessManagerImpl*
+PreallocatedProcessManagerImpl::SingletonForRecording() {
+  MOZ_ASSERT(NS_IsMainThread());
+  Singleton();
+  return sSingletonForRecording;
+}
+
 NS_IMPL_ISUPPORTS(PreallocatedProcessManagerImpl, nsIObserver)
 
 PreallocatedProcessManagerImpl::PreallocatedProcessManagerImpl()
-    : mEnabled(false), mLaunchInProgress(false), mNumberPreallocs(1) {}
+    : mEnabled(false), mLaunchInProgress(false), mNumberPreallocs(1),
+      mRecordingDispatchAddress() {}
+PreallocatedProcessManagerImpl::PreallocatedProcessManagerImpl(
+    const nsAString& aRecordingDispatchAddress)
+    : mEnabled(false), mLaunchInProgress(false), mNumberPreallocs(1),
+      mRecordingDispatchAddress(aRecordingDispatchAddress) {}
 
 PreallocatedProcessManagerImpl::~PreallocatedProcessManagerImpl() {
   // This shouldn't happen, because the promise callbacks should
   // hold strong references, but let't make absolutely sure:
   MOZ_RELEASE_ASSERT(!mLaunchInProgress);
+}
+
+nsresult PreallocatedProcessManagerImpl::GetReplayDispatchServer(nsAString& addr) {
+  const char* envAddr = getenv("RECORD_REPLAY_SERVER");
+  if (envAddr) {
+    CopyUTF8toUTF16(mozilla::Span(envAddr, strlen(envAddr)), addr);
+    return NS_OK;
+  }
+  return Preferences::GetString("devtools.recordreplay.cloudServer", addr);
 }
 
 void PreallocatedProcessManagerImpl::Init() {
@@ -128,6 +176,11 @@ void PreallocatedProcessManagerImpl::Init() {
   // if the value goes up or down, so we need to run code on change.
   Preferences::AddStrongObserver(this,
                                  "dom.ipc.processPrelaunch.fission.number");
+
+  if (mRecordingDispatchAddress.Length() > 0) {
+    Preferences::GetString("devtools.recordreplay.user-token", mRecordingUserToken);
+    Preferences::AddStrongObserver(this, "devtools.recordreplay.user-token");
+  }
 
   nsCOMPtr<nsIObserverService> os = services::GetObserverService();
   MOZ_ASSERT(os);
@@ -171,6 +224,15 @@ PreallocatedProcessManagerImpl::Observe(nsISupports* aSubject,
 }
 
 void PreallocatedProcessManagerImpl::RereadPrefs() {
+  if (mRecordingDispatchAddress.Length() > 0) {
+    nsString userToken;
+    Preferences::GetString("devtools.recordreplay.user-token", userToken);
+    if (!userToken.Equals(mRecordingUserToken)) {
+      mRecordingUserToken = userToken;
+      CloseProcesses();
+      AllocateOnIdle();
+    }
+  }
   if (mozilla::BrowserTabsRemoteAutostart() &&
       Preferences::GetBool("dom.ipc.processPrelaunch.enabled")) {
     int32_t number = 1;
@@ -211,15 +273,16 @@ already_AddRefed<ContentParent> PreallocatedProcessManagerImpl::Take(
   return process.forget();
 }
 
-void PreallocatedProcessManagerImpl::Erase(ContentParent* aParent) {
+bool PreallocatedProcessManagerImpl::Erase(ContentParent* aParent) {
   // Ensure this ContentParent isn't cached
   for (auto it = mPreallocatedProcesses.begin();
        it != mPreallocatedProcesses.end(); it++) {
     if (*it == aParent) {
       mPreallocatedProcesses.erase(it);
-      break;
+      return true;
     }
   }
+  return false;
 }
 
 void PreallocatedProcessManagerImpl::Enable(uint32_t aProcesses) {
@@ -232,14 +295,21 @@ void PreallocatedProcessManagerImpl::Enable(uint32_t aProcesses) {
   AllocateAfterDelay();
 }
 
-void PreallocatedProcessManagerImpl::AddBlocker(ContentParent* aParent) {
+/* static */
+void PreallocatedProcessManagerImpl::AddBlocker() {
   if (sNumBlockers == 0) {
-    mBlockingStartTime = TimeStamp::Now();
+    if (auto* impl = Singleton()) {
+      impl->StartBlockers();
+    }
+    if (auto* implRec = SingletonForRecording()) {
+      implRec->StartBlockers();
+    }
   }
   sNumBlockers++;
 }
 
-void PreallocatedProcessManagerImpl::RemoveBlocker(ContentParent* aParent) {
+/* static */
+void PreallocatedProcessManagerImpl::RemoveBlocker() {
   // This used to assert that the blocker existed, but preallocated
   // processes aren't blockers anymore because it's not useful and
   // interferes with async launch, and it's simpler if content
@@ -248,18 +318,29 @@ void PreallocatedProcessManagerImpl::RemoveBlocker(ContentParent* aParent) {
   MOZ_DIAGNOSTIC_ASSERT(sNumBlockers > 0);
   sNumBlockers--;
   if (sNumBlockers == 0) {
-    MOZ_LOG(ContentParent::GetLog(), LogLevel::Debug,
-            ("Blocked preallocation for %fms",
-             (TimeStamp::Now() - mBlockingStartTime).ToMilliseconds()));
-    PROFILER_MARKER_TEXT("Process", DOM,
-                         MarkerTiming::IntervalUntilNowFrom(mBlockingStartTime),
-                         "Blocked preallocation");
-    if (IsEmpty()) {
-      AllocateAfterDelay();
+    if (auto* impl = Singleton()) {
+      impl->EndBlockers();
+    }
+    if (auto* implRec = SingletonForRecording()) {
+      implRec->EndBlockers();
     }
   }
 }
 
+void PreallocatedProcessManagerImpl::StartBlockers() {
+  mBlockingStartTime = TimeStamp::Now();
+}
+void PreallocatedProcessManagerImpl::EndBlockers() {
+  MOZ_LOG(ContentParent::GetLog(), LogLevel::Debug,
+          ("Blocked preallocation for %fms",
+           (TimeStamp::Now() - mBlockingStartTime).ToMilliseconds()));
+  PROFILER_MARKER_TEXT("Process", DOM,
+                       MarkerTiming::IntervalUntilNowFrom(mBlockingStartTime),
+                       "Blocked preallocation");
+  if (IsEmpty()) {
+    AllocateAfterDelay();
+  }
+}
 bool PreallocatedProcessManagerImpl::CanAllocate() {
   return mEnabled && sNumBlockers == 0 &&
          mPreallocatedProcesses.size() < mNumberPreallocs && !sShutdown &&
@@ -301,7 +382,7 @@ void PreallocatedProcessManagerImpl::AllocateNow() {
   RefPtr<PreallocatedProcessManagerImpl> self(this);
   mLaunchInProgress = true;
 
-  ContentParent::PreallocateProcess()->Then(
+  ContentParent::PreallocateProcess(mRecordingDispatchAddress)->Then(
       GetCurrentSerialEventTarget(), __func__,
 
       [self, this](const RefPtr<ContentParent>& process) {
@@ -377,6 +458,14 @@ PreallocatedProcessManager::GetPPMImpl() {
   return PreallocatedProcessManagerImpl::Singleton();
 }
 
+inline PreallocatedProcessManagerImpl*
+PreallocatedProcessManager::GetPPMImplForRecording() {
+  if (PreallocatedProcessManagerImpl::sShutdown) {
+    return nullptr;
+  }
+  return PreallocatedProcessManagerImpl::SingletonForRecording();
+}
+
 /* static */
 bool PreallocatedProcessManager::Enabled() {
   if (auto impl = GetPPMImpl()) {
@@ -392,9 +481,7 @@ void PreallocatedProcessManager::AddBlocker(const nsACString& aRemoteType,
           ("AddBlocker: %s %p (sNumBlockers=%d)",
            PromiseFlatCString(aRemoteType).get(), aParent,
            PreallocatedProcessManagerImpl::sNumBlockers));
-  if (auto impl = GetPPMImpl()) {
-    impl->AddBlocker(aParent);
-  }
+  PreallocatedProcessManagerImpl::AddBlocker();
 }
 
 /* static */
@@ -404,9 +491,7 @@ void PreallocatedProcessManager::RemoveBlocker(const nsACString& aRemoteType,
           ("RemoveBlocker: %s %p (sNumBlockers=%d)",
            PromiseFlatCString(aRemoteType).get(), aParent,
            PreallocatedProcessManagerImpl::sNumBlockers));
-  if (auto impl = GetPPMImpl()) {
-    impl->RemoveBlocker(aParent);
-  }
+  PreallocatedProcessManagerImpl::RemoveBlocker();
 }
 
 /* static */
@@ -417,11 +502,24 @@ already_AddRefed<ContentParent> PreallocatedProcessManager::Take(
   }
   return nullptr;
 }
+already_AddRefed<ContentParent> PreallocatedProcessManager::TakeForRecording(
+    const nsACString& aRemoteType) {
+  if (auto impl = GetPPMImplForRecording()) {
+    return impl->Take(aRemoteType);
+  }
+  return nullptr;
+}
 
 /* static */
 void PreallocatedProcessManager::Erase(ContentParent* aParent) {
-  if (auto impl = GetPPMImpl()) {
-    impl->Erase(aParent);
+  if (aParent->IsRecording()) {
+    if (auto impl = GetPPMImplForRecording()) {
+      impl->Erase(aParent);
+    }
+  } else {
+    if (auto impl = GetPPMImpl()) {
+      impl->Erase(aParent);
+    }
   }
 }
 

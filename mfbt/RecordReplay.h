@@ -190,8 +190,15 @@ struct MOZ_RAII AutoOrderedLock {
 
 // Mark an existing mutex so that locking operations on it will occur in the
 // same order when replaying as when recording.
+#ifndef XP_WIN
 static inline void AddOrderedPthreadMutex(const char* aName,
                                           pthread_mutex_t* aMutex);
+#else
+static inline void AddOrderedCriticalSection(const char* aName,
+                                             /*PCRITICAL_SECTION*/ void* aCS);
+static inline void AddOrderedSRWLock(const char* aName,
+                                     /*PSRWLOCK*/ void* aLock);
+#endif
 
 // Atomic wrapper that ensures accesses happen in the same order when
 // recording vs. replaying.
@@ -307,6 +314,11 @@ static inline void NoteContentParse(const void* aToken, const char* aURL,
 // Add a record/replay assertion for the current JS caller.
 static inline void AssertScriptedCaller(const char* aWhy);
 
+// Report that the current recording/replaying process is using an unsupported
+// browser feature, and message the user to notify them the page might not work right.
+// Issue numbers are from https://github.com/RecordReplay/gecko-dev/issues
+MFBT_API void ReportUnsupportedFeature(const char* aFeature, int aIssueNumber);
+
 ///////////////////////////////////////////////////////////////////////////////
 // API inline function implementation
 ///////////////////////////////////////////////////////////////////////////////
@@ -370,10 +382,20 @@ MOZ_MAKE_RECORD_REPLAY_WRAPPER(CreateOrderedLock, int, 0,
                                (const char* aName), (aName))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(OrderedLock, (int aLock), (aLock))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(OrderedUnlock, (int aLock), (aLock))
+MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AssertScriptedCaller, (const char* aWhy), (aWhy))
+
+#ifndef XP_WIN
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AddOrderedPthreadMutex,
                                     (const char* aName, pthread_mutex_t* aMutex),
                                     (aName, aMutex));
-MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AssertScriptedCaller, (const char* aWhy), (aWhy))
+#else
+MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AddOrderedCriticalSection,
+                                    (const char* aName, void* aCS),
+                                    (aName, aCS));
+MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AddOrderedSRWLock,
+                                    (const char* aName, void* aLock),
+                                    (aName, aLock));
+#endif
 
 #undef MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID
 #undef MOZ_MAKERECORDREPLAYWRAPPER
@@ -396,6 +418,17 @@ static inline void PrintLog(const char* aFormat, ...) {
     va_list ap;
     va_start(ap, aFormat);
     InternalPrintLog(aFormat, ap);
+    va_end(ap);
+  }
+}
+
+MFBT_API void InternalDiagnostic(const char* aFormat, va_list aArgs);
+
+static inline void Diagnostic(const char* aFormat, ...) {
+  if (IsRecordingOrReplaying()) {
+    va_list ap;
+    va_start(ap, aFormat);
+    InternalDiagnostic(aFormat, ap);
     va_end(ap);
   }
 }

@@ -7,17 +7,18 @@ the Record Replay gecko based browser.
 
 1. Make sure that you are using Python v2.7
 2. `cp mozconfig.macsample mozconfig`
-3. Download `MacOSX10.12.sdk.tar.xz` from https://github.com/phracker/MacOSX-SDKs/releases
-4. untar `MacOSX10.12.sdk.tar.xz` in the repo root to create a `MacOSX10.12.sdk` directory
+3. Download `MacOSX11.1.sdk.tar.xz` from https://github.com/phracker/MacOSX-SDKs/releases
+4. untar `MacOSX11.1.sdk.tar.xz` in the repo root to create a `MacOSX11.1.sdk` directory
 5. run `./mach bootstrap` and select (2) Firefox Desktop
-6. run `./mach build`
+6. run `node build`
+   * On Apple Silicon, you many need to run `RUSTC_BOOTSTRAP=qcms node build` to build successfully.
 7. run `./mach run`
 
 **Linux**
 
 1. `cp mozconfig.linuxsample mozconfig`
 2. run `./mach bootstrap` and select (2) Firefox Desktop
-3. run `./mach build`
+3. run `node build`
 4. run `./mach run`
 
 ### Troubleshooting Tips
@@ -54,7 +55,8 @@ git push
 ```
 
 8. Update geckoVersion in the backend.
-9. Make sure automatic updates work with the new browser. Deploy a browser but do not release it, then open it, open "About Replay" and see if it updates.
+9. Update User Agent version reported by `CurrentFirefoxVersion()` in `toolkit/recordreplay/ProcessRecordReplay.cpp`
+10. Make sure automatic updates work with the new browser. Deploy a browser but do not release it, then open it, open "About Replay" and see if it updates.
 
 Tips for debugging:
 

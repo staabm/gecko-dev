@@ -13,6 +13,10 @@
 
 #ifndef XP_WIN
 #include <dlfcn.h>
+#else
+#include <windows.h>
+#include <libloaderapi.h>
+#include <psapi.h>
 #endif
 
 #include <stdlib.h>
@@ -38,7 +42,20 @@ namespace recordreplay {
   Macro(NewTimeWarpTarget, ProgressCounter, (), ())                            \
   Macro(ShouldUpdateProgressCounter, bool, (const char* aURL), (aURL))
 
+#ifndef XP_WIN
+#define FOR_EACH_PLATFORM_INTERFACE_VOID(Macro)                                \
+  Macro(InternalAddOrderedPthreadMutex,                                        \
+        (const char* aName, pthread_mutex_t* aMutex), (aName, aMutex))
+#else
+#define FOR_EACH_PLATFORM_INTERFACE_VOID(Macro)                                \
+  Macro(InternalAddOrderedCriticalSection,                                     \
+        (const char* aName, void* aCS), (aName, aCS))                          \
+  Macro(InternalAddOrderedSRWLock,                                             \
+        (const char* aName, void* aLock), (aName, aLock))
+#endif
+
 #define FOR_EACH_INTERFACE_VOID(Macro)                                         \
+  FOR_EACH_PLATFORM_INTERFACE_VOID(Macro)                                      \
   Macro(InternalBeginPassThroughThreadEvents, (), ())                          \
   Macro(InternalEndPassThroughThreadEvents, (), ())                            \
   Macro(InternalBeginDisallowThreadEvents, (), ())                             \
@@ -60,12 +77,12 @@ namespace recordreplay {
         (aData, aSize))                                                        \
   Macro(InternalPrintLog, (const char* aFormat, va_list aArgs),                \
         (aFormat, aArgs))                                                      \
+  Macro(InternalDiagnostic, (const char* aFormat, va_list aArgs),              \
+        (aFormat, aArgs))                                                      \
   Macro(InternalRegisterThing, (void* aThing), (aThing))                       \
   Macro(InternalUnregisterThing, (void* aThing), (aThing))                     \
   Macro(InternalOrderedLock, (int aLock), (aLock))                             \
   Macro(InternalOrderedUnlock, (int aLock), (aLock))                           \
-  Macro(InternalAddOrderedPthreadMutex,                                        \
-        (const char* aName, pthread_mutex_t* aMutex), (aName, aMutex))         \
   Macro(BeginContentParse,                                                     \
         (const void* aToken, const char* aURL, const char* aContentType),      \
         (aToken, aURL, aContentType))                                          \
@@ -77,6 +94,8 @@ namespace recordreplay {
         (const void* aToken, const char16_t* aBuffer, size_t aLength),         \
         (aToken, aBuffer, aLength))                                            \
   Macro(EndContentParse, (const void* aToken), (aToken))                       \
+  Macro(ReportUnsupportedFeature,                                              \
+        (const char* aFeature, int aIssueNumber), (aFeature, aIssueNumber))    \
   Macro(AdvanceExecutionProgressCounter, (), ())                               \
   Macro(SetExecutionProgressCallback, (void (*aCallback)(uint64_t)), (aCallback)) \
   Macro(ExecutionProgressReached, (), ())                                      \
@@ -96,15 +115,23 @@ FOR_EACH_INTERFACE_VOID(DECLARE_SYMBOL_VOID)
 
 static void* LoadSymbol(const char* aName) {
 #ifdef XP_WIN
-  MOZ_CRASH("LoadSymbol");
+  static HMODULE module;
+  if (!module) {
+    module = GetModuleHandle("xul.dll");
+    if (!module) {
+      fprintf(stderr, "Could not find libxul.dll in loaded modules, crashing...\n");
+      MOZ_CRASH("Unexpected modules");
+    }
+  }
+  void* rv = BitwiseCast<void*>(GetProcAddress(module, aName));
 #else
   void* rv = dlsym(RTLD_DEFAULT, aName);
+#endif
   if (!rv) {
     fprintf(stderr, "Record/Replay LoadSymbol failed: %s\n", aName);
     MOZ_CRASH("LoadSymbol");
   }
   return rv;
-#endif
 }
 
 static bool gInitialized;

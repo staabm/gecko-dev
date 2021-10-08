@@ -37,6 +37,8 @@ class MutexImpl {
 
 #if !defined(XP_WIN)
   MFBT_API pthread_mutex_t* NativeHandle();
+#else
+  MFBT_API /*PSRWLOCK*/ void* NativeHandle();
 #endif
 
  private:

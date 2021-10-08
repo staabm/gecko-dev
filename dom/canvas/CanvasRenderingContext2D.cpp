@@ -4044,6 +4044,13 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
 gfxFontGroup* CanvasRenderingContext2D::GetCurrentFontStyle() {
   // use lazy initilization for the font group since it's rather expensive
   if (!CurrentState().fontGroup) {
+    // Creating new font groups interacts with the system and could trigger
+    // unhandled divergences from the recording, so avoid this when those
+    // divergences aren't allowed.
+    if (!recordreplay::IsUnhandledDivergenceAllowed()) {
+      return nullptr;
+    }
+
     ErrorResult err;
     constexpr auto kDefaultFontStyle = "10px sans-serif"_ns;
     static float kDefaultFontSize = 10.0;

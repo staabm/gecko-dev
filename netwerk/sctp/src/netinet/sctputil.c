@@ -1762,6 +1762,8 @@ sctp_handle_addr_wq(void)
  *|SCTP_TIMER_TYPE_PRIM_DELETED |stcb->asoc.delete_prim_timer |Yes |Yes |No  |
  */
 
+extern void RecordReplayAssertFromC(const char* aFormat, ...);
+
 void
 sctp_timeout_handler(void *t)
 {
@@ -1783,6 +1785,8 @@ sctp_timeout_handler(void *t)
 	int did_output;
 	int type;
 	int i, secret;
+
+  RecordReplayAssertFromC("sctp_timeout_handler start");
 
 	tmr = (struct sctp_timer *)t;
 	inp = (struct sctp_inpcb *)tmr->ep;
@@ -1824,6 +1828,7 @@ sctp_timeout_handler(void *t)
 #if defined(__FreeBSD__) && !defined(__Userspace__)
 			CURVNET_RESTORE();
 #endif
+      RecordReplayAssertFromC("sctp_timeout_handler #1");
 			return;
 		}
 	}
@@ -1842,6 +1847,7 @@ sctp_timeout_handler(void *t)
 #if defined(__FreeBSD__) && !defined(__Userspace__)
 		CURVNET_RESTORE();
 #endif
+    RecordReplayAssertFromC("sctp_timeout_handler #2");
 		return;
 	}
 
@@ -1862,6 +1868,7 @@ sctp_timeout_handler(void *t)
 #if defined(__FreeBSD__) && !defined(__Userspace__)
 			CURVNET_RESTORE();
 #endif
+      RecordReplayAssertFromC("sctp_timeout_handler #3");
 			return;
 		}
 	} else if (inp != NULL) {
@@ -1901,6 +1908,7 @@ sctp_timeout_handler(void *t)
 	}
 #endif
 	/* call the handler for the appropriate timer type */
+  RecordReplayAssertFromC("sctp_timeout_handler #4 %d", (int)type);
 	switch (type) {
 	case SCTP_TIMER_TYPE_SEND:
 		KASSERT(inp != NULL && stcb != NULL && net != NULL,
@@ -2196,6 +2204,7 @@ sctp_timeout_handler(void *t)
 		sctp_fix_ecn_echo(&stcb->asoc);
 	}
 get_out:
+  RecordReplayAssertFromC("sctp_timeout_handler get_out");
 	if (stcb) {
 		SCTP_TCB_UNLOCK(stcb);
 	} else if (inp != NULL) {
@@ -2205,6 +2214,7 @@ get_out:
 	}
 
 out_decr:
+  RecordReplayAssertFromC("sctp_timeout_handler out_decr");
 #if defined(__Userspace__)
 	if (upcall_socket != NULL) {
 		if ((upcall_socket->so_upcall != NULL) &&
@@ -2221,6 +2231,7 @@ out_decr:
 	}
 
 out_no_decr:
+  RecordReplayAssertFromC("sctp_timeout_handler out_no_decr");
 	SCTPDBG(SCTP_DEBUG_TIMER2, "Timer type %d handler finished.\n", type);
 #if defined(__FreeBSD__) && !defined(__Userspace__)
 	CURVNET_RESTORE();

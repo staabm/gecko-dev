@@ -650,8 +650,10 @@ static const char* sObserverTopics[] = {
 // PreallocateProcess is called by the PreallocatedProcessManager.
 // ContentParent then takes this process back within GetNewOrUsedBrowserProcess.
 /*static*/ RefPtr<ContentParent::LaunchPromise>
-ContentParent::PreallocateProcess() {
-  RefPtr<ContentParent> process = new ContentParent(PREALLOC_REMOTE_TYPE, nsString());
+ContentParent::PreallocateProcess(const nsAString& aRecordingDispatchAddress) {
+  RefPtr<ContentParent> process = new ContentParent(
+    PREALLOC_REMOTE_TYPE,
+    aRecordingDispatchAddress);
 
   MOZ_LOG(ContentParent::GetLog(), LogLevel::Debug,
           ("Preallocating process of type prealloc"));
@@ -908,12 +910,19 @@ nsString ContentParent::GetRecording(Element* aFrameElement) {
 /*static*/
 already_AddRefed<ContentParent> ContentParent::GetUsedBrowserProcess(
     const nsACString& aRemoteType, nsTArray<ContentParent*>& aContentParents,
-    uint32_t aMaxContentParents, bool aPreferUsed) {
+    uint32_t aMaxContentParents, bool aPreferUsed,
+    const nsAString& aRecordingDispatchAddress) {
+  if (aRecordingDispatchAddress.Length() > 0) {
+    return GetUsedBrowserProcessForRecording(
+      aRemoteType, aContentParents, aRecordingDispatchAddress);
+  }
+
   // This code is disabled, as the presence of recording tabs can cause other
   // new tabs to not render. There might be a simple fix here but it doesn't
   // seem worth investigating.
   return nullptr;
   /*
+
 #ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
   AutoRestore ar(sInProcessSelector);
   sInProcessSelector = true;
@@ -1037,6 +1046,61 @@ already_AddRefed<ContentParent> ContentParent::GetUsedBrowserProcess(
 }
 
 /*static*/
+already_AddRefed<ContentParent> ContentParent::GetUsedBrowserProcessForRecording(
+    const nsACString& aRemoteType, nsTArray<ContentParent*>& aContentParents,
+    const nsAString& aRecordingDispatchAddress) {
+  MOZ_ASSERT(aRecordingDispatchAddress.Length() > 0);
+
+#ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
+  AutoRestore ar(sInProcessSelector);
+  sInProcessSelector = true;
+#endif
+
+  // Try to take a preallocated process except for certain remote types.
+  RefPtr<ContentParent> preallocated;
+  if (aRemoteType != FILE_REMOTE_TYPE &&
+      aRemoteType != EXTENSION_REMOTE_TYPE &&  // Bug 1638119
+      (preallocated = PreallocatedProcessManager::TakeForRecording(aRemoteType))) {
+    MOZ_DIAGNOSTIC_ASSERT(preallocated->GetRemoteType() ==
+                          PREALLOC_REMOTE_TYPE);
+    MOZ_DIAGNOSTIC_ASSERT(sRecycledE10SProcess != preallocated);
+    preallocated->AssertAlive();
+
+#ifdef MOZ_GECKO_PROFILER
+    if (profiler_thread_is_being_profiled()) {
+      nsPrintfCString marker("Assigned preallocated process %u",
+                             (unsigned int)preallocated->ChildID());
+      PROFILER_MARKER_TEXT("Process", DOM, {}, marker);
+    }
+#endif
+    MOZ_LOG(ContentParent::GetLog(), LogLevel::Debug,
+            ("Adopted preallocated process %p for type %s", preallocated.get(),
+             PromiseFlatCString(aRemoteType).get()));
+
+    // Specialize this process for the appropriate remote type, and activate it.
+    preallocated->mActivateTS = TimeStamp::Now();
+    preallocated->AddToPool(aContentParents);
+
+    preallocated->mRemoteType.Assign(aRemoteType);
+    preallocated->mRemoteTypeIsolationPrincipal =
+        CreateRemoteTypeIsolationPrincipal(aRemoteType);
+    Unused << preallocated->SendRemoteType(preallocated->mRemoteType);
+
+    nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+    if (obs) {
+      nsAutoString cpId;
+      cpId.AppendInt(static_cast<uint64_t>(preallocated->ChildID()));
+      obs->NotifyObservers(static_cast<nsIObserver*>(preallocated),
+                           "process-type-set", cpId.get());
+      preallocated->AssertAlive();
+    }
+    return preallocated.forget();
+  }
+
+  return nullptr;
+}
+
+/*static*/
 already_AddRefed<ContentParent>
 ContentParent::GetNewOrUsedLaunchingBrowserProcess(
     const nsACString& aRemoteType, BrowsingContextGroup* aGroup,
@@ -1075,9 +1139,12 @@ ContentParent::GetNewOrUsedLaunchingBrowserProcess(
                                                /*aPreferUsed =*/false);
   }
 
-  // Let's try and reuse an existing process.
-  contentParent = GetUsedBrowserProcess(aRemoteType, contentParents,
-                                        maxContentParents, aPreferUsed);
+  // Let's try and reuse an existing process, if that's not disabled.
+  if (!Preferences::GetBool("devtools.recordreplay.disablePreallocated")) {
+    contentParent = GetUsedBrowserProcess(aRemoteType, contentParents,
+                                          maxContentParents, aPreferUsed,
+                                          aRecordingDispatchAddress);
+  }
 
   if (contentParent) {
     // We have located a process. It may not have finished initializing,

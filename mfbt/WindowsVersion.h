@@ -9,6 +9,7 @@
 
 #include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/RecordReplay.h"
 #include <stdint.h>
 #include <windows.h>
 
@@ -18,6 +19,9 @@ inline bool IsWindowsVersionOrLater(uint32_t aVersion) {
   static Atomic<uint32_t> minVersion(0);
   static Atomic<uint32_t> maxVersion(UINT32_MAX);
 
+  // Avoid using cache in case we're recording/replaying, as the system calls made
+  // can be affected by other threads.
+#if 0
   if (minVersion >= aVersion) {
     return true;
   }
@@ -25,6 +29,7 @@ inline bool IsWindowsVersionOrLater(uint32_t aVersion) {
   if (aVersion >= maxVersion) {
     return false;
   }
+#endif // 0
 
   OSVERSIONINFOEXW info;
   ZeroMemory(&info, sizeof(OSVERSIONINFOEXW));

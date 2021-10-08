@@ -338,6 +338,9 @@ gDebugger.onNewScript = (script) => {
   }
 };
 
+// All domains within which scripts were loaded.
+const gScriptDomains = new Set();
+
 function registerSource(source) {
   if (gSources.getId(source)) {
     return;
@@ -370,6 +373,11 @@ function registerSource(source) {
   if (source.introductionType === "inlineScript") {
     kind = "inlineScript";
   }
+
+  try {
+    const domain = new URL(sourceURL).hostname;
+    gScriptDomains.add(domain);
+  } catch (e) {}
 
   RecordReplayControl.onNewSource(id, kind, sourceURL);
 }
@@ -489,6 +497,62 @@ function eventListener(info) {
   }
 }
 
+// Get information about operations performed by the recording which are
+// potentially sensitive and can be shown to users before deciding to make
+// the recording public.
+function buildRecordingOperations() {
+  const scriptDomains = [...gScriptDomains];
+  let cookies, storage;
+
+  for (const { kind, value } of RecordReplayControl.recordingOperations()) {
+    switch (kind) {
+      case "cookie":
+        if (!cookies) {
+          cookies = new Set();
+        }
+        cookies.add(value);
+        break;
+      case "localStorage":
+        if (!storage) {
+          storage = new Set();
+        }
+        storage.add(localStorageDomain(value));
+        break;
+      case "indexedDB":
+        if (!storage) {
+          storage = new Set();
+        }
+        storage.add(indexedDBDomain(value));
+        break;
+    }
+  }
+
+  return {
+    scriptDomains,
+    cookies: cookies ? [...cookies] : undefined,
+    storage: storage ? [...storage] : undefined,
+  };
+
+  function localStorageDomain(value) {
+    // Local storage values include the domain with its characters reversed,
+    // for whatever reason, followed by ".:$protocol:$port"
+    const idx = value.lastIndexOf(".");
+    if (idx < 0) {
+      return value;
+    }
+    return value.substring(0, idx).split("").reverse().join("");
+  }
+
+  function indexedDBDomain(value) {
+    // Indexed DB values include the protocol as well.
+    const idx = value.lastIndexOf("/");
+    if (idx < 0) {
+      return value;
+    }
+    return value.substring(idx + 1);
+  }
+}
+
 function SendRecordingFinished(recordingId) {
   try {
     const document = getWindow().document;
@@ -499,6 +563,7 @@ function SendRecordingFinished(recordingId) {
       duration: new Date() - startTime,
       lastScreenData: getWindowAsImageData(getWindow()),
       lastScreenMimeType: "image/jpeg",
+      operations: buildRecordingOperations(),
     };
     Services.cpmm.sendAsyncMessage("RecordingFinished", data);
   } catch (e) {
@@ -510,6 +575,15 @@ function SendRecordingFinished(recordingId) {
 
 function SendRecordingUnusable(why) {
   Services.cpmm.sendAsyncMessage("RecordingUnusable", { why });
+}
+
+function SendRecordingUnsupported(why) {
+  Services.cpmm.sendAsyncMessage("RecordingStarting");
+  Services.cpmm.sendAsyncMessage("RecordingUnusable", { why });
+}
+
+function SendUnsupportedFeature(feature, issueNumber) {
+  Services.cpmm.sendAsyncMessage("RecordingUnsupportedFeature", { feature, issueNumber });
 }
 
 function OnTestCommand(str) {
@@ -574,6 +648,8 @@ function OnProtocolCommand(method, params) {
 const exports = {
   SendRecordingFinished,
   SendRecordingUnusable,
+  SendRecordingUnsupported,
+  SendUnsupportedFeature,
   OnTestCommand,
   OnProtocolCommand,
   ClearPauseData,
@@ -1062,6 +1138,9 @@ function createProtocolValue(v) {
   if (typeof v == "string" && v.length > MaxStringLength) {
     return { value: v.substring(0, MaxStringLength) + "…" };
   }
+  if (typeof v == "symbol") {
+    return { symbol: v.toString() };
+  }
   return { value: v };
 }
 
@@ -1071,7 +1150,7 @@ function createProtocolValueRaw(v) {
 
 function createProtocolPropertyDescriptor(name, desc) {
   const rv = createProtocolValue(desc.value);
-  rv.name = name;
+  rv.name = name.toString();
 
   let flags = 0;
   if (desc.writable) {
@@ -1092,6 +1171,10 @@ function createProtocolPropertyDescriptor(name, desc) {
   }
   if (desc.set) {
     rv.set = getObjectId(desc.set);
+  }
+
+  if (typeof name == "symbol") {
+    rv.isSymbol = true;
   }
 
   return rv;
@@ -1262,7 +1345,7 @@ function propertyNames(object) {
     return [];
   }
   try {
-    return object.getOwnPropertyNames();
+    return [...object.getOwnPropertyNames(), ...object.getOwnPropertySymbols()];
   } catch (e) {
     return [];
   }
