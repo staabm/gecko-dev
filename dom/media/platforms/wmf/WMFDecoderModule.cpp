@@ -91,6 +91,7 @@ static bool CanCreateMFTDecoder(const GUID& aGuid) {
   // is not.
   bool canCreateDecoder = false;
   mozilla::mscom::EnsureMTA([&]() -> void {
+    recordreplay::Diagnostic("CanCreateMFTDecoder callback");
     if (FAILED(wmf::MFStartup())) {
       return;
     }
