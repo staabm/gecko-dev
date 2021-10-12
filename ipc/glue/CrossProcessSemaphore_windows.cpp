@@ -67,8 +67,6 @@ void CrossProcessSemaphore::Signal() {
 
 CrossProcessSemaphoreHandle CrossProcessSemaphore::ShareToProcess(
     base::ProcessId aTargetPid) {
-  recordreplay::RecordReplayAssert("CrossProcessSemaphore::ShareToProcess"
-
   HANDLE newHandle;
   bool succeeded = ipc::DuplicateHandle(mSemaphore, aTargetPid, &newHandle, 0,
                                         DUPLICATE_SAME_ACCESS);
