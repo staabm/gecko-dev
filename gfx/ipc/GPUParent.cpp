@@ -94,6 +94,11 @@ GPUParent::GPUParent() : mLaunchTime(TimeStamp::Now()) { sGPUParent = this; }
 GPUParent::~GPUParent() { sGPUParent = nullptr; }
 
 /* static */
+bool GPUParent::Exists() {
+  return sGPUParent != nullptr;
+}
+
+/* static */
 GPUParent* GPUParent::GetSingleton() {
   MOZ_DIAGNOSTIC_ASSERT(sGPUParent);
   return sGPUParent;
