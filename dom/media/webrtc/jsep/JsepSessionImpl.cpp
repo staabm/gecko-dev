@@ -448,9 +448,13 @@ std::string JsepSessionImpl::GetNewMid() {
   std::string mid;
 
   do {
-    std::ostringstream osMid;
-    osMid << mMidCounter++;
-    mid = osMid.str();
+    // Don't use ostringstream to avoid problems replaying these calls on windows.
+    char buf[50];
+    snprintf(buf, sizeof(buf), "%zu", mMidCounter++);
+    mid = buf;
+    //std::ostringstream osMid;
+    //osMid << mMidCounter++;
+    //mid = osMid.str();
   } while (mUsedMids.count(mid));
 
   mUsedMids.insert(mid);
