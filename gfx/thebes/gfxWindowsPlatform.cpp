@@ -326,6 +326,8 @@ static void UpdateANGLEConfig() {
 }
 
 void gfxWindowsPlatform::InitAcceleration() {
+  recordreplay::Diagnostic("gfxWindowsPlatform::InitAcceleration");
+
   gfxPlatform::InitAcceleration();
 
   DeviceManagerDx::Init();
@@ -1459,6 +1461,9 @@ void gfxWindowsPlatform::InitializeDevices() {
 
     // No GPU process, continue initializing devices as normal.
   }
+
+  recordreplay::Diagnostic("gfxWindowsPlatform::InitializeDevices %d",
+                           gfxConfig::IsEnabled(Feature::HW_COMPOSITING));
 
   // If acceleration is disabled, we refuse to initialize anything.
   if (!gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
