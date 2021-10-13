@@ -54,9 +54,14 @@ __FBSDID("$FreeBSD$");
 
 #if defined(__Userspace__)
 #if defined(_WIN32)
+extern void RecordReplayAddOrderedCriticalSectionFromC(const char* aName, PCRITICAL_SECTION aCS);
 #define SCTP_TIMERQ_LOCK()          EnterCriticalSection(&SCTP_BASE_VAR(timer_mtx))
 #define SCTP_TIMERQ_UNLOCK()        LeaveCriticalSection(&SCTP_BASE_VAR(timer_mtx))
-#define SCTP_TIMERQ_LOCK_INIT()     InitializeCriticalSection(&SCTP_BASE_VAR(timer_mtx))
+#define SCTP_TIMERQ_LOCK_INIT() \
+  do { \
+    InitializeCriticalSection(&SCTP_BASE_VAR(timer_mtx)); \
+    RecordReplayAddOrderedCriticalSectionFromC("sctp_timerq", &SCTP_BASE_VAR(timer_mtx)); \
+  } while (0)
 #define SCTP_TIMERQ_LOCK_DESTROY()  DeleteCriticalSection(&SCTP_BASE_VAR(timer_mtx))
 #else
 #ifdef INVARIANTS
@@ -66,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #define SCTP_TIMERQ_LOCK()          (void)pthread_mutex_lock(&SCTP_BASE_VAR(timer_mtx))
 #define SCTP_TIMERQ_UNLOCK()        (void)pthread_mutex_unlock(&SCTP_BASE_VAR(timer_mtx))
 #endif
+extern void RecordReplayAddOrderedPthreadMutexFromC(const char* aName, pthread_mutex_t* aMutex);
 #define SCTP_TIMERQ_LOCK_INIT() \
   do { \
     pthread_mutex_init(&SCTP_BASE_VAR(timer_mtx), &SCTP_BASE_VAR(mtx_attr)); \

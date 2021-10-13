@@ -666,7 +666,9 @@ Channel::ChannelId Channel::GenerateVerifiedChannelID() {
   do {  // Guarantee we get a non-zero value.
     secret = base::RandInt(0, std::numeric_limits<int>::max());
   } while (secret == 0);
-  return StringPrintf(L"%d.%u.%d\\%d", base::GetCurrentProcId(), g_last_id++,
+  return StringPrintf(L"%d.%u.%d\\%d", base::GetCurrentProcId(),
+                      mozilla::recordreplay::RecordReplayValue("Channel::GenerateVerifiedChannelID",
+                                                               g_last_id++),
                       base::RandInt(0, std::numeric_limits<int32_t>::max()),
                       secret);
 }
