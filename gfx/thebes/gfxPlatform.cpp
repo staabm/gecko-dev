@@ -2505,12 +2505,12 @@ void gfxPlatform::UpdateForceSubpixelAAWherePossible() {
 }
 
 void gfxPlatform::InitAcceleration() {
-  recordreplay::Diagnostic("gfxPlatform::InitAcceleration %d",
-                           (int)sLayersAccelerationPrefsInitialized);
-
   if (sLayersAccelerationPrefsInitialized) {
+    recordreplay::Diagnostic("gfxPlatform::InitAcceleration EarlyReturn");
     return;
   }
+
+  recordreplay::Diagnostic("gfxPlatform::InitAcceleration Start");
 
   InitCompositorAccelerationPrefs();
 
