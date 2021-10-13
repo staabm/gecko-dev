@@ -2658,11 +2658,22 @@ void gfxPlatform::InitCompositorAccelerationPrefs() {
                          "Acceleration blocked by headless mode",
                          "FEATURE_FAILURE_COMP_HEADLESSMODE"_ns);
   }
-  if (recordreplay::IsRecordingOrReplaying()) {
+
+  // Hardware compositing isn't supported when recording/replaying. On windows we
+  // universally disable compositing as otherwise our disable below will be
+  // overwritten later during initialization.
+#ifndef XP_WIN
+  if (recordreplay::IsRecordingOrReplaying())
+#endif
+  {
     recordreplay::Diagnostic("gfxPlatform::InitCompositorAccelerationPrefs DISABLE");
     feature.ForceDisable(
         FeatureStatus::Blocked, "Acceleration blocked by recording/replaying",
         "FEATURE_FAILURE_COMP_RECORDREPLAY"_ns);
+  }
+
+  if (!gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
+    recordreplay::Diagnostic("gfxPlatform::InitCompositorAccelerationPrefs Done DISABLED");
   }
 }
 
@@ -3442,6 +3453,12 @@ void gfxPlatform::ImportContentDeviceData(
   const DevicePrefs& prefs = aData.prefs();
   gfxConfig::Inherit(Feature::HW_COMPOSITING, prefs.hwCompositing());
   gfxConfig::Inherit(Feature::OPENGL_COMPOSITING, prefs.oglCompositing());
+
+  if (gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
+    recordreplay::Diagnostic("gfxPlatform::ImportContentDeviceData ENABLED");
+  } else {
+    recordreplay::Diagnostic("gfxPlatform::ImportContentDeviceData DISABLED");
+  }
 }
 
 void gfxPlatform::BuildContentDeviceData(
