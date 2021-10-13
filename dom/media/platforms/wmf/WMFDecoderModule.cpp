@@ -83,6 +83,11 @@ static bool IsRemoteAcceleratedCompositor(
 }
 
 static bool CanCreateMFTDecoder(const GUID& aGuid) {
+  if (recordreplay::IsRecordingOrReplaying()) {
+    recordreplay::ReportUnsupportedFeature("MediaPlayback", 54);
+    return false;
+  }
+
   // The IMFTransform interface used by MFTDecoder is documented to require to
   // run on an MTA thread.
   // https://msdn.microsoft.com/en-us/library/windows/desktop/ee892371(v=vs.85).aspx#components
