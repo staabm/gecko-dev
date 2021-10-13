@@ -235,6 +235,7 @@ struct MOZ_STACK_CLASS DebuggerScript::CallData {
   bool getPossibleBreakpoints();
   bool getPossibleBreakpointOffsets();
   bool getOffsetMetadata();
+  bool getOffsetMetadataArray();
   bool getOffsetLocation();
   bool getEffectfulOffsets();
   bool getBytecodeOffsets();
@@ -932,6 +933,36 @@ bool DebuggerScript::CallData::getPossibleBreakpointOffsets() {
   return true;
 }
 
+static PlainObject* NewMetadataObject(JSContext* cx,
+                                      const BytecodeRangeWithPosition& r) {
+  RootedPlainObject obj(cx, NewBuiltinClassInstance<PlainObject>(cx));
+  if (!obj) {
+    return nullptr;
+  }
+
+  RootedValue value(cx, NumberValue(r.frontLineNumber()));
+  if (!DefineDataProperty(cx, obj, cx->names().lineNumber, value)) {
+    return nullptr;
+  }
+
+  value = NumberValue(r.frontColumnNumber());
+  if (!DefineDataProperty(cx, obj, cx->names().columnNumber, value)) {
+    return nullptr;
+  }
+
+  value = BooleanValue(r.frontIsBreakablePoint());
+  if (!DefineDataProperty(cx, obj, cx->names().isBreakpoint, value)) {
+    return nullptr;
+  }
+
+  value = BooleanValue(r.frontIsBreakableStepPoint());
+  if (!DefineDataProperty(cx, obj, cx->names().isStepStart, value)) {
+    return nullptr;
+  }
+
+  return obj;
+}
+
 class DebuggerScript::GetOffsetMetadataMatcher {
   JSContext* cx_;
   size_t offset_;
@@ -952,37 +983,13 @@ class DebuggerScript::GetOffsetMetadataMatcher {
       return false;
     }
 
-    result_.set(NewBuiltinClassInstance<PlainObject>(cx_));
-    if (!result_) {
-      return false;
-    }
-
     BytecodeRangeWithPosition r(cx_, script);
     while (!r.empty() && r.frontOffset() < offset_) {
       r.popFront();
     }
 
-    RootedValue value(cx_, NumberValue(r.frontLineNumber()));
-    if (!DefineDataProperty(cx_, result_, cx_->names().lineNumber, value)) {
-      return false;
-    }
-
-    value = NumberValue(r.frontColumnNumber());
-    if (!DefineDataProperty(cx_, result_, cx_->names().columnNumber, value)) {
-      return false;
-    }
-
-    value = BooleanValue(r.frontIsBreakablePoint());
-    if (!DefineDataProperty(cx_, result_, cx_->names().isBreakpoint, value)) {
-      return false;
-    }
-
-    value = BooleanValue(r.frontIsBreakableStepPoint());
-    if (!DefineDataProperty(cx_, result_, cx_->names().isStepStart, value)) {
-      return false;
-    }
-
-    return true;
+    result_.set(NewMetadataObject(cx_, r));
+    return !!result_;
   }
   ReturnType match(Handle<WasmInstanceObject*> instanceObj) {
     wasm::Instance& instance = instanceObj->instance();
@@ -1040,6 +1047,94 @@ bool DebuggerScript::CallData::getOffsetMetadata() {
 
   RootedPlainObject result(cx);
   GetOffsetMetadataMatcher matcher(cx, offset, &result);
+  if (!referent.match(matcher)) {
+    return false;
+  }
+
+  args.rval().setObject(*result);
+  return true;
+}
+
+class DebuggerScript::GetOffsetMetadataArrayMatcher {
+  JSContext* cx_;
+  HandleValue offsetsValue_;
+  MutableHandleArrayObject result_;
+
+ public:
+  explicit GetOffsetMetadataArrayMatcher(JSContext* cx, HandleValue offsetsValue,
+                                         MutableHandleArrayObject result)
+      : cx_(cx), offsetsValue_(offsetsValue), result_(result) {}
+
+  using ReturnType = bool;
+  ReturnType match(Handle<BaseScript*> base) {
+    RootedScript script(cx_, DelazifyScript(cx_, base));
+    if (!script) {
+      return false;
+    }
+
+    RootedArrayObject result(cx_, NewDenseEmptyArray(cx_));
+    if (!result) {
+      return false;
+    }
+
+    if (!offsetsValue_.isObject() || !offsetsValue_.toObject().is<ArrayObject>()) {
+      JS_ReportErrorASCII(cx_, "getOffsetsMetadataArray argument must be an array");
+      return false;
+    }
+
+    RootedArrayObject offsets(cx_, &offsetsValue_.toObject().as<ArrayObject>());
+    BytecodeRangeWithPosition r(cx_, script);
+
+    for (size_t i = 0; i < offsets->length(); i++) {
+      RootedValue v(cx_);
+      if (!JS_GetElement(cx_, offsets, i, &v)) {
+        return false;
+      }
+
+      size_t offset;
+      if (!ScriptOffset(cx_, v, &offset)) {
+        return false;
+      }
+
+      // Advance the bytecode iterator to this offset. The input offsets must be sorted.
+      while (true) {
+        if (r.empty() || r.frontOffset() > offset) {
+          JS_ReportErrorASCII(cx_, "Bad offset in getOffsetsMetadataArray");
+          return false;
+        }
+        if (r.frontOffset() == offset) {
+          break;
+        }
+        r.popFront();
+      }
+
+      RootedObject meta(cx_, NewMetadataObject(cx_, r));
+      if (!meta) {
+        return false;
+      }
+
+      if (!NewbornArrayPush(cx_, result, ObjectValue(*meta))) {
+        return false;
+      }
+    }
+
+    result_.set(result);
+    return !!result_;
+  }
+
+  ReturnType match(Handle<WasmInstanceObject*> instanceObj) {
+    JS_ReportErrorASCII(cx_, "getOffsetMetadataArray NYI on wasm");
+    return false;
+  }
+};
+
+bool DebuggerScript::CallData::getOffsetMetadataArray() {
+  if (!args.requireAtLeast(cx, "Debugger.Script.getOffsetMetadataArray", 1)) {
+    return false;
+  }
+
+  RootedArrayObject result(cx);
+  GetOffsetMetadataArrayMatcher matcher(cx, args[0], &result);
   if (!referent.match(matcher)) {
     return false;
   }
@@ -2390,6 +2485,7 @@ const JSFunctionSpec DebuggerScript::methods_[] = {
     JS_DEBUG_FN("clearAllBreakpoints", clearAllBreakpoints, 0),
     JS_DEBUG_FN("isInCatchScope", isInCatchScope, 1),
     JS_DEBUG_FN("getOffsetMetadata", getOffsetMetadata, 1),
+    JS_DEBUG_FN("getOffsetMetadataArray", getOffsetMetadataArray, 1),
     JS_DEBUG_FN("getOffsetsCoverage", getOffsetsCoverage, 0),
     JS_DEBUG_FN("getEffectfulOffsets", getEffectfulOffsets, 1),
     JS_DEBUG_FN("getBytecodeOffsets", getBytecodeOffsets, 0),

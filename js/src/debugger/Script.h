@@ -77,6 +77,7 @@ class DebuggerScript : public NativeObject {
   template <bool OnlyOffsets>
   class GetPossibleBreakpointsMatcher;
   class GetOffsetMetadataMatcher;
+  class GetOffsetMetadataArrayMatcher;
   class GetOffsetLocationMatcher;
   class GetAllColumnOffsetsMatcher;
   class GetLineOffsetsMatcher;

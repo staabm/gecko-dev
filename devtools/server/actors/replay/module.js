@@ -620,6 +620,7 @@ const commands = {
   "DOM.querySelector": DOM_querySelector,
   "Graphics.getDevicePixelRatio": Graphics_getDevicePixelRatio,
   "Target.convertFunctionOffsetToLocation": Target_convertFunctionOffsetToLocation,
+  "Target.convertFunctionOffsetsToLocations": Target_convertFunctionOffsetsToLocations,
   "Target.convertLocationToFunctionOffset": Target_convertLocationToFunctionOffset,
   "Target.countStackFrames": Target_countStackFrames,
   "Target.currentGeneratorId": Target_currentGeneratorId,
@@ -965,6 +966,24 @@ function Target_convertFunctionOffsetToLocation({ functionId, offset }) {
   }
   const location = { sourceId, line: meta.lineNumber, column: meta.columnNumber };
   return { location };
+}
+
+function Target_convertFunctionOffsetsToLocations({ functionId, offsets }) {
+  const script = functionIdToScript(functionId);
+  const sourceId = sourceToProtocolSourceId(script.source);
+
+  const metaArray = script.getOffsetMetadataArray(offsets);
+  const locations = [];
+  for (const meta of metaArray) {
+    if (!meta) {
+      throw new Error(`convertFunctionOffsetToLocation unknown offset ${offset}`);
+    }
+    if (!meta.isBreakpoint) {
+      throw new Error(`convertFunctionOffsetToLocation non-breakpoint offset ${offset}`);
+    }
+    locations.push({ sourceId, line: meta.lineNumber, column: meta.columnNumber });
+  }
+  return { locations };
 }
 
 function Target_convertLocationToFunctionOffset({ location }) {
