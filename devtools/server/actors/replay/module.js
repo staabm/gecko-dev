@@ -2011,7 +2011,7 @@ function CSS_getAppliedRules({ node }) {
 
 function CSS_getComputedStyle({ node }) {
   const nodeObj = getObjectFromId(node).unsafeDereference();
-  if (nodeObj.nodeType != Node.ELEMENT_NODE) {
+  if (nodeObj.nodeType != Node.ELEMENT_NODE || !nodeObj.ownerGlobal) {
     return { computedStyle: [] };
   }
 
@@ -2156,6 +2156,12 @@ StackingContext.prototype = {
       const { left, top } = elem.raw.getBoundingClientRect();
       this.addContext(elem, left, top);
       elem.context.addChildren(elem.raw.contentWindow.document);
+    }
+
+    if (!elem.style) {
+      this.addNonPositionedElement(elem);
+      this.addChildren(elem.raw);
+      return;
     }
 
     if (elem.style.getPropertyValue("position") != "static") {
