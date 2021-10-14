@@ -353,11 +353,15 @@ function registerSource(source) {
 
   const window = getWindow();
   let sourceURL = getDebuggerSourceURL(source);
+  RecordReplayControl.recordReplayAssert(`RegisterSource #1 ${sourceURL}`);
+
   if (!sourceURL && source.displayURL) {
     try {
       sourceURL = new URL(source.displayURL, window?.location?.href).toString();
     } catch {}
   }
+
+  RecordReplayControl.recordReplayAssert(`RegisterSource #2 ${sourceURL}`);
 
   if (source.text !== "[wasm]") {
     setSourceMap({
