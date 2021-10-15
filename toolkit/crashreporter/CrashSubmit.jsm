@@ -9,6 +9,9 @@ const { FileUtils } = ChromeUtils.import(
 const { XPCOMUtils } = ChromeUtils.import(
   "resource://gre/modules/XPCOMUtils.jsm"
 );
+const ReplayAuth = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/auth.js"
+);
 XPCOMUtils.defineLazyGlobalGetters(this, [
   "File",
   "FormData",
@@ -224,9 +227,14 @@ Submitter.prototype = {
       serverURL = envOverride;
     }
 
+    // fetch the user info to send in `Authorization` header.
+    const auth = ReplayAuth.getOriginalApiKey() || ReplayAuth.getReplayUserToken();
+
     let xhr = new XMLHttpRequest();
     xhr.open("POST", serverURL, true);
-
+    if (auth) {
+      xhr.setRequestHeader("Authorization", `Bearer ${auth}`);
+    }
     let formData = new FormData();
 
     // When submitting Record Replay crash reports, only include keys of particular
