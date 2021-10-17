@@ -3041,7 +3041,7 @@ MediaTrackGraphImpl::MediaTrackGraphImpl(
       mPortCount(0),
       mInputDeviceID(nullptr),
       mOutputDeviceID(aOutputDeviceID),
-      mMonitor("MediaTrackGraphImpl"),
+      mMonitor("MediaTrackGraphImpl", /* aOrdered */ true),
       mLifecycleState(LIFECYCLE_THREAD_NOT_STARTED),
       mPostedRunInStableStateEvent(false),
       mGraphDriverRunning(false),
