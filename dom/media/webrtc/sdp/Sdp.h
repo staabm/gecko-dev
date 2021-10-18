@@ -120,6 +120,8 @@ inline std::string Sdp::ToString() const {
   return s.str();
 }
 
+extern std::string NumberToStringRecordReplayWorkaroundForWindows(uint64_t v);
+
 class SdpOrigin {
  public:
   SdpOrigin(const std::string& username, uint64_t sessId, uint64_t sessVer,
@@ -142,8 +144,8 @@ class SdpOrigin {
 
   void Serialize(std::ostream& os) const {
     sdp::NetType netType = sdp::kInternet;
-    os << "o=" << mUsername << " " << mSessionId << " " << mSessionVersion
-       << " " << netType << " " << mAddrType << " " << mAddress << "\r\n";
+    os << "o=" << mUsername << " " << NumberToStringRecordReplayWorkaroundForWindows(mSessionId) << " " << NumberToStringRecordReplayWorkaroundForWindows(mSessionVersion)
+       << " " << NumberToStringRecordReplayWorkaroundForWindows(netType) << " " << NumberToStringRecordReplayWorkaroundForWindows(mAddrType) << " " << mAddress << "\r\n";
   }
 
  private:

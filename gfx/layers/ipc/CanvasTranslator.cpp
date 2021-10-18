@@ -394,8 +394,9 @@ bool CanvasTranslator::CheckForFreshCanvasDevice(int aLineNumber) {
   RefPtr<Runnable> runnable = NS_NewRunnableFunction(
       "CanvasTranslator NotifyDeviceReset",
       []() {
-        auto singleton = gfx::GPUParent::GetSingleton();
-        if (singleton) singleton->NotifyDeviceReset();
+        if (gfx::GPUParent::Exists()) {
+          gfx::GPUParent::GetSingleton()->NotifyDeviceReset();
+        }
       });
 
   // It is safe to wait here because only the Compositor thread waits on us and

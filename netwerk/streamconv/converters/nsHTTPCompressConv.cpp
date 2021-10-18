@@ -51,7 +51,7 @@ nsHTTPCompressConv::nsHTTPCompressConv()
       mSkipCount(0),
       mFlags(0),
       mDecodedDataLength(0),
-      mMutex("nsHTTPCompressConv") {
+      mMutex("nsHTTPCompressConv", /* aOrdered */ true) {
   LOG(("nsHttpCompresssConv %p ctor\n", this));
   if (NS_IsMainThread()) {
     mFailUncleanStops =

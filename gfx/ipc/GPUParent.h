@@ -24,6 +24,7 @@ class GPUParent final : public PGPUParent {
   GPUParent();
   ~GPUParent();
 
+  static bool Exists();
   static GPUParent* GetSingleton();
 
   AsyncBlockers& AsyncShutdownService() { return mShutdownBlockers; }

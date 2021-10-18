@@ -353,11 +353,15 @@ function registerSource(source) {
 
   const window = getWindow();
   let sourceURL = getDebuggerSourceURL(source);
+  RecordReplayControl.recordReplayAssert(`RegisterSource #1 ${sourceURL}`);
+
   if (!sourceURL && source.displayURL) {
     try {
       sourceURL = new URL(source.displayURL, window?.location?.href).toString();
     } catch {}
   }
+
+  RecordReplayControl.recordReplayAssert(`RegisterSource #2 ${sourceURL}`);
 
   if (source.text !== "[wasm]") {
     setSourceMap({
@@ -620,6 +624,7 @@ const commands = {
   "DOM.querySelector": DOM_querySelector,
   "Graphics.getDevicePixelRatio": Graphics_getDevicePixelRatio,
   "Target.convertFunctionOffsetToLocation": Target_convertFunctionOffsetToLocation,
+  "Target.convertFunctionOffsetsToLocations": Target_convertFunctionOffsetsToLocations,
   "Target.convertLocationToFunctionOffset": Target_convertLocationToFunctionOffset,
   "Target.countStackFrames": Target_countStackFrames,
   "Target.currentGeneratorId": Target_currentGeneratorId,
@@ -967,6 +972,24 @@ function Target_convertFunctionOffsetToLocation({ functionId, offset }) {
   return { location };
 }
 
+function Target_convertFunctionOffsetsToLocations({ functionId, offsets }) {
+  const script = functionIdToScript(functionId);
+  const sourceId = sourceToProtocolSourceId(script.source);
+
+  const metaArray = script.getOffsetMetadataArray(offsets);
+  const locations = [];
+  for (const meta of metaArray) {
+    if (!meta) {
+      throw new Error(`convertFunctionOffsetToLocation unknown offset ${offset}`);
+    }
+    if (!meta.isBreakpoint) {
+      throw new Error(`convertFunctionOffsetToLocation non-breakpoint offset ${offset}`);
+    }
+    locations.push({ sourceId, line: meta.lineNumber, column: meta.columnNumber });
+  }
+  return { locations };
+}
+
 function Target_convertLocationToFunctionOffset({ location }) {
   const { sourceId, line, column } = location;
   const source = protocolSourceIdToSource(sourceId);
@@ -1138,6 +1161,9 @@ function createProtocolValue(v) {
   if (typeof v == "string" && v.length > MaxStringLength) {
     return { value: v.substring(0, MaxStringLength) + "…" };
   }
+  if (typeof v == "symbol") {
+    return { symbol: v.toString() };
+  }
   return { value: v };
 }
 
@@ -1147,7 +1173,7 @@ function createProtocolValueRaw(v) {
 
 function createProtocolPropertyDescriptor(name, desc) {
   const rv = createProtocolValue(desc.value);
-  rv.name = name;
+  rv.name = name.toString();
 
   let flags = 0;
   if (desc.writable) {
@@ -1168,6 +1194,10 @@ function createProtocolPropertyDescriptor(name, desc) {
   }
   if (desc.set) {
     rv.set = getObjectId(desc.set);
+  }
+
+  if (typeof name == "symbol") {
+    rv.isSymbol = true;
   }
 
   return rv;
@@ -1338,7 +1368,7 @@ function propertyNames(object) {
     return [];
   }
   try {
-    return object.getOwnPropertyNames();
+    return [...object.getOwnPropertyNames(), ...object.getOwnPropertySymbols()];
   } catch (e) {
     return [];
   }
@@ -1985,7 +2015,7 @@ function CSS_getAppliedRules({ node }) {
 
 function CSS_getComputedStyle({ node }) {
   const nodeObj = getObjectFromId(node).unsafeDereference();
-  if (nodeObj.nodeType != Node.ELEMENT_NODE) {
+  if (nodeObj.nodeType != Node.ELEMENT_NODE || !nodeObj.ownerGlobal) {
     return { computedStyle: [] };
   }
 
@@ -2130,6 +2160,12 @@ StackingContext.prototype = {
       const { left, top } = elem.raw.getBoundingClientRect();
       this.addContext(elem, left, top);
       elem.context.addChildren(elem.raw.contentWindow.document);
+    }
+
+    if (!elem.style) {
+      this.addNonPositionedElement(elem);
+      this.addChildren(elem.raw);
+      return;
     }
 
     if (elem.style.getPropertyValue("position") != "static") {

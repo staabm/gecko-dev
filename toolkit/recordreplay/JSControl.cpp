@@ -270,11 +270,7 @@ MOZ_EXPORT void RecordReplayInterface_ReportUnsupportedFeature(const char* aFeat
 
 static bool IsRecordingUnusable() {
   if (IsRecording()) {
-    char* reason = gGetUnusableRecordingReason();
-    if (reason) {
-      free(reason);
-      return true;
-    }
+    return gGetUnusableRecordingReason() != nullptr;
   }
   return false;
 }
@@ -401,6 +397,25 @@ static bool Method_Log(JSContext* aCx, unsigned aArgc, Value* aVp) {
   }
 
   PrintLog("%s", cstr.get());
+
+  args.rval().setUndefined();
+  return true;
+}
+
+static bool Method_RecordReplayAssert(JSContext* aCx, unsigned aArgc, Value* aVp) {
+  CallArgs args = CallArgsFromVp(aArgc, aVp);
+
+  RootedString str(aCx, ToString(aCx, args.get(0)));
+  if (!str) {
+    return false;
+  }
+
+  JS::UniqueChars cstr = JS_EncodeStringToLatin1(aCx, str);
+  if (!cstr) {
+    return false;
+  }
+
+  RecordReplayAssert("%s", cstr.get());
 
   args.rval().setUndefined();
   return true;
@@ -733,6 +748,7 @@ static bool Method_RecordingOperations(JSContext* aCx, unsigned aArgc, Value* aV
 
 static const JSFunctionSpec gRecordReplayMethods[] = {
   JS_FN("log", Method_Log, 1, 0),
+  JS_FN("recordReplayAssert", Method_RecordReplayAssert, 1, 0),
   JS_FN("onNewSource", Method_OnNewSource, 3, 0),
   JS_FN("areThreadEventsDisallowed", Method_AreThreadEventsDisallowed, 0, 0),
   JS_FN("shouldUpdateProgressCounter", Method_ShouldUpdateProgressCounter, 1, 0),

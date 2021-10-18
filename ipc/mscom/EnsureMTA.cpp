@@ -63,6 +63,8 @@ RefPtr<EnsureMTA::CreateInstanceAgileRefPromise>
 EnsureMTA::CreateInstanceInternal(REFCLSID aClsid, REFIID aIid) {
   MOZ_ASSERT(IsCurrentThreadExplicitMTA());
 
+  recordreplay::Diagnostic("EnsureMTA::CreateInstanceInternal");
+
   RefPtr<IUnknown> iface;
   HRESULT hr = ::CoCreateInstance(aClsid, nullptr, CLSCTX_INPROC_SERVER, aIid,
                                   getter_AddRefs(iface));

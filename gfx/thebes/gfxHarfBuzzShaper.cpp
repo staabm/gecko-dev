@@ -1360,6 +1360,14 @@ bool gfxHarfBuzzShaper::ShapeText(DrawTarget* aDrawTarget,
                                   gfxShapedText* aShapedText) {
   mUseVerticalPresentationForms = false;
 
+  std::string str;
+  for (uint32_t i = 0; i < aLength; i++) {
+    char buf[50];
+    snprintf(buf, sizeof(buf), " %u", aText[i]);
+    str += buf;
+  }
+  recordreplay::RecordReplayAssert("gfxHarfBuzzShaper::ShapeText %s", str.c_str());
+
   if (!Initialize()) {
     return false;
   }

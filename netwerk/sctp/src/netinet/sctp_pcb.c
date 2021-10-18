@@ -76,10 +76,6 @@ __FBSDID("$FreeBSD: head/sys/netinet/sctp_pcb.c 362497 2020-06-22 14:01:31Z mark
 #endif
 #endif
 
-#ifndef _WIN32
-extern void RecordReplayAddOrderedPthreadMutexFromC(const char* aName, pthread_mutex_t* aMutex);
-#endif
-
 #if !defined(__FreeBSD__) || defined(__Userspace__)
 struct sctp_base_info system_base_info;
 

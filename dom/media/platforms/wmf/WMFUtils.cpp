@@ -230,6 +230,7 @@ LoadDLLs() {
 HRESULT
 MFStartup() {
   recordreplay::RecordReplayAssert("wmf::MFStartup");
+  recordreplay::Diagnostic("wmf::MFStartup");
 
   if (IsWin7AndPre2000Compatible()) {
     /*
@@ -261,6 +262,7 @@ MFStartup() {
 HRESULT
 MFShutdown() {
   recordreplay::RecordReplayAssert("wmf::MFShutdown");
+  recordreplay::Diagnostic("wmf::MFShutdown");
   ENSURE_FUNCTION_PTR(MFShutdown, Mfplat.dll)
   HRESULT hr = E_FAIL;
   mozilla::mscom::EnsureMTA([&]() -> void { hr = (MFShutdownPtr)(); });

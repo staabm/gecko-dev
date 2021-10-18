@@ -211,11 +211,21 @@ const Channel::ChannelId Channel::ChannelImpl::PipeName(
   return ss.str();
 }
 
+static std::string WideStringToCString(const std::wstring& wstr) {
+  std::string rv;
+  for (int i = 0; i < wstr.length(); i++) {
+    rv += (char)wstr[i];
+  }
+  return rv;
+}
+
 bool Channel::ChannelImpl::CreatePipe(const ChannelId& channel_id, Mode mode) {
   DCHECK(pipe_ == INVALID_HANDLE_VALUE);
   const ChannelId pipe_name = PipeName(channel_id, &shared_secret_);
   if (mode == MODE_SERVER) {
     waiting_for_shared_secret_ = !!shared_secret_;
+    mozilla::recordreplay::RecordReplayAssert("Channel::ChannelImpl::CreatePipe %s",
+                                              WideStringToCString(pipe_name).c_str());
     pipe_ = CreateNamedPipeW(pipe_name.c_str(),
                              PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED |
                                  FILE_FLAG_FIRST_PIPE_INSTANCE,
@@ -656,7 +666,9 @@ Channel::ChannelId Channel::GenerateVerifiedChannelID() {
   do {  // Guarantee we get a non-zero value.
     secret = base::RandInt(0, std::numeric_limits<int>::max());
   } while (secret == 0);
-  return StringPrintf(L"%d.%u.%d\\%d", base::GetCurrentProcId(), g_last_id++,
+  return StringPrintf(L"%d.%u.%d\\%d", base::GetCurrentProcId(),
+                      mozilla::recordreplay::RecordReplayValue("Channel::GenerateVerifiedChannelID",
+                                                               g_last_id++),
                       base::RandInt(0, std::numeric_limits<int32_t>::max()),
                       secret);
 }
