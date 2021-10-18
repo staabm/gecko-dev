@@ -78,6 +78,7 @@ class CompileRuntime {
   const void* addressOfJitStackLimit();
   const void* addressOfInterruptBits();
   const void* addressOfZone();
+  bool hasParentRuntime();
 
 #ifdef DEBUG
   const void* addressOfIonBailAfterCounter();

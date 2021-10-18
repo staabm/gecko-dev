@@ -111,6 +111,7 @@ static void (*gProcessRecording)();
 static void (*gSetCrashReasonCallback)(const char* (*aCallback)());
 static void (*gInvalidateRecording)(const char* aFormat, ...);
 static void (*gSetCrashNote)(const char* aNote);
+static void (*gNotifyActivity)();
 
 #ifndef XP_WIN
 static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
@@ -367,6 +368,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol("RecordReplaySetCrashReasonCallback", gSetCrashReasonCallback);
   LoadSymbol("RecordReplayInvalidateRecording", gInvalidateRecording);
   LoadSymbol("RecordReplaySetCrashNote", gSetCrashNote, /* aOptional */ true);
+  LoadSymbol("RecordReplayNotifyActivity", gNotifyActivity);
 
   if (apiKey) {
     gSetApiKey(apiKey->c_str());
@@ -500,6 +502,10 @@ MOZ_EXPORT void RecordReplayInterface_InternalAssertScriptedCaller(const char* a
   } else {
     RecordReplayAssert("%s NoScriptedCaller", aWhy);
   }
+}
+
+MOZ_EXPORT void RecordReplayInterface_InternalNotifyActivity() {
+  gNotifyActivity();
 }
 
 MOZ_EXPORT void RecordReplayInterface_ExecutionProgressHook(unsigned aSourceId, const char* aFilename, unsigned aLineno,

@@ -99,7 +99,8 @@ namespace recordreplay {
   Macro(AdvanceExecutionProgressCounter, (), ())                               \
   Macro(SetExecutionProgressCallback, (void (*aCallback)(uint64_t)), (aCallback)) \
   Macro(ExecutionProgressReached, (), ())                                      \
-  Macro(InternalAssertScriptedCaller, (const char* aWhy), (aWhy))
+  Macro(InternalAssertScriptedCaller, (const char* aWhy), (aWhy))              \
+  Macro(InternalNotifyActivity, (), ())
 // clang-format on
 
 #define DECLARE_SYMBOL(aName, aReturnType, aFormals, _) \

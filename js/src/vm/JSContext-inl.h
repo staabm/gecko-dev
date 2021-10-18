@@ -300,6 +300,14 @@ inline bool CallJSDeletePropertyOp(JSContext* cx, JSDeletePropertyOp op,
 
 MOZ_ALWAYS_INLINE bool CheckForInterrupt(JSContext* cx) {
   MOZ_ASSERT(!cx->isExceptionPending());
+
+  if (mozilla::recordreplay::IsRecordingOrReplaying() &&
+      cx->runtime()->parentRuntime) {
+    // Let the record/replay driver know when a long-running operation might be
+    // taking place while running off the main thread.
+    mozilla::recordreplay::NotifyActivity();
+  }
+
   // Add an inline fast-path since we have to check for interrupts in some hot
   // C++ loops of library builtins.
   if (MOZ_UNLIKELY(cx->hasAnyPendingInterrupt())) {
