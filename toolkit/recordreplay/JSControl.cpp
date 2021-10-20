@@ -812,6 +812,8 @@ static void ClearPauseDataCallback() {
   AutoSafeJSContext cx;
   JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
 
+  recordreplay::Diagnostic("ClearPauseData %d", JS_IsExceptionPending(cx));
+
   JS::RootedValueArray<0> args(cx);
 
   RootedValue rv(cx);
