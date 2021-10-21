@@ -200,9 +200,15 @@ static DriverHandle OpenDriverHandle() {
     snprintf(filename, sizeof(filename), "%s/recordreplay.so-XXXXXX", tmpdir);
     int fd = mkstemp(filename);
 #else
-    snprintf(filename, sizeof(filename), "%s\\recordreplay.dll-XXXXXX", tmpdir);
-    _mktemp(filename);
-    int fd = _open(filename, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY);
+    int fd;
+    for (int i = 0; i < 10; i++) {
+      snprintf(filename, sizeof(filename), "%s\\recordreplay.dll-XXXXXX", tmpdir);
+      _mktemp(filename);
+      fd = _open(filename, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY);
+      if (fd >= 0) {
+        break;
+      }
+    }
     #define write _write
     #define close _close
 #endif
