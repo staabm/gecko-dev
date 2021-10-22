@@ -1249,15 +1249,15 @@ void SdpOptionsAttribute::Load(const std::string& value) {
 }
 
 void SdpFlagAttribute::Serialize(std::ostream& os) const {
-  os << "a=" << mType << CRLF;
+  os << "a=" << NumberToStringRecordReplayWorkaroundForWindows(mType) << CRLF;
 }
 
 void SdpStringAttribute::Serialize(std::ostream& os) const {
-  os << "a=" << mType << ":" << mValue << CRLF;
+  os << "a=" << NumberToStringRecordReplayWorkaroundForWindows(mType) << ":" << mValue << CRLF;
 }
 
 void SdpNumberAttribute::Serialize(std::ostream& os) const {
-  os << "a=" << mType << ":" << mValue << CRLF;
+  os << "a=" << NumberToStringRecordReplayWorkaroundForWindows(mType) << ":" << NumberToStringRecordReplayWorkaroundForWindows(mValue) << CRLF;
 }
 
 bool SdpAttribute::IsAllowedAtMediaLevel(AttributeType type) {
