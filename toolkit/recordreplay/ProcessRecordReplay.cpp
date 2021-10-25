@@ -160,20 +160,9 @@ static void ConfigureGecko() {
 #endif
 }
 
-static const char* GetPlatformKind() {
-#if defined(XP_MACOSX)
-  return "macOS";
-#elif defined(XP_LINUX)
-  return "linux";
-#elif defined(XP_WIN)
-  return "windows";
-#else
-  return "unknown";
-#endif
-}
-
 extern char gRecordReplayDriver[];
 extern int gRecordReplayDriverSize;
+extern char gBuildId[];
 
 static const char* GetTempDirectory() {
 #ifndef XP_WIN
@@ -387,9 +376,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol("RecordReplayAddOrderedSRWLock", gAddOrderedSRWLock);
 #endif
 
-  char buildId[128];
-  snprintf(buildId, sizeof(buildId), "%s-gecko-%s", GetPlatformKind(), PlatformBuildID());
-  gAttach(*dispatchAddress, buildId);
+  gAttach(*dispatchAddress, gBuildId);
 
   if (TestEnv("RECORD_ALL_CONTENT")) {
     gRecordAllContent = true;
