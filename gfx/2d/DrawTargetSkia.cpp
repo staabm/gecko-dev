@@ -289,8 +289,7 @@ static sk_sp<SkImage> GetSkImageForSurface(SourceSurface* aSurface,
     return nullptr;
   }
 
-  RecordReplayPrintDataSurfaceDiagnostics("Diverged GetSkImageForSurface #2",
-                                          static_cast<SourceSurfaceSkia*>(aSurface));
+  RecordReplayPrintDataSurfaceDiagnostics("Diverged GetSkImageForSurface #2", surf);
 
   // Skia doesn't support RGBX surfaces so ensure that the alpha value is opaque
   // white.
