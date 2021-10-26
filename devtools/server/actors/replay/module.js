@@ -2303,7 +2303,7 @@ function DOM_getAllBoundingClientRects() {
       if (left >= right || top >= bottom) {
         return null;
       }
-      return {
+      const v = {
         node: id,
         rect: [
           elem.left + left,
@@ -2312,6 +2312,13 @@ function DOM_getAllBoundingClientRects() {
           elem.top + bottom,
         ],
       };
+      if (elem.style?.getPropertyValue("visibility") === "hidden") {
+        v.visibility = "hidden";
+      }
+      if (elem.style?.getPropertyValue("pointer-events") === "none") {
+        v.pointerEvents = "none";
+      }
+      return v;
     })
     .filter((v) => !!v);
 
