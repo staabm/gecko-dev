@@ -238,6 +238,10 @@ const { toggleRecording } = ChromeUtils.import(
   "resource://devtools/server/actors/replay/connection.js"
 );
 
+const { pingTelemetry } = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/telemetry.js"
+);
+
 // [Replay] - Mapping of replay: URL scheme values to destinations. Can either
 // be a URL or a function which invokes arbitrary browser-chrome functionality
 const replaySchemeMap = {
@@ -255,6 +259,8 @@ const replaySchemeMap = {
 
     if (!target) return;
 
+    pingTelemetry("replay:record", "start", { url: target, newtab });
+
     const browser = browsingContext.topFrameElement;
     const tabbrowser = browser.getTabBrowser();
     if (newtab) {
@@ -270,8 +276,44 @@ const replaySchemeMap = {
       });
     }
 
-    new Promise(resolve => setTimeout(resolve, 500)).then(() => {
+    Promise.race([
+      new Promise((_, reject) => setTimeout(() => reject({message: "Timed out waiting to start recording"}), 30000)),
+      new Promise((resolve, reject) => {
+        let started = false;
+        const listener = {
+          onStateChange(_a, _b, status) {
+            try {
+              // Useful for debugging status
+              // Object.keys(Ci.nsIWebProgressListener).forEach(k => {
+              //   args[2] & Ci.nsIWebProgressListener[k] && console.log(k, args[2] & Ci.nsIWebProgressListener[k]);
+              // });
+              if (!started && status & Ci.nsIWebProgressListener.STATE_IS_DOCUMENT && status & Ci.nsIWebProgressListener.STATE_START) {
+                started = true;
+              } else if (started && status & Ci.nsIWebProgressListener.STATE_IS_WINDOW && status & Ci.nsIWebProgressListener.STATE_STOP) {
+                tabbrowser.removeProgressListener(listener);
+                resolve();
+              }
+            } catch (e) {
+              reject(e);
+              tabbrowser.removeProgressListener(listener);
+            }
+          },
+          QueryInterface: ChromeUtils.generateQI([
+            "nsIWebProgressListener2",
+            "nsIWebProgressListener",
+            "nsISupportsWeakReference",
+          ]),
+        }
+        tabbrowser.addProgressListener(listener)
+      })
+    ]).then(() => {
+      pingTelemetry("replay:record", "record", { url: target, newtab });
       toggleRecording(browser.ownerDocument.defaultView.gBrowser.selectedBrowser);
+    }).catch((e) => {
+      pingTelemetry("replay:record", "error", { url: target, newtab, message: e.message });
+      tabbrowser.loadURI(`https://app.replay.io/browser/error?message=Failed to launch recorder: (${e.message})`, {
+        triggeringPrincipal: principal
+      });
     });
   }
 };
@@ -280,6 +322,7 @@ function mayRedirectToReplayBrowser (aURI, aPrincipal, aBrowsingContext) {
   if (aURI.scheme.toLowerCase() === 'replay') {
     const newUrl = replaySchemeMap[aURI.filePath];
     
+    pingTelemetry(`${aURI.scheme}:${aURI.filePath}`, "init", {handler: !!newUrl});
     if (newUrl) {
       if (typeof newUrl === 'function') {
         newUrl(aURI, aPrincipal, aBrowsingContext);
