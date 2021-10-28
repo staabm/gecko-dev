@@ -61,6 +61,15 @@ void AxisPhysicsModel::SetPosition(double aPosition) {
 }
 
 void AxisPhysicsModel::Simulate(const TimeDuration& aDeltaTime) {
+  // If we try to repaint after diverging from the recording, the delta time
+  // isn't particularly meaningful, and may be extremely large if we're
+  // comparing the time the recording was created with the current time.
+  // This can lead to a hang while repainting, so don't do any simulation in
+  // this case.
+  if (recordreplay::HasDivergedFromRecording()) {
+    return;
+  }
+
   for (mProgress += aDeltaTime.ToSeconds() / kFixedTimestep; mProgress > 1.0;
        mProgress -= 1.0) {
     Integrate(kFixedTimestep);
