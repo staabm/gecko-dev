@@ -2431,7 +2431,7 @@ SourceMediaTrack::SourceMediaTrack(MediaSegment::Type aType,
                  aType == MediaSegment::AUDIO
                      ? static_cast<MediaSegment*>(new AudioSegment())
                      : static_cast<MediaSegment*>(new VideoSegment())),
-      mMutex("mozilla::media::SourceMediaTrack") {
+      mMutex("mozilla::media::SourceMediaTrack", /* aOrdered */ true) {
   mUpdateTrack = MakeUnique<TrackData>();
   mUpdateTrack->mInputRate = aSampleRate;
   mUpdateTrack->mResamplerChannelCount = 0;
