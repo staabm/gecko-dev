@@ -301,7 +301,7 @@ BlobURLInputStream::BlobURLInputStream(BlobURLChannel* const aChannel,
                                        nsACString& aBlobURLSpec)
     : mChannel(aChannel),
       mBlobURLSpec(std::move(aBlobURLSpec)),
-      mStateMachineMutex("BlobURLInputStream::mStateMachineMutex"),
+      mStateMachineMutex("BlobURLInputStream::mStateMachineMutex", /* aOrdered */ true),
       mState(State::INITIAL),
       mError(NS_OK),
       mBlobSize(-1),
