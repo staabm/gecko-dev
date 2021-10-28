@@ -369,6 +369,8 @@ DataChannelConnection::~DataChannelConnection() {
 }
 
 void DataChannelConnection::Destroy() {
+  recordreplay::RecordReplayAssert("DataChannelConnection::Destroy");
+
   // Though it's probably ok to do this and close the sockets;
   // if we really want it to do true clean shutdowns it can
   // create a dependant Internal object that would remain around
@@ -406,6 +408,8 @@ void DataChannelConnection::Destroy() {
 
 void DataChannelConnection::DestroyOnSTS(struct socket* aMasterSocket,
                                          struct socket* aSocket) {
+  recordreplay::RecordReplayAssert("DataChannelConnection::DestroyOnSTS Start");
+
   if (aSocket && aSocket != aMasterSocket) usrsctp_close(aSocket);
   if (aMasterSocket) usrsctp_close(aMasterSocket);
 
@@ -421,6 +425,8 @@ void DataChannelConnection::DestroyOnSTS(struct socket* aMasterSocket,
   GetMainThreadEventTarget()->Dispatch(NS_NewRunnableFunction(
       "DataChannelConnection::Destroy",
       [id = mId]() { DataChannelRegistry::Deregister(id); }));
+
+  recordreplay::RecordReplayAssert("DataChannelConnection::DestroyOnSTS Done");
 }
 
 Maybe<RefPtr<DataChannelConnection>> DataChannelConnection::Create(
