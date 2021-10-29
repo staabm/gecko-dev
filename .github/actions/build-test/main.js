@@ -62,7 +62,7 @@ function sendBuildTestRequest(contents) {
     () => {}
   );
   request.on("error", e => {
-    console.log(`Error contacting build/test server: ${e}`);
+    throw new Error(`Error contacting build/test server: ${e}`);
   });
   request.write(text);
   request.end();
