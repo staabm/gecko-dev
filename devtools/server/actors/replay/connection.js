@@ -778,6 +778,17 @@ function handleRecordingStarted(pmm) {
     // Log the reason so we can see in our CI logs when something went wrong.
     console.error("Unstable recording: " + data.why);
     const browser = getBrowser();
+
+    // Sometimes, an unusable recording causes the browser to be cleaned
+    // up before this point.  Check for this and emit a clear telemetry
+    // event instead of an internal crash (getRecordingKey failing).
+    if (!browser) {
+      pingTelemetry("recording", "unusable-browser-died", data);
+      // Log the reason so we can see in our CI logs when something went wrong.
+      console.error("Browser was destroyed before 'unusable' handler ran.");
+      return;
+    }
+
     hideUnsupportedFeatureNotification(browser);
 
     const url = getViewURL('/browser/error');
