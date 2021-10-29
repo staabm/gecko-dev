@@ -5,6 +5,8 @@ const { spawnSync } = require("child_process");
 const gecko = `${__dirname}/../../..`;
 const revision = getLatestRevision();
 
+console.log("SendRequest", process.env.BUILD_TEST_HOSTNAME, process.env.BUILD_TEST_PORT, process.env.BUILD_TEST_INSECURE);
+
 sendBuildTestRequest({
   name: `Gecko Build/Test ${revision}`,
   tasks: [
