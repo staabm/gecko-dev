@@ -1,3 +1,6 @@
+const http = require("http");
+const https = require("https");
+const { spawnSync } = require("child_process");
 
 const gecko = `${__dirname}/../../..`;
 const revision = getLatestRevision();
@@ -39,10 +42,10 @@ function getLatestRevision() {
 function sendBuildTestRequest(contents) {
   const text = JSON.stringify(contents);
 
-  const headers {
+  const headers = {
     "Content-Type": "application/json",
     "Content-Length": text.length,
-    Authorization: AuthorizationKey,
+    Authorization: process.env.BUILD_TEST_AUTHORIZATION,
   };
 
   // Allow overriding the build/test connection info for testing.
@@ -63,4 +66,18 @@ function sendBuildTestRequest(contents) {
   });
   request.write(text);
   request.end();
+}
+
+function spawnChecked(cmd, args, options) {
+  const prettyCmd = [cmd].concat(args).join(" ");
+  console.error(prettyCmd);
+
+  const rv = spawnSync(cmd, args, options);
+
+  if (rv.status != 0 || rv.error) {
+    console.error(rv.error);
+    throw new Error(`Spawned process failed with exit code ${rv.status}`);
+  }
+
+  return rv;
 }
