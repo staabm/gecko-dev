@@ -662,6 +662,9 @@ PRIntervalTime nsSocketTransportService::PollTimeout(PRIntervalTime now) {
 
 int32_t nsSocketTransportService::Poll(TimeDuration* pollDuration,
                                        PRIntervalTime ts) {
+  recordreplay::RecordReplayAssert("nsSocketTransportService::Poll");
+  recordreplay::Diagnostic("nsSocketTransportService::Poll");
+
   MOZ_ASSERT(IsOnCurrentThread());
   PRPollDesc* pollList;
   uint32_t pollCount;

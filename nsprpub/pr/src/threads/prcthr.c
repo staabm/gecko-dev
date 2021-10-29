@@ -62,6 +62,13 @@ PR_IMPLEMENT(PRStatus) PR_Yield()
 */
 PR_IMPLEMENT(PRStatus) PR_Sleep(PRIntervalTime timeout)
 {
+    if (timeout == PR_INTERVAL_NO_WAIT) {
+      Sleep(0);
+    } else {
+      Sleep(PR_IntervalToMilliseconds(timeout));
+    }
+    return PR_SUCCESS;
+#if 0
     PRStatus rv = PR_SUCCESS;
 
     if (!_pr_initialized) {
@@ -131,6 +138,7 @@ PR_IMPLEMENT(PRStatus) PR_Sleep(PRIntervalTime timeout)
         PR_DestroyCondVar(cv);
     }
     return rv;
+#endif
 }
 
 PR_IMPLEMENT(PRUint32) PR_GetThreadID(PRThread *thread)
