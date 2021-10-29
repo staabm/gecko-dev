@@ -779,6 +779,18 @@ function handleRecordingStarted(pmm) {
     console.error("Unstable recording: " + data.why);
     const browser = getBrowser();
 
+    // Sometimes, an unusable recording causes the browser to be cleaned
+    // up before this point.  Check for this and emit a clear telemetry
+    // event instead of an internal crash (getRecordingKey failing).
+    if (!browser) {
+      pingTelemetry("recording", "unusable-browser-died", data);
+      // Log the reason so we can see in our CI logs when something went wrong.
+      console.error("Browser was destroyed before 'unusable' handler ran.");
+      return;
+    }
+
+    hideUnsupportedFeatureNotification(browser);
+
     const url = getViewURL('/browser/error');
     url.searchParams.set("message", data.why);
     setRecordingFinished(browser, url.toString());
@@ -793,6 +805,8 @@ function handleRecordingStarted(pmm) {
     try {
       const browser = getBrowser();
       let url;
+
+      hideUnsupportedFeatureNotification(browser);
 
       // When the submitTestRecordings pref is set we don't load the viewer,
       // but show a simple page that the recording was submitted, to make things
@@ -835,10 +849,7 @@ function handleRecordingStarted(pmm) {
 }
 
 function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
-  // FIXME how do we get from the browser to the associated window?
-  const window = Services.wm.getMostRecentWindow("navigator:browser");
-
-  const notificationBox = window.gHighPriorityNotificationBox;
+  const notificationBox = browser.ownerGlobal.gHighPriorityNotificationBox;
   let notification = notificationBox.getNotificationWithValue(
     "unsupported-feature"
   );
@@ -860,6 +871,17 @@ function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
       }
     }],
   );
+}
+
+function hideUnsupportedFeatureNotification(browser) {
+  const notificationBox = browser.ownerGlobal.gHighPriorityNotificationBox;
+  const notification = notificationBox.getNotificationWithValue(
+    "unsupported-feature"
+  );
+
+  if (notification) {
+    notificationBox.removeNotification(notification)
+  }
 }
 
 function uploadSourceMap(
