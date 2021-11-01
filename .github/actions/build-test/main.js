@@ -68,6 +68,7 @@ function sendBuildTestRequest(contents) {
     response => {
       response.on("end", () => {
         console.log(`RequestFinished Code ${response.statusCode}`);
+        process.exit(response.statusCode == 200 ? 0 : 1);
       });
     }
   );
@@ -76,6 +77,11 @@ function sendBuildTestRequest(contents) {
   });
   request.write(text);
   request.end();
+
+  setTimeout(() => {
+    console.log("Timed out waiting for build/test server response");
+    process.exit(1);
+  }, 30000);
 }
 
 function spawnChecked(cmd, args, options) {
