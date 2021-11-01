@@ -65,7 +65,11 @@ function sendBuildTestRequest(contents) {
 
   const request = (process.env.BUILD_TEST_INSECURE ? http : https).request(
     options,
-    () => {}
+    response => {
+      response.on("end", () => {
+        console.log(`RequestFinished Code ${response.statusCode}`);
+      });
+    }
   );
   request.on("error", e => {
     throw new Error(`Error contacting build/test server: ${e}`);
