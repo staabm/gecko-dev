@@ -1,15 +1,12 @@
-const http = require("http");
-const https = require("https");
-const { spawnSync } = require("child_process");
 
 const {
   getLatestReplayRevision,
+  getLatestPlaywrightRevision,
   sendBuildTestRequest,
   spawnChecked,
   newTask,
 } = require("../utils");
 
-const gecko = `${__dirname}/../../..`;
 const replayRevision = getLatestReplayRevision();
 const playwrightRevision = getLatestPlaywrightRevision();
 
