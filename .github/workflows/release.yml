@@ -6,9 +6,14 @@ jobs:
   release:
     name: Trigger release run
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: replay-playwright
+      - uses: actions/checkout@v2
+        with:
+          ref: webreplay-release
       - uses: ./.github/actions/release
         env:
           BUILD_TEST_AUTHORIZATION: ${{ secrets.BUILD_TEST_AUTHORIZATION }}
