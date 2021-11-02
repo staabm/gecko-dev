@@ -749,7 +749,9 @@ nsresult GfxInfo::Init() {
   // end up being swapped.  Actually enumerate the adapters that come
   // back from the DXGI factory to check, and tag the second as active
   // if found.
-  if (mHasDualGPU) {
+  // For now we skip this when recording/replaying, because the GPU won't be
+  // used and because calling CreateDXGIFactory isn't supported yet.
+  if (mHasDualGPU && !recordreplay::IsRecordingOrReplaying()) {
     nsModuleHandle dxgiModule(LoadLibrarySystem32(L"dxgi.dll"));
     decltype(CreateDXGIFactory)* createDXGIFactory =
         (decltype(CreateDXGIFactory)*)GetProcAddress(dxgiModule,

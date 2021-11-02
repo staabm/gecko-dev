@@ -826,6 +826,8 @@ static void FrameRatePrefChanged(const char* aPref, void*) {
 }
 
 void gfxPlatform::Init() {
+  recordreplay::Diagnostic("gfxPlatform::Init");
+
   MOZ_RELEASE_ASSERT(!XRE_IsGPUProcess(), "GFX: Not allowed in GPU process.");
   MOZ_RELEASE_ASSERT(!XRE_IsRDDProcess(), "GFX: Not allowed in RDD process.");
   MOZ_RELEASE_ASSERT(NS_IsMainThread(), "GFX: Not in main thread.");
@@ -946,6 +948,8 @@ void gfxPlatform::Init() {
   gPlatform->PopulateScreenInfo();
   gPlatform->InitAcceleration();
   gPlatform->InitWebRenderConfig();
+
+  recordreplay::Diagnostic("gfxPlatform::Init #1");
 
   gPlatform->InitWebGLConfig();
   gPlatform->InitWebGPUConfig();
@@ -2502,8 +2506,11 @@ void gfxPlatform::UpdateForceSubpixelAAWherePossible() {
 
 void gfxPlatform::InitAcceleration() {
   if (sLayersAccelerationPrefsInitialized) {
+    recordreplay::Diagnostic("gfxPlatform::InitAcceleration EarlyReturn");
     return;
   }
+
+  recordreplay::Diagnostic("gfxPlatform::InitAcceleration Start");
 
   InitCompositorAccelerationPrefs();
 
@@ -2614,6 +2621,7 @@ void gfxPlatform::InitGPUProcessPrefs() {
 }
 
 void gfxPlatform::InitCompositorAccelerationPrefs() {
+  recordreplay::Diagnostic("gfxPlatform::InitCompositorAccelerationPrefs");
   const char* acceleratedEnv = PR_GetEnv("MOZ_ACCELERATED");
 
   FeatureState& feature = gfxConfig::GetFeature(Feature::HW_COMPOSITING);
@@ -2650,10 +2658,22 @@ void gfxPlatform::InitCompositorAccelerationPrefs() {
                          "Acceleration blocked by headless mode",
                          "FEATURE_FAILURE_COMP_HEADLESSMODE"_ns);
   }
-  if (recordreplay::IsRecordingOrReplaying()) {
+
+  // Hardware compositing isn't supported when recording/replaying. On windows we
+  // universally disable compositing as otherwise our disable below will be
+  // overwritten later during initialization.
+#ifndef XP_WIN
+  if (recordreplay::IsRecordingOrReplaying())
+#endif
+  {
+    recordreplay::Diagnostic("gfxPlatform::InitCompositorAccelerationPrefs DISABLE");
     feature.ForceDisable(
         FeatureStatus::Blocked, "Acceleration blocked by recording/replaying",
         "FEATURE_FAILURE_COMP_RECORDREPLAY"_ns);
+  }
+
+  if (!gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
+    recordreplay::Diagnostic("gfxPlatform::InitCompositorAccelerationPrefs Done DISABLED");
   }
 }
 
@@ -3433,6 +3453,12 @@ void gfxPlatform::ImportContentDeviceData(
   const DevicePrefs& prefs = aData.prefs();
   gfxConfig::Inherit(Feature::HW_COMPOSITING, prefs.hwCompositing());
   gfxConfig::Inherit(Feature::OPENGL_COMPOSITING, prefs.oglCompositing());
+
+  if (gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
+    recordreplay::Diagnostic("gfxPlatform::ImportContentDeviceData ENABLED");
+  } else {
+    recordreplay::Diagnostic("gfxPlatform::ImportContentDeviceData DISABLED");
+  }
 }
 
 void gfxPlatform::BuildContentDeviceData(

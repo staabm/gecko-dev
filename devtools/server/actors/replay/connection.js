@@ -287,7 +287,14 @@ class CommandError extends Error {
 const gRecordingCreateWaiters = [];
 
 function isLoggedIn() {
-  return !!ReplayAuth.getReplayUserToken() || ReplayAuth.hasOriginalApiKey();
+  const token = ReplayAuth.getReplayUserToken();
+  if (token) {
+    const expiration = ReplayAuth.tokenExpiration(token);
+
+    return expiration && expiration > Date.now();
+  }
+
+  return !!ReplayAuth.hasOriginalApiKey();
 }
 
 async function saveRecordingToken(token) {
@@ -320,6 +327,7 @@ if (ReplayAuth.hasOriginalApiKey()) {
       return;
     }
 
+    const payload = ReplayAuth.tokenInfo(token);
     const expiration = ReplayAuth.tokenExpiration(token);
     if (typeof expiration !== "number") {
       ChromeUtils.recordReplayLog(`InvalidJWTExpiration`);
@@ -329,13 +337,14 @@ if (ReplayAuth.hasOriginalApiKey()) {
 
     const timeToExpiration = expiration - Date.now();
     if (timeToExpiration <= 0) {
+      pingTelemetry("browser", "auth-expired", {expiration, authId: payload.sub});
       clearUserToken();
       return;
     }
 
     gExpirationTimer = setTimeout(
       () => {
-        pingTelemetry("browser", "auth-expired");
+        pingTelemetry("browser", "auth-expired", {expiration, authId: payload.sub});
         clearUserToken();
       },
       timeToExpiration
@@ -770,6 +779,18 @@ function handleRecordingStarted(pmm) {
     console.error("Unstable recording: " + data.why);
     const browser = getBrowser();
 
+    // Sometimes, an unusable recording causes the browser to be cleaned
+    // up before this point.  Check for this and emit a clear telemetry
+    // event instead of an internal crash (getRecordingKey failing).
+    if (!browser) {
+      pingTelemetry("recording", "unusable-browser-died", data);
+      // Log the reason so we can see in our CI logs when something went wrong.
+      console.error("Browser was destroyed before 'unusable' handler ran.");
+      return;
+    }
+
+    hideUnsupportedFeatureNotification(browser);
+
     const url = getViewURL('/browser/error');
     url.searchParams.set("message", data.why);
     setRecordingFinished(browser, url.toString());
@@ -784,6 +805,8 @@ function handleRecordingStarted(pmm) {
     try {
       const browser = getBrowser();
       let url;
+
+      hideUnsupportedFeatureNotification(browser);
 
       // When the submitTestRecordings pref is set we don't load the viewer,
       // but show a simple page that the recording was submitted, to make things
@@ -826,10 +849,7 @@ function handleRecordingStarted(pmm) {
 }
 
 function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
-  // FIXME how do we get from the browser to the associated window?
-  const window = Services.wm.getMostRecentWindow("navigator:browser");
-
-  const notificationBox = window.gHighPriorityNotificationBox;
+  const notificationBox = browser.getTabBrowser().getNotificationBox(browser);
   let notification = notificationBox.getNotificationWithValue(
     "unsupported-feature"
   );
@@ -851,6 +871,17 @@ function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
       }
     }],
   );
+}
+
+function hideUnsupportedFeatureNotification(browser) {
+  const notificationBox = browser.getTabBrowser().getNotificationBox(browser);
+  const notification = notificationBox.getNotificationWithValue(
+    "unsupported-feature"
+  );
+
+  if (notification) {
+    notificationBox.removeNotification(notification)
+  }
 }
 
 function uploadSourceMap(

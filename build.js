@@ -1,16 +1,21 @@
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const gecko = __dirname;
 
-// Download the latest record/replay driver.
+// Download the latest record/replay driver archive.
+const driverArchive = `${currentPlatform()}-recordreplay.tgz`;
 const driverFile = `${currentPlatform()}-recordreplay.${driverExtension()}`;
-spawnChecked("curl", [`https://static.replay.io/downloads/${driverFile}`, "-o", driverFile], { stdio: "inherit" });
+const driverJSON = `${currentPlatform()}-recordreplay.json`;
+spawnChecked("curl", [`https://static.replay.io/downloads/${driverArchive}`, "-o", driverArchive], { stdio: "inherit" });
+spawnChecked("tar", ["xf", driverArchive]);
+fs.unlinkSync(driverArchive);
 
 // Embed the driver in the source.
 const driverContents = fs.readFileSync(driverFile);
+const { revision: driverRevision, date: driverDate } = JSON.parse(fs.readFileSync(driverJSON, "utf8"));
 fs.unlinkSync(driverFile);
+fs.unlinkSync(driverJSON);
 let driverString = "";
 for (let i = 0; i < driverContents.length; i++) {
   driverString += `\\${driverContents[i].toString(8)}`;
@@ -21,6 +26,7 @@ fs.writeFileSync(
 namespace mozilla::recordreplay {
   char gRecordReplayDriver[] = "${driverString}";
   int gRecordReplayDriverSize = ${driverContents.length};
+  char gBuildId[] = "${computeBuildId()}";
 }
   `
 );
@@ -73,4 +79,23 @@ function currentPlatform() {
 
 function driverExtension() {
   return currentPlatform() == "windows" ? "dll" : "so";
+}
+
+function computeBuildId() {
+  const geckoRevision = spawnChecked("git", ["rev-parse", "--short", "HEAD"]).stdout.toString().trim();
+  const geckoDate = spawnChecked("git", [
+    "show",
+    "HEAD",
+    "--pretty=%cd",
+    "--date=short",
+    "--no-patch",
+  ])
+    .stdout.toString()
+    .trim()
+    .replace(/-/g, "-");
+
+  // Use the later of the two dates in the build ID.
+  const date = +geckoDate >= +driverDate ? geckoDate : driverDate;
+
+  return `${currentPlatform()}-gecko-${date}-${geckoRevision}-${driverRevision}`;
 }

@@ -227,6 +227,7 @@ class nsThreadStartupEvent final : public Runnable {
   ~nsThreadStartupEvent() = default;
 
   NS_IMETHOD Run() override {
+    recordreplay::RecordReplayAssert("nsThreadStartupEvent::Run");
     ReentrantMonitorAutoEnter mon(mMon);
     mInitialized = true;
     mon.Notify();

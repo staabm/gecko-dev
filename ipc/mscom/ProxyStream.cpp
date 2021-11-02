@@ -86,6 +86,8 @@ ProxyStream::ProxyStream(REFIID aIID, const BYTE* aInitBuf,
   auto marshalFn = [this, &unmarshalResult, &aIID, aEnv]() -> void
 #endif  // defined(ACCESSIBILITY)
   {
+    recordreplay::Diagnostic("ProxyStream::ProxyStream marshalFn #1");
+
     if (aEnv) {
       bool pushOk = aEnv->Push();
       MOZ_DIAGNOSTIC_ASSERT(pushOk);
@@ -286,6 +288,8 @@ ProxyStream::ProxyStream(REFIID aIID, IUnknown* aObject, Environment* aEnv,
   auto marshalFn = [&aIID, aObject, mshlFlags, &stream, &streamSize, &hglobal,
                     &createStreamResult, &marshalResult, &statResult,
                     &getHGlobalResult, aEnv, &manifestPath]() -> void {
+    recordreplay::Diagnostic("ProxyStream::ProxyStream marshalFn #2");
+
     if (aEnv) {
       bool pushOk = aEnv->Push();
       MOZ_DIAGNOSTIC_ASSERT(pushOk);

@@ -614,7 +614,7 @@ void SdpHelper::AppendSdpParseErrors(
     std::string* aErrorString) {
   std::ostringstream os;
   for (auto i = aErrors.begin(); i != aErrors.end(); ++i) {
-    os << "SDP Parse Error on line " << i->first << ": " + i->second
+    os << "SDP Parse Error on line " << NumberToStringRecordReplayWorkaroundForWindows(i->first) << ": " + i->second
        << std::endl;
   }
   *aErrorString += os.str();

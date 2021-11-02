@@ -52,11 +52,15 @@ static std::bitset<128> GetForbiddenSdpPayloadTypes() {
   return forbidden;
 }
 
+// Workaround for problems using ostringstream with numbers when replaying on windows.
+std::string NumberToStringRecordReplayWorkaroundForWindows(uint64_t v) {
+  char buf[50];
+  snprintf(buf, sizeof(buf), "%llu", v);
+  return std::string(buf);
+}
+
 static std::string GetRandomHex(size_t words) {
-  // Note: For now avoid using ostringstream, to workaround problems replaying
-  // these calls on windows.
-  //std::ostringstream os;
-  std::string result;
+  std::ostringstream os;
 
   for (size_t i = 0; i < words; ++i) {
     uint32_t rand;
@@ -67,14 +71,15 @@ static std::string GetRandomHex(size_t words) {
       return "";
     }
 
+    // Note: For now avoid using ostringstream, to workaround problems replaying
+    // these calls on windows.
     char buf[50];
     snprintf(buf, sizeof(buf), "%08x", rand);
-    result += buf;
+    os << buf;
 
     //os << std::hex << std::setfill('0') << std::setw(8) << rand;
   }
-  return result;
-  //return os.str();
+  return os.str();
 }
 
 nsresult JsepSessionImpl::Init() {
@@ -449,7 +454,7 @@ std::string JsepSessionImpl::GetNewMid() {
 
   do {
     std::ostringstream osMid;
-    osMid << mMidCounter++;
+    osMid << NumberToStringRecordReplayWorkaroundForWindows(mMidCounter++);
     mid = osMid.str();
   } while (mUsedMids.count(mid));
 

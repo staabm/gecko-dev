@@ -77,6 +77,10 @@ const void* CompileRuntime::addressOfInterruptBits() {
   return runtime()->mainContextFromAnyThread()->addressOfInterruptBits();
 }
 
+bool CompileRuntime::hasParentRuntime() {
+  return runtime()->parentRuntime != nullptr;
+}
+
 const void* CompileRuntime::addressOfZone() {
   return runtime()->mainContextFromAnyThread()->addressOfZone();
 }

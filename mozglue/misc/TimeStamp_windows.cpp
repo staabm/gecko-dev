@@ -409,6 +409,9 @@ static bool HasStableTSC() {
   // Generic Timer", section D7, in the ARMARM for ARMv8.
   return true;
 #else
+  // Checks for a stable TSC can cause inconsistent behavior when replaying,
+  // so for now we disable these checks entirely by always treating the TSC as stable.
+  /*
   union {
     int regs[4];
     struct {
@@ -440,6 +443,7 @@ static bool HasStableTSC() {
   // if bit 8 is set than TSC will run at a constant rate
   // in all ACPI P-states, C-states and T-states
   return regs[3] & (1 << 8);
+  */
 #endif
 }
 

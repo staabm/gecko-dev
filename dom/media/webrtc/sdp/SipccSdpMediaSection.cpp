@@ -370,11 +370,11 @@ void SipccSdpMediaSection::AddDataChannel(const std::string& name,
 }
 
 void SipccSdpMediaSection::Serialize(std::ostream& os) const {
-  os << "m=" << mMediaType << " " << mPort;
+  os << "m=" << NumberToStringRecordReplayWorkaroundForWindows(mMediaType) << " " << NumberToStringRecordReplayWorkaroundForWindows(mPort);
   if (mPortCount) {
-    os << "/" << mPortCount;
+    os << "/" << NumberToStringRecordReplayWorkaroundForWindows(mPortCount);
   }
-  os << " " << mProtocol;
+  os << " " << NumberToStringRecordReplayWorkaroundForWindows(mProtocol);
   for (auto i = mFormats.begin(); i != mFormats.end(); ++i) {
     os << " " << (*i);
   }

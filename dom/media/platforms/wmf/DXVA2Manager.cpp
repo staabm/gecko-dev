@@ -724,6 +724,7 @@ D3D11DXVA2Manager::InitInternal(layers::KnowsCompositor* aKnowsCompositor,
   // The main thread (where this function is called) is STA, not MTA.
   RefPtr<MFTDecoder> mft;
   mozilla::mscom::EnsureMTA([&]() -> void {
+    recordreplay::Diagnostic("D3D11DXVA2Manager::InitInternal callback");
     mft = new MFTDecoder();
     hr = mft->Create(CLSID_VideoProcessorMFT);
 
@@ -913,7 +914,7 @@ D3D11DXVA2Manager::CopyToImage(IMFSample* aVideoSample,
       // Use MFT to do color conversion.
       hr = E_FAIL;
       mozilla::mscom::EnsureMTA(
-          [&]() -> void { hr = mTransform->Input(aVideoSample); });
+          [&]() -> void { recordreplay::Diagnostic("D3D11DXVA2Manager::CopyToImage callback #1"); hr = mTransform->Input(aVideoSample); });
       NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
       RefPtr<IMFSample> sample;
@@ -922,7 +923,7 @@ D3D11DXVA2Manager::CopyToImage(IMFSample* aVideoSample,
 
       hr = E_FAIL;
       mozilla::mscom::EnsureMTA(
-          [&]() -> void { hr = mTransform->Output(&sample); });
+          [&]() -> void { recordreplay::Diagnostic("D3D11DXVA2Manager::CopyToImage callback #2"); hr = mTransform->Output(&sample); });
       NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
     }
   }
@@ -1041,7 +1042,7 @@ D3D11DXVA2Manager::CopyToBGRATexture(ID3D11Texture2D* aInTexture,
 
   hr = E_FAIL;
   mozilla::mscom::EnsureMTA(
-      [&]() -> void { hr = mTransform->Input(inputSample); });
+      [&]() -> void { recordreplay::Diagnostic("D3D11DXVA2Manager::CopyToBGRATexture callback #1"); hr = mTransform->Input(inputSample); });
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   RefPtr<IMFSample> outputSample;
@@ -1050,7 +1051,7 @@ D3D11DXVA2Manager::CopyToBGRATexture(ID3D11Texture2D* aInTexture,
 
   hr = E_FAIL;
   mozilla::mscom::EnsureMTA(
-      [&]() -> void { hr = mTransform->Output(&outputSample); });
+      [&]() -> void { recordreplay::Diagnostic("D3D11DXVA2Manager::CopyToBGRATexture callback #2"); hr = mTransform->Output(&outputSample); });
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   texture.forget(aOutTexture);
@@ -1085,7 +1086,7 @@ D3D11DXVA2Manager::ConfigureForSize(IMFMediaType* aInputType,
 
   RefPtr<IMFAttributes> attr;
   mozilla::mscom::EnsureMTA(
-      [&]() -> void { attr = mTransform->GetAttributes(); });
+      [&]() -> void { recordreplay::Diagnostic("D3D11DXVA2Manager::ConfigureForSize callback #1"); attr = mTransform->GetAttributes(); });
   NS_ENSURE_TRUE(attr != nullptr, E_FAIL);
 
   hr = attr->SetUINT32(MF_XVP_PLAYBACK_MODE, TRUE);
@@ -1106,6 +1107,7 @@ D3D11DXVA2Manager::ConfigureForSize(IMFMediaType* aInputType,
 
   hr = E_FAIL;
   mozilla::mscom::EnsureMTA([&]() -> void {
+    recordreplay::Diagnostic("D3D11DXVA2Manager::ConfigureForSize callback #2");
     hr = mTransform->SetMediaTypes(
         inputType, outputType, [aWidth, aHeight](IMFMediaType* aOutput) {
           HRESULT hr = aOutput->SetUINT32(MF_MT_INTERLACE_MODE,

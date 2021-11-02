@@ -223,8 +223,14 @@ static void RecordReplayPrintDataSurfaceDiagnostics(const char* aWhy, DataSource
     return;
   }
 
+  recordreplay::Diagnostic("RecordReplayPrintDataSurfaceDiagnostics Start");
+
   int numPixels = 0;
   uint8_t* data = aSurface->GetData();
+
+  recordreplay::Diagnostic("RecordReplayPrintDataSurfaceDiagnostics HaveData");
+  recordreplay::Diagnostic("RecordReplayPrintDataSurfaceDiagnostics DataPointer %p", data);
+
   for (int i = 0; i < aSurface->GetSize().height; i++) {
     uint8_t* row = data + i * aSurface->Stride();
     for (int j = 0; j < std::min<int>(aSurface->GetSize().width * 4, aSurface->Stride()); j++) {
@@ -234,11 +240,15 @@ static void RecordReplayPrintDataSurfaceDiagnostics(const char* aWhy, DataSource
     }
   }
 
+  recordreplay::Diagnostic("RecordReplayPrintDataSurfaceDiagnostics HavePixels");
+
   recordreplay::PrintLog("%s Rect %d %d %d %d Size %d %d Format %d Pixels %d",
                          aWhy, aSurface->GetRect().x, aSurface->GetRect().y,
                          aSurface->GetRect().width, aSurface->GetRect().height,
                          aSurface->GetSize().width, aSurface->GetSize().height,
                          (int)aSurface->GetFormat(), numPixels);
+
+  recordreplay::Diagnostic("RecordReplayPrintDataSurfaceDiagnostics Done");
 }
 
 static sk_sp<SkImage> GetSkImageForSurface(SourceSurface* aSurface,
@@ -279,8 +289,7 @@ static sk_sp<SkImage> GetSkImageForSurface(SourceSurface* aSurface,
     return nullptr;
   }
 
-  RecordReplayPrintDataSurfaceDiagnostics("Diverged GetSkImageForSurface #2",
-                                          static_cast<SourceSurfaceSkia*>(aSurface));
+  RecordReplayPrintDataSurfaceDiagnostics("Diverged GetSkImageForSurface #2", surf);
 
   // Skia doesn't support RGBX surfaces so ensure that the alpha value is opaque
   // white.

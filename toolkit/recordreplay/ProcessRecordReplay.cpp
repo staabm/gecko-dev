@@ -111,6 +111,7 @@ static void (*gProcessRecording)();
 static void (*gSetCrashReasonCallback)(const char* (*aCallback)());
 static void (*gInvalidateRecording)(const char* aFormat, ...);
 static void (*gSetCrashNote)(const char* aNote);
+static void (*gNotifyActivity)();
 
 #ifndef XP_WIN
 static void (*gAddOrderedPthreadMutex)(const char* aName, pthread_mutex_t* aMutex);
@@ -159,20 +160,9 @@ static void ConfigureGecko() {
 #endif
 }
 
-static const char* GetPlatformKind() {
-#if defined(XP_MACOSX)
-  return "macOS";
-#elif defined(XP_LINUX)
-  return "linux";
-#elif defined(XP_WIN)
-  return "windows";
-#else
-  return "unknown";
-#endif
-}
-
 extern char gRecordReplayDriver[];
 extern int gRecordReplayDriverSize;
+extern char gBuildId[];
 
 static const char* GetTempDirectory() {
 #ifndef XP_WIN
@@ -199,9 +189,15 @@ static DriverHandle OpenDriverHandle() {
     snprintf(filename, sizeof(filename), "%s/recordreplay.so-XXXXXX", tmpdir);
     int fd = mkstemp(filename);
 #else
-    snprintf(filename, sizeof(filename), "%s\\recordreplay.dll-XXXXXX", tmpdir);
-    _mktemp(filename);
-    int fd = _open(filename, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY);
+    int fd;
+    for (int i = 0; i < 10; i++) {
+      snprintf(filename, sizeof(filename), "%s\\recordreplay.dll-XXXXXX", tmpdir);
+      _mktemp(filename);
+      fd = _open(filename, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY);
+      if (fd >= 0) {
+        break;
+      }
+    }
     #define write _write
     #define close _close
 #endif
@@ -367,6 +363,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol("RecordReplaySetCrashReasonCallback", gSetCrashReasonCallback);
   LoadSymbol("RecordReplayInvalidateRecording", gInvalidateRecording);
   LoadSymbol("RecordReplaySetCrashNote", gSetCrashNote, /* aOptional */ true);
+  LoadSymbol("RecordReplayNotifyActivity", gNotifyActivity);
 
   if (apiKey) {
     gSetApiKey(apiKey->c_str());
@@ -379,9 +376,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol("RecordReplayAddOrderedSRWLock", gAddOrderedSRWLock);
 #endif
 
-  char buildId[128];
-  snprintf(buildId, sizeof(buildId), "%s-gecko-%s", GetPlatformKind(), PlatformBuildID());
-  gAttach(*dispatchAddress, buildId);
+  gAttach(*dispatchAddress, gBuildId);
 
   if (TestEnv("RECORD_ALL_CONTENT")) {
     gRecordAllContent = true;
@@ -500,6 +495,10 @@ MOZ_EXPORT void RecordReplayInterface_InternalAssertScriptedCaller(const char* a
   } else {
     RecordReplayAssert("%s NoScriptedCaller", aWhy);
   }
+}
+
+MOZ_EXPORT void RecordReplayInterface_InternalNotifyActivity() {
+  gNotifyActivity();
 }
 
 MOZ_EXPORT void RecordReplayInterface_ExecutionProgressHook(unsigned aSourceId, const char* aFilename, unsigned aLineno,

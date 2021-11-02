@@ -13859,9 +13859,15 @@ void CodeGenerator::visitInterruptCheck(LInterruptCheck* lir) {
   OutOfLineCode* ool =
       oolCallVM<Fn, InterruptCheck>(lir, ArgList(), StoreNothing());
 
-  const void* interruptAddr = gen->runtime->addressOfInterruptBits();
-  masm.branch32(Assembler::NotEqual, AbsoluteAddress(interruptAddr), Imm32(0),
-                ool->entry());
+  if (mozilla::recordreplay::IsRecordingOrReplaying() && gen->runtime->hasParentRuntime()) {
+    // Always call InterruptCheck in worker runtimes when recording/replaying,
+    // to make sure NotifyActivity() is called regularly.
+    masm.jump(ool->entry());
+  } else {
+    const void* interruptAddr = gen->runtime->addressOfInterruptBits();
+    masm.branch32(Assembler::NotEqual, AbsoluteAddress(interruptAddr), Imm32(0),
+                  ool->entry());
+  }
   masm.bind(ool->rejoin());
 }
 

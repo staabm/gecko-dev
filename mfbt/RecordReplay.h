@@ -314,6 +314,9 @@ static inline void NoteContentParse(const void* aToken, const char* aURL,
 // Add a record/replay assertion for the current JS caller.
 static inline void AssertScriptedCaller(const char* aWhy);
 
+// Notify the record/replay driver during long running operations off the main thread.
+static inline void NotifyActivity();
+
 // Report that the current recording/replaying process is using an unsupported
 // browser feature, and message the user to notify them the page might not work right.
 // Issue numbers are from https://github.com/RecordReplay/gecko-dev/issues
@@ -383,6 +386,7 @@ MOZ_MAKE_RECORD_REPLAY_WRAPPER(CreateOrderedLock, int, 0,
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(OrderedLock, (int aLock), (aLock))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(OrderedUnlock, (int aLock), (aLock))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AssertScriptedCaller, (const char* aWhy), (aWhy))
+MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(NotifyActivity, (), ())
 
 #ifndef XP_WIN
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(AddOrderedPthreadMutex,

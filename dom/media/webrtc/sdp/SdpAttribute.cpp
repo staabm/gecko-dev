@@ -112,8 +112,14 @@ std::string SdpFingerprintAttributeList::FormatFingerprint(
 
   std::ostringstream os;
   for (auto i = fp.begin(); i != fp.end(); ++i) {
-    os << ":" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
-       << static_cast<uint32_t>(*i);
+    // Note: For now avoid formatting numbers using ostringstream, to workaround
+    // problems replaying these calls on windows.
+    char buf[50];
+    snprintf(buf, sizeof(buf), "%02X", static_cast<uint32_t>(*i));
+    os << ":" << buf;
+
+    //os << ":" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+    //   << static_cast<uint32_t>(*i);
   }
   return os.str().substr(1);
 }
@@ -1243,15 +1249,15 @@ void SdpOptionsAttribute::Load(const std::string& value) {
 }
 
 void SdpFlagAttribute::Serialize(std::ostream& os) const {
-  os << "a=" << mType << CRLF;
+  os << "a=" << NumberToStringRecordReplayWorkaroundForWindows(mType) << CRLF;
 }
 
 void SdpStringAttribute::Serialize(std::ostream& os) const {
-  os << "a=" << mType << ":" << mValue << CRLF;
+  os << "a=" << NumberToStringRecordReplayWorkaroundForWindows(mType) << ":" << mValue << CRLF;
 }
 
 void SdpNumberAttribute::Serialize(std::ostream& os) const {
-  os << "a=" << mType << ":" << mValue << CRLF;
+  os << "a=" << NumberToStringRecordReplayWorkaroundForWindows(mType) << ":" << NumberToStringRecordReplayWorkaroundForWindows(mValue) << CRLF;
 }
 
 bool SdpAttribute::IsAllowedAtMediaLevel(AttributeType type) {
