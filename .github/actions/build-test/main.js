@@ -40,7 +40,7 @@ sendBuildTestRequest({
 });
 
 function getLatestRevision() {
-  const revision = spawnChecked("git", ["rev-parse", "--short", "HEAD"], { cwd: gecko })
+  return spawnChecked("git", ["rev-parse", "--short", "HEAD"], { cwd: gecko })
     .stdout.toString()
     .trim();
 }
@@ -66,10 +66,8 @@ function sendBuildTestRequest(contents) {
   const request = (process.env.BUILD_TEST_INSECURE ? http : https).request(
     options,
     response => {
-      response.on("end", () => {
-        console.log(`RequestFinished Code ${response.statusCode}`);
-        process.exit(response.statusCode == 200 ? 0 : 1);
-      });
+      console.log(`RequestFinished Code ${response.statusCode}`);
+      process.exit(response.statusCode == 200 ? 0 : 1);
     }
   );
   request.on("error", e => {
