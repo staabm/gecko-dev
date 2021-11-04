@@ -353,6 +353,10 @@ using mozilla::dom::quota::QuotaManager;
 using mozilla::intl::LocaleService;
 using mozilla::scache::StartupCache;
 
+namespace mozilla::recordreplay {
+  extern char gBuildId[];
+}
+
 // Save the given word to the specified environment variable.
 static void MOZ_NEVER_INLINE SaveWordToEnv(const char* name,
                                            const nsACString& word) {
@@ -867,7 +871,7 @@ nsXULAppInfo::GetAppBuildID(nsACString& aResult) {
 
 NS_IMETHODIMP
 nsXULAppInfo::GetPlatformBuildID(nsACString& aResult) {
-  aResult.Assign(gToolkitBuildID);
+  aResult.Assign(recordreplay::gBuildId);
 
   return NS_OK;
 }
