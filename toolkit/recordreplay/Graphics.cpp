@@ -17,6 +17,7 @@
 #include "mozilla/layers/LayerTransactionChild.h"
 #include "mozilla/layers/LayerTransactionParent.h"
 #include "mozilla/layers/LayersMessages.h"
+#include "mozilla/StaticMutex.h"
 #include "imgIEncoder.h"
 #include "nsComponentManagerUtils.h"
 #include "nsPrintfCString.h"
@@ -198,12 +199,11 @@ struct TextureInfo {
 };
 
 static std::unordered_map<PTextureChild*, TextureInfo> gTextureInfo;
+static StaticMutex gTextureInfoMutex;
 
 void RegisterTextureChild(PTextureChild* aChild, TextureData* aData,
                           const SurfaceDescriptor& aDesc,
                           TextureFlags aFlags) {
-  MOZ_RELEASE_ASSERT(NS_IsMainThread());
-
   if (aDesc.type() != SurfaceDescriptor::TSurfaceDescriptorBuffer) {
     PrintLog("RegisterTextureChild %p unknown descriptor type %d", aChild, aDesc.type());
     return;
@@ -219,15 +219,16 @@ void RegisterTextureChild(PTextureChild* aChild, TextureData* aData,
     aFlags
   };
 
+  StaticMutexAutoLock lock(gTextureInfoMutex);
   gTextureInfo[aChild] = info;
 }
 
 TextureHost* CreateTextureHost(PTextureChild* aChild) {
-  MOZ_RELEASE_ASSERT(NS_IsMainThread());
-
   if (!aChild) {
     return nullptr;
   }
+
+  StaticMutexAutoLock lock(gTextureInfoMutex);
 
   auto iter = gTextureInfo.find(aChild);
   if (iter == gTextureInfo.end()) {
