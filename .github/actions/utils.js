@@ -6,13 +6,13 @@ const { spawnSync } = require("child_process");
 const gecko = `${__dirname}/../..`;
 
 function getLatestReplayRevision() {
-  return spawnChecked("git", ["rev-parse", "--short", "HEAD"], { cwd: gecko })
+  return spawnChecked("git", ["rev-parse", "--short=12", "HEAD"], { cwd: gecko })
     .stdout.toString()
     .trim();
 }
 
 function getLatestPlaywrightRevision() {
-  return spawnChecked("git", ["rev-parse", "--short", "origin/replay-playwright"], { cwd: gecko })
+  return spawnChecked("git", ["rev-parse", "--short=12", "origin/replay-playwright"], { cwd: gecko })
     .stdout.toString()
     .trim();
 }
