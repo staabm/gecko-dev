@@ -1057,7 +1057,11 @@ bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
   nsCString parentBuildID(aParentBuildID);
   nsCString childBuildID(mozilla::PlatformBuildID());
 
-  if (parentBuildID != childBuildID) {
+  recordreplay::RecordReplayAssert("MessageChannel::SendBuildIDsMatchMessage %s %s",
+                                   parentBuildID.get(), childBuildID.get());
+
+  if (recordreplay::RecordReplayValue("MessageChannel::SendBuildIDsMatchMessage #1",
+                                      parentBuildID != childBuildID)) {
     // The build IDs didn't match, usually because an update occurred in the
     // background.
     return false;
@@ -1074,9 +1078,11 @@ bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
 
   MonitorAutoLock lock(*mMonitor);
   if (!Connected()) {
+    recordreplay::RecordReplayAssert("MessageChannel::SendBuildIDsMatchMessage #2");
     ReportConnectionError("MessageChannel", msg.get());
     return false;
   }
+  recordreplay::RecordReplayAssert("MessageChannel::SendBuildIDsMatchMessage #3");
   mLink->SendMessage(std::move(msg));
   return true;
 }
