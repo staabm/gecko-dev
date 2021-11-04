@@ -713,8 +713,10 @@ bool ContentChild::Init(MessageLoop* aIOLoop, base::ProcessId aParentPid,
   if (channel && !channel->SendBuildIDsMatchMessage(aParentBuildID)) {
     // We need to quit this process if the buildID doesn't match the parent's.
     // This can occur when an update occurred in the background.
+    recordreplay::RecordReplayAssert("ContentChild::Init #10");
     ProcessChild::QuickExit();
   }
+  recordreplay::RecordReplayAssert("ContentChild::Init #11");
 
 #if defined(__OpenBSD__) && defined(MOZ_SANDBOX)
   StartOpenBSDSandbox(GeckoProcessType_Content);
