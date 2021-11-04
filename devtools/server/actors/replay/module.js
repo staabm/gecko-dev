@@ -35,6 +35,16 @@ const { CryptoUtils } = ChromeUtils.import(
   "resource://services-crypto/utils.js"
 );
 
+const {
+  getChannelRequestData,
+  getChannelRequestDoneData,
+  getChannelRequestFailedData,
+} = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/network-helpers.jsm"
+);
+
+const { ComponentUtils } = ChromeUtils.import("resource://gre/modules/ComponentUtils.jsm");
+
 const { require } = ChromeUtils.import("resource://devtools/shared/Loader.jsm");
 
 const { getCurrentZoom } = require("devtools/shared/layout/utils");
@@ -636,6 +646,7 @@ const commands = {
   "Target.getSourceMapURL": Target_getSourceMapURL,
   "Target.getSheetSourceMapURL": Target_getSheetSourceMapURL,
   "Target.topFrameLocation": Target_topFrameLocation,
+  "Target.getCurrentNetworkRequestEvent": Target_getCurrentNetworkRequestEvent,
 };
 
 function OnProtocolCommand(method, params) {
@@ -1047,6 +1058,238 @@ function Debugger_getSourceContents({ sourceId }) {
     contentType: "text/javascript",
   };
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Network Commands
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Networking in Gecko is complex because requests themselves are handled in the
+ * parent process, even though the page itself is executed and rendered in the
+ * child process.
+ *
+ * Primary notes:
+ *  * Only a few http-on-* events are available in the child, so the parent
+ *    is the only place to observe basic response data consistently.
+ *  * Only the parent process has an API for observing request timing and
+ *    capturing raw request header data.
+ *  * Observing request-start in the child process is important to allow us to
+ *    capture execution info so we can jump to that point in the recording later.
+ *  * Observing request-done in the child process is important because decoding
+ *    of Content-Encoding request data happens in the child process, so the
+ *    parent process has no access to 'decodedBodySize'.
+ *
+ * To handle all of these cases consistently, we watch for the minimal number of
+ * parent-process events that we need, and send IPC messages to the child so
+ * that the child can directly use that data.
+ */
+
+let gCurrentRequestEvent;
+
+if (isRecordingOrReplaying) {
+  // ChannelId => BookmarkId
+  // While a request is in-progress, this map will have an entry for the channelId
+  // and will track the bookmark that was used for the request, so if the request
+  // is redirected and a new channel forks off of this one, its bookmark can be
+  // applied to the new channel as well.
+  const gActiveRequests = new Map();
+
+  // ChannelId => BookmarkId
+  // When a channel redirects, we need to save the bookmark for the channel so that
+  // it can be applied to the new channel created to handle the redirect.
+  const gPendingRedirects = new Map();
+
+  function getChannel(subject) {
+    if (!(subject instanceof Ci.nsIHttpChannel)) {
+      return null;
+    }
+    const channel = subject.QueryInterface(Ci.nsIHttpChannel);
+    channel.QueryInterface(Ci.nsIHttpChannelInternal);
+
+    return channel;
+  }
+
+  Services.obs.addObserver((subject, topic, data) => {
+    const channel = getChannel(subject);
+    if (!channel) {
+      return;
+    }
+
+    onHttpOpeningRequest(channel.channelId, getChannelRequestData(channel), false);
+  }, "http-on-opening-request");
+
+  Services.cpmm.addMessageListener("RecordingChannelOpeningRequest", {
+    receiveMessage(msg) {
+      const { channelId, data } = msg.data;
+      onHttpOpeningRequest(channelId, data, true);
+    },
+  });
+  function onHttpOpeningRequest(channelId, data, fromParent) {
+    if (gActiveRequests.has(channelId)) {
+      return;
+    }
+
+    let bookmark;
+    if (gPendingRedirects.has(channelId)) {
+      // Some channels may be created as a result of other channels being redirected.
+      // When that happens, we still want to treat the redirected request as if it
+      // was initiated with the same callstack as the original request, so we have
+      // to pull in the bookmark from the previous request if we can.
+      bookmark = gPendingRedirects.get(channelId);
+      gPendingRedirects.delete(channelId);
+    } else if (fromParent) {
+      // Requests opened by the parent process are never going to
+      // have a pause location associated with them.
+      bookmark = 0;
+    } else {
+      // Record the actual callstack location of this call so we can jump back to it.
+      bookmark = RecordReplayControl.makeBookmark();
+    }
+
+    gActiveRequests.set(channelId, bookmark);
+
+    RecordReplayControl.onHttpRequest(channelId.toString(), bookmark);
+
+    notifyRequestEvent(channelId, "request", data);
+  }
+
+  Services.obs.addObserver((subject, topic, data) => {
+    const channel = getChannel(subject);
+    if (!channel) {
+      return;
+    }
+
+    onHttpOpeningRequest(channel.channelId, getChannelRequestData(channel), false);
+    onHttpFailedOpeningRequest(channel.channelId, getChannelRequestFailedData(channel));
+  }, "http-on-failed-opening-request");
+  Services.cpmm.addMessageListener("RecordingChannelRequestFailed", {
+    receiveMessage(msg) {
+      const { channelId, data } = msg.data;
+      onHttpFailedOpeningRequest(channelId, data);
+    },
+  });
+  function onHttpFailedOpeningRequest(channelId, data) {
+    notifyRequestEvent(channelId, "request-failed", data);
+  }
+
+  Services.obs.addObserver((subject, topic, data) => {
+    const channel = getChannel(subject);
+    if (!channel) {
+      return;
+    }
+
+    onHttpStopRequest(channel);
+  }, "http-on-stop-request");
+
+  function onHttpStopRequest(channel) {
+    if (!gActiveRequests.has(channel.channelId)) {
+      return;
+    }
+
+    gActiveRequests.delete(channel.channelId);
+
+    notifyRequestEvent(channel.channelId, "request-done", getChannelRequestDoneData(channel));
+  }
+
+  function notifyRequestEvent(channelId, kind, data) {
+    gCurrentRequestEvent = {
+      kind,
+      data,
+    };
+    RecordReplayControl.onHttpRequestEvent(channelId.toString());
+    gCurrentRequestEvent = null;
+  }
+
+  Services.cpmm.addMessageListener("RecordingChannelRequestRawHeaders", {
+    receiveMessage(msg) {
+      const { channelId, requestRawHeaders } = msg.data;
+
+      if (!gActiveRequests.has(channelId)) {
+        return;
+      }
+
+      notifyRequestEvent(channelId, "request-raw-headers", {
+        requestRawHeaders
+      });
+    },
+  });
+
+  Services.cpmm.addMessageListener("RecordingChannelResponseStart", {
+    receiveMessage(msg) {
+      const { channelId, data } = msg.data;
+
+      if (!gActiveRequests.has(channelId)) {
+        return;
+      }
+
+      const { remoteDestination, ...response } = data;
+
+      if (remoteDestination) {
+        notifyRequestEvent(channelId, "request-destination", {
+          remoteAddress: remoteDestination.address,
+          remotePort: remoteDestination.port,
+        });
+      }
+      notifyRequestEvent(channelId, "response", response);
+    },
+  });
+
+  Services.cpmm.addMessageListener("RecordingChannelResponseRawHeaders", {
+    receiveMessage(msg) {
+      const { channelId, responseRawHeaders } = msg.data;
+
+      if (!gActiveRequests.has(channelId)) {
+        return;
+      }
+
+      notifyRequestEvent(channelId, "response-raw-headers", {
+        responseRawHeaders,
+      });
+    },
+  });
+
+  const SINK_CLASS_DESCRIPTION = "Replay Networking Event Sink";
+  const SINK_CLASS_ID = Components.ID("{96692fd5-4d0d-4656-9283-fdf0e3c65553}");
+  const SINK_CONTRACT_ID = "@mozilla.org/network/monitor/channeleventsink;1";
+  const SINK_CATEGORY_NAME = "net-channel-event-sinks";
+  class ReplayChannelEventSink {
+    asyncOnChannelRedirect(oldChannel, newChannel, flags, callback) {
+      const oldChan = getChannel(oldChannel);
+      const newChan = getChannel(newChannel);
+
+      const bookmark = oldChan ? gActiveRequests.get(oldChan.channelId) : null;
+      if (newChan && typeof bookmark === "number") {
+        gPendingRedirects.set(newChan.channelId, bookmark);
+
+        // It seems that redirected requests don't fire the done event.
+        onHttpStopRequest(oldChan);
+      }
+
+      callback.onRedirectVerifyCallback(Cr.NS_OK);
+    }
+  }
+  ReplayChannelEventSink.prototype.QueryInterface = ChromeUtils.generateQI([
+    "nsIChannelEventSink",
+  ]);
+  const ReplayChannelEventSinkFactory = ComponentUtils.generateSingletonFactory(
+    ReplayChannelEventSink
+  );
+  const registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
+  registrar.registerFactory(
+    SINK_CLASS_ID,
+    SINK_CLASS_DESCRIPTION,
+    SINK_CONTRACT_ID,
+    ReplayChannelEventSinkFactory
+  );
+  Services.catMan.addCategoryEntry(
+    SINK_CATEGORY_NAME,
+    SINK_CONTRACT_ID,
+    SINK_CONTRACT_ID,
+    false,
+    true
+  );
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // Graphics Commands
@@ -1923,6 +2166,12 @@ function Pause_getTopFrame() {
     return { frame: id, data: { frames: [frameData] } };
   }
   return { data: {} };
+}
+
+function Target_getCurrentNetworkRequestEvent() {
+  assert(gCurrentRequestEvent);
+  const { kind, data } = gCurrentRequestEvent;
+  return { data: { kind, ...data } };
 }
 
 function Target_countStackFrames() {
