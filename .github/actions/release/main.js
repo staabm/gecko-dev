@@ -11,7 +11,7 @@ const replayRevision = getLatestReplayRevision();
 const playwrightRevision = getLatestPlaywrightRevision();
 
 sendBuildTestRequest({
-  name: `Gecko Release ${revision}`,
+  name: `Gecko Release ${replayRevision}`,
   tasks: [
     ...platformTasks("macOS"),
     ...platformTasks("linux"),

@@ -92,7 +92,7 @@ function computeBuildId() {
   ])
     .stdout.toString()
     .trim()
-    .replace(/-/g, "-");
+    .replace(/-/g, "");
 
   // Use the later of the two dates in the build ID.
   const date = +geckoDate >= +driverDate ? geckoDate : driverDate;
