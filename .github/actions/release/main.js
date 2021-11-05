@@ -35,7 +35,7 @@ function platformTasks(platform) {
     {
       kind: "ReleaseRuntime",
       runtime: "geckoPlaywright",
-      revision: replayRevision,
+      revision: playwrightRevision,
     },
     platform
   );
