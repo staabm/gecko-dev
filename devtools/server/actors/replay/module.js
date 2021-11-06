@@ -1226,8 +1226,8 @@ if (isRecordingOrReplaying) {
 
       if (remoteDestination) {
         notifyRequestEvent(channelId, "request-destination", {
-          remoteAddress: remoteDestination.address,
-          remotePort: remoteDestination.port,
+          destinationAddress: remoteDestination.address,
+          destinationPort: remoteDestination.port,
         });
       }
       notifyRequestEvent(channelId, "response", response);
