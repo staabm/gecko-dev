@@ -4639,7 +4639,8 @@ bool js::GetProperty(JSContext* cx, HandleValue v, HandlePropertyName name,
       case ValueType::Magic:
       case ValueType::PrivateGCThing:
       case ValueType::Object:
-        MOZ_CRASH("unexpected type");
+        JS_ReportErrorASCII(cx, "Unexpected type");
+        return false;
     }
 
     if (!proto) {
