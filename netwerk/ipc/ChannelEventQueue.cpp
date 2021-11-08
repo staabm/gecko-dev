@@ -37,6 +37,9 @@ void ChannelEventQueue::FlushQueue() {
   nsCOMPtr<nsISupports> kungFuDeathGrip(mOwner);
   mozilla::Unused << kungFuDeathGrip;  // Not used in this function
 
+  // https://github.com/RecordReplay/backend/issues/1511
+  recordreplay::RecordReplayAssert("ChannelEventQueue::FlushQueue Start");
+
 #ifdef DEBUG
   {
     MutexAutoLock lock(mMutex);
@@ -47,6 +50,9 @@ void ChannelEventQueue::FlushQueue() {
   bool needResumeOnOtherThread = false;
 
   while (true) {
+    // https://github.com/RecordReplay/backend/issues/1511
+    recordreplay::RecordReplayAssert("ChannelEventQueue::FlushQueue LoopHead");
+
     UniquePtr<ChannelEvent> event;
     {
       MutexAutoLock lock(mMutex);
@@ -71,6 +77,9 @@ void ChannelEventQueue::FlushQueue() {
       isCurrentThread = true;
     }
 
+    // https://github.com/RecordReplay/backend/issues/1511
+    recordreplay::RecordReplayAssert("ChannelEventQueue::FlushQueue #1 %d", isCurrentThread);
+
     if (!isCurrentThread) {
       // Next event needs to run on another thread. Put it back to
       // the front of the queue can try resume on that thread.
@@ -89,6 +98,9 @@ void ChannelEventQueue::FlushQueue() {
 
     event->Run();
   }  // end of while(true)
+
+  // https://github.com/RecordReplay/backend/issues/1511
+  recordreplay::RecordReplayAssert("ChannelEventQueue::FlushQueue LoopDone");
 
   // The flush procedure is aborted because next event cannot be run on current
   // thread. We need to resume the event processing right after flush procedure
