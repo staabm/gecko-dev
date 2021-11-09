@@ -251,6 +251,29 @@ static nsresult InitXPCOMGlue(LibLoadingStrategy aLibLoadingStrategy, bool skipL
 uint32_t gBlocklistInitFlags = eDllBlocklistInitFlagDefault;
 #endif
 
+#ifdef XP_WIN
+
+static void SetDPIAwareness() {
+  HMODULE module = GetModuleHandle("user32.dll");
+  if (!module) {
+    fprintf(stderr, "Unable to set process DPI awareness context: user32.dll unavailable\n");
+    return;
+  }
+
+  FARPROC proc = GetProcAddress(module, "SetProcessDpiAwarenessContext");
+  if (!proc) {
+    fprintf(stderr, "Unable to set process DPI awareness context: SetProcessDpiAwarenessContext unavailable\n");
+    return;
+  }
+
+  BOOL rv = BitwiseCast<BOOL (*)(DPI_AWARENESS_CONTEXT)>(proc)(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+  if (!rv) {
+    fprintf(stderr, "Unable to set process DPI awareness context: SetProcessDpiAwarenessContext failed %lu\n", GetLastError());
+  }
+}
+
+#endif // XP_WIN
+
 int main(int argc, char* argv[], char* envp[]) {
 #if defined(MOZ_ENABLE_FORKSERVER)
   if (strcmp(argv[argc - 1], "forkserver") == 0) {
@@ -334,6 +357,8 @@ int main(int argc, char* argv[], char* envp[]) {
 #endif
 
 #if defined(XP_WIN)
+  SetDPIAwareness();
+
   // Once the browser process hits the main function, we no longer need
   // a writable section handle because all dependent modules have been
   // loaded.
