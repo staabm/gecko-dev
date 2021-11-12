@@ -560,10 +560,6 @@ const void* HDCOffscreen::draw(const SkGlyph& glyph, bool isBW,
     BOOL ret = ExtTextOutW(fDC, 0, 0, ETO_GLYPH_INDEX, nullptr, reinterpret_cast<LPCWSTR>(&glyphID), 1, nullptr);
     GdiFlush();
 
-    // For now we record/replay the drawn text manually, instead of handling this
-    // within the recording driver.
-    mozilla::recordreplay::RecordReplayBytes("HDCOffscreen::draw", fBits, size);
-
     if (0 == ret) {
         return nullptr;
     }
