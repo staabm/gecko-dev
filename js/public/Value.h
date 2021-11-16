@@ -703,7 +703,9 @@ class alignas(8) Value {
     if (!isMagic()) {
       return false;
     }
-    MOZ_RELEASE_ASSERT(whyMagic() == why);
+    // Workaround crashes that have been seen when recording where another
+    // magic value is in an array being checked for holes.
+    MOZ_RELEASE_ASSERT(whyMagic() == why || why == JS_ELEMENTS_HOLE);
     return true;
   }
 
