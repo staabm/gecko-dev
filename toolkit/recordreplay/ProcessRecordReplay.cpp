@@ -83,6 +83,7 @@ static void (*gDiagnosticVA)(const char* format, va_list args);
 static void (*gRegisterPointer)(void* ptr);
 static void (*gUnregisterPointer)(void* ptr);
 static int (*gPointerId)(void* ptr);
+static void* (*gIdPointer)(size_t id);
 static void (*gAssert)(const char* format, va_list);
 static void (*gAssertBytes)(const char* why, const void*, size_t);
 static void (*gSaveRecording)(const char* dir);
@@ -337,6 +338,7 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   LoadSymbol("RecordReplayRegisterPointer", gRegisterPointer);
   LoadSymbol("RecordReplayUnregisterPointer", gUnregisterPointer);
   LoadSymbol("RecordReplayPointerId", gPointerId);
+  LoadSymbol("RecordReplayIdPointer", gIdPointer);
   LoadSymbol("RecordReplayAssert", gAssert);
   LoadSymbol("RecordReplayAssertBytes", gAssertBytes);
   LoadSymbol("RecordReplayProgressCounter", gProgressCounter);
@@ -472,6 +474,10 @@ MOZ_EXPORT void RecordReplayInterface_InternalUnregisterThing(void* aThing) {
 
 MOZ_EXPORT size_t RecordReplayInterface_InternalThingIndex(void* aThing) {
   return gPointerId(aThing);
+}
+
+MOZ_EXPORT void* RecordReplayInterface_InternalIndexThing(size_t aId) {
+  return gIdPointer(aId);
 }
 
 MOZ_EXPORT void RecordReplayInterface_InternalHoldJSObject(void* aJSObj) {

@@ -160,7 +160,7 @@ LayoutDeviceIntRect DocAccessibleChild::GetCaretRectFor(const uint64_t& aID) {
   Accessible* target;
 
   if (aID) {
-    target = reinterpret_cast<Accessible*>(aID);
+    target = Accessible::FromUniqueID(aID);
   } else {
     target = mDoc;
   }

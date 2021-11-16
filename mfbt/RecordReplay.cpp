@@ -37,6 +37,7 @@ namespace recordreplay {
   Macro(InternalHasDivergedFromRecording, bool, (), ())                        \
   Macro(InternalIsUnhandledDivergenceAllowed, bool, (), ())                    \
   Macro(InternalThingIndex, size_t, (void* aThing), (aThing))                  \
+  Macro(InternalIndexThing, void*, (size_t aId), (aId))                        \
   Macro(InternalCreateOrderedLock, int, (const char* aName), (aName))          \
   Macro(ExecutionProgressCounter, ProgressCounter*, (), ())                    \
   Macro(NewTimeWarpTarget, ProgressCounter, (), ())                            \
