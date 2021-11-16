@@ -92,9 +92,9 @@ mozilla::detail::MutexImpl::MutexImpl() {
 }
 
 mozilla::detail::MutexImpl::~MutexImpl() {
-  TRY_CALL_PTHREADS(
-      pthread_mutex_destroy(&platformData()->ptMutex),
-      "mozilla::detail::MutexImpl::~MutexImpl: pthread_mutex_destroy failed");
+  // Note: There have been crashes while recording when this returned non-zero,
+  // which seems most likely to be a bug with how the mutex is being used.
+  pthread_mutex_destroy(&platformData()->ptMutex);
 }
 
 inline void mozilla::detail::MutexImpl::mutexLock() {

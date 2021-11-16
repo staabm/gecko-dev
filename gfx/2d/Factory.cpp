@@ -765,6 +765,7 @@ already_AddRefed<SharedFTFace> Factory::NewSharedFTFaceFromData(
     int aFaceIndex, SharedFTFaceData* aSharedData) {
   if (FT_Face face =
           NewFTFaceFromData(aFTLibrary, aData, aDataSize, aFaceIndex)) {
+    recordreplay::Diagnostic("Factory::NewSharedFTFaceFromData #1");
     return MakeAndAddRef<SharedFTFace>(face, aSharedData);
   } else {
     return nullptr;

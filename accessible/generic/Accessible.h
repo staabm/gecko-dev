@@ -183,6 +183,13 @@ class Accessible : public nsISupports {
     return static_cast<void*>(this);
   }
 
+  static Accessible* FromUniqueID(uint64_t aId) {
+    if (recordreplay::IsRecordingOrReplaying()) {
+      return reinterpret_cast<Accessible*>(recordreplay::IndexThing(aId));
+    }
+    return reinterpret_cast<Accessible*>(aId);
+  }
+
   /**
    * Return language associated with the accessible.
    */

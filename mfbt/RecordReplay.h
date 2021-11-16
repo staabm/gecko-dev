@@ -173,6 +173,7 @@ static inline void RecordReplayAssertBytes(const void* aData, size_t aSize);
 static inline void RegisterThing(void* aThing);
 static inline void UnregisterThing(void* aThing);
 static inline size_t ThingIndex(void* aThing);
+static inline void* IndexThing(size_t aIndex);
 
 // Access a locking resource that will be acquired in the same order when
 // replaying as when recording.
@@ -381,6 +382,7 @@ MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(RecordReplayAssertBytes,
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(RegisterThing, (void* aThing), (aThing))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(UnregisterThing, (void* aThing), (aThing))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER(ThingIndex, size_t, 0, (void* aThing), (aThing))
+MOZ_MAKE_RECORD_REPLAY_WRAPPER(IndexThing, void*, nullptr, (size_t aIndex), (aIndex))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER(CreateOrderedLock, int, 0,
                                (const char* aName), (aName))
 MOZ_MAKE_RECORD_REPLAY_WRAPPER_VOID(OrderedLock, (int aLock), (aLock))
