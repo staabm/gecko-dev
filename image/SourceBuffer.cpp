@@ -403,6 +403,9 @@ nsresult SourceBuffer::Append(const char* aData, size_t aLength) {
     }
   }
 
+  recordreplay::Diagnostic("image::SourceBuffer::Append %p %p %zu %zu",
+                           currentChunkData, aData, currentChunkLength, forCurrentChunk);
+
   // Write everything we can fit into the current chunk.
   MOZ_ASSERT(currentChunkLength + forCurrentChunk <= currentChunkCapacity);
   memcpy(currentChunkData + currentChunkLength, aData, forCurrentChunk);
