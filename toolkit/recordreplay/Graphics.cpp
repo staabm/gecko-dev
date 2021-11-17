@@ -176,6 +176,10 @@ already_AddRefed<gfx::DrawTarget> DrawTargetForRemoteDrawing(const gfx::IntRect&
   size_t bufferSize = ImageDataSerializer::ComputeRGBBufferSize(size, SurfaceFormat);
 
   if (bufferSize != gDrawTargetBufferSize) {
+    // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
+    if (HasDivergedFromRecording()) {
+      PrintLog("Diverged UPDATE_BUFFER %zu", bufferSize);
+    }
     free(gDrawTargetBuffer);
     gDrawTargetBuffer = malloc(bufferSize);
     gDrawTargetBufferSize = bufferSize;
