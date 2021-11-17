@@ -7046,7 +7046,7 @@ void FrameLayerBuilder::PaintItems(std::vector<AssignedDisplayItem>& aItems,
 
     // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
     if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("FrameLayerBuilder::PaintItems ITEM %d %d %d %d PAINTED %d %d %d %d",
+      recordreplay::PrintLog("Diverged FrameLayerBuilder::PaintItems ITEM %d %d %d %d PAINTED %d %d %d %d",
                              (int)visibleRect.x,
                              (int)visibleRect.y,
                              (int)visibleRect.width,
@@ -7186,7 +7186,7 @@ void FrameLayerBuilder::PaintItems(std::vector<AssignedDisplayItem>& aItems,
 
     // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
     if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("FrameLayerBuilder::PaintItems ITEM_START %s",
+      recordreplay::PrintLog("Diverged FrameLayerBuilder::PaintItems ITEM_START %s",
                              paintedItem->Name());
     }
 
@@ -7199,7 +7199,7 @@ void FrameLayerBuilder::PaintItems(std::vector<AssignedDisplayItem>& aItems,
 
     // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
     if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("FrameLayerBuilder::PaintItems ITEM_DONE");
+      recordreplay::PrintLog("Diverged FrameLayerBuilder::PaintItems ITEM_DONE");
     }
   }
 
@@ -7272,7 +7272,7 @@ void FrameLayerBuilder::DrawPaintedLayer(PaintedLayer* aLayer,
                                          void* aCallbackData) {
   // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
   if (recordreplay::HasDivergedFromRecording()) {
-    recordreplay::PrintLog("FrameLayerBuilder::DrawPaintedLayer DRAW %d %d %d %d DIRTY %d %d %d %d",
+    recordreplay::PrintLog("Diverged FrameLayerBuilder::DrawPaintedLayer DRAW %d %d %d %d DIRTY %d %d %d %d",
                            aRegionToDraw.GetBounds().ToUnknownRect().x,
                            aRegionToDraw.GetBounds().ToUnknownRect().y,
                            aRegionToDraw.GetBounds().ToUnknownRect().width,

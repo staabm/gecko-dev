@@ -444,7 +444,7 @@ void ClientTiledPaintedLayer::EndPaint() {
 void ClientTiledPaintedLayer::RenderLayer() {
   // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
   if (recordreplay::HasDivergedFromRecording()) {
-    recordreplay::PrintLog("ClientTiledPaintedLayer::RenderLayer %d %d %d %d",
+    recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer %d %d %d %d",
                            mVisibleRegion.GetBounds().ToUnknownRect().x,
                            mVisibleRegion.GetBounds().ToUnknownRect().y,
                            mVisibleRegion.GetBounds().ToUnknownRect().width,
@@ -532,7 +532,7 @@ void ClientTiledPaintedLayer::RenderLayer() {
     EndPaint();
     // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
     if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("ClientTiledPaintedLayer::RenderLayer Done #1");
+      recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #1");
     }
     return;
   }
@@ -541,7 +541,7 @@ void ClientTiledPaintedLayer::RenderLayer() {
     ClientManager()->SetTransactionIncomplete();
     // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
     if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("ClientTiledPaintedLayer::RenderLayer Done #2");
+      recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #2");
     }
     return;
   }
@@ -553,7 +553,7 @@ void ClientTiledPaintedLayer::RenderLayer() {
     if (mPaintData.mPaintFinished) {
       // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
       if (recordreplay::HasDivergedFromRecording()) {
-        recordreplay::PrintLog("ClientTiledPaintedLayer::RenderLayer Done #3");
+        recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #3");
       }
       return;
     }
@@ -606,7 +606,7 @@ void ClientTiledPaintedLayer::RenderLayer() {
       ClientManager()->SetRepeatTransaction();
       // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
       if (recordreplay::HasDivergedFromRecording()) {
-        recordreplay::PrintLog("ClientTiledPaintedLayer::RenderLayer Done #4");
+        recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #4");
       }
       return;
     }
@@ -617,7 +617,7 @@ void ClientTiledPaintedLayer::RenderLayer() {
     EndPaint();
     // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
     if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("ClientTiledPaintedLayer::RenderLayer Done #5");
+      recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #5");
     }
     return;
   }
@@ -635,7 +635,7 @@ void ClientTiledPaintedLayer::RenderLayer() {
     mPaintData.mPaintFinished = false;
     // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
     if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("ClientTiledPaintedLayer::RenderLayer Done #6");
+      recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #6");
     }
     return;
   }
@@ -653,7 +653,7 @@ void ClientTiledPaintedLayer::RenderLayer() {
       ClientManager()->SetRepeatTransaction();
     // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
       if (recordreplay::HasDivergedFromRecording()) {
-        recordreplay::PrintLog("ClientTiledPaintedLayer::RenderLayer Done #7");
+        recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #7");
       }
       return;
     }
@@ -665,7 +665,7 @@ void ClientTiledPaintedLayer::RenderLayer() {
 
   // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
   if (recordreplay::HasDivergedFromRecording()) {
-    recordreplay::PrintLog("ClientTiledPaintedLayer::RenderLayer Done #8");
+    recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #8");
   }
 }
 
