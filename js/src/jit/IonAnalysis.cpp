@@ -3941,7 +3941,19 @@ bool jit::AnalyzeArgumentsUsage(JSContext* cx, JSScript* scriptArg) {
     return false;
   }
 
-  MDefinition* argumentsValue = graph.entryBlock()->getSlot(info.argsObjSlot());
+  MDefinition* argumentsValue = nullptr;
+  for (auto iter = graph.begin(); iter != graph.end(); ++iter) {
+    MBasicBlock* block = *iter;
+    MDefinition* def = block->getSlot(info.argsObjSlot());
+    if (!def->isConstant() ||
+        !def->toConstant()->toJSValue().isUndefined()) {
+      argumentsValue = def;
+      break;
+    }
+  }
+  if (!argumentsValue) {
+    return true;
+  }
 
   bool argumentsContentsObserved = false;
 
