@@ -227,6 +227,11 @@ static void DrawCellIncludingFocusRing(NSCell* aCell, NSRect aWithFrame, NSView*
 }
 
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView*)controlView {
+  // Custom objective C messages are not replayed, so we pass through events
+  // while recording to ensure that the recorded calls will be consistent
+  // when replaying.
+  recordreplay::AutoPassThroughThreadEvents pt;
+
   CGContext* cgContext = (CGContextRef)[[NSGraphicsContext currentContext] graphicsPort];
 
   HIThemeTrackDrawInfo tdi;
@@ -269,6 +274,9 @@ static void DrawCellIncludingFocusRing(NSCell* aCell, NSRect aWithFrame, NSView*
 @implementation SearchFieldCellWithFocusRing
 
 - (void)drawWithFrame:(NSRect)rect inView:(NSView*)controlView {
+  // Custom objective C messages aren't replayed, see above.
+  recordreplay::AutoPassThroughThreadEvents pt;
+
   [super drawWithFrame:rect inView:controlView];
 
   if (FocusIsDrawnByDrawWithFrame(self)) {

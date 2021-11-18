@@ -261,6 +261,9 @@ class RefreshDriverTimer {
   TimeStamp GetIdleDeadlineHint(TimeStamp aDefault) {
     MOZ_ASSERT(NS_IsMainThread());
 
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/3608
+    recordreplay::RecordReplayAssert("RefreshDriverTimer::GetIdleDeadlineHint");
+
     TimeStamp mostRecentRefresh = MostRecentRefresh();
     TimeDuration refreshRate = GetTimerRate();
     TimeStamp idleEnd = mostRecentRefresh + refreshRate;
