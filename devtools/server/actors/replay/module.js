@@ -2415,8 +2415,6 @@ StackingContext.prototype = {
 
   // Add elem and its descendants to this stacking context.
   add(elem, parentElem) {
-    log(`${this} Add ${elem}`);
-
     // Create a new stacking context for any iframes.
     if (elem.raw.tagName == "IFRAME") {
       const { left, top } = elem.raw.getBoundingClientRect();
@@ -2487,11 +2485,9 @@ StackingContext.prototype = {
       return;
     }
     elem.context = new StackingContext(elem, this.left + left, this.top + top);
-    log(`${this} NewContext ${elem} ${elem.context}`);
   },
 
   addZIndexElement(elem, index) {
-    log(`${this} ZIndex ${index} ${elem}`);
     const existing = this.zIndexElements.get(index);
     if (existing) {
       existing.push(elem);
@@ -2501,17 +2497,14 @@ StackingContext.prototype = {
   },
 
   addPositionedElement(elem) {
-    log(`${this} Positioned ${elem}`);
     this.positionedElements.push(elem);
   },
 
   addFloatingElement(elem) {
-    log(`${this} Floating ${elem}`);
     this.floatingElements.push(elem);
   },
 
   addNonPositionedElement(elem) {
-    log(`${this} NonPositioned ${elem}`);
     this.nonPositionedElements.push(elem);
   },
 
@@ -2536,7 +2529,6 @@ StackingContext.prototype = {
         if (elem.context && elem.context != this) {
           rv.push(...elem.context.flatten());
         } else {
-          log(`${this} FlattenPush ${elem}`);
           rv.push(elem);
         }
       }
@@ -2545,7 +2537,6 @@ StackingContext.prototype = {
     const pushZIndexElements = (filter) => {
       for (const z of zIndexes) {
         if (filter(z)) {
-          log(`${this} PushZIndex ${z}`);
           pushElements(this.zIndexElements.get(z));
         }
       }
@@ -2554,15 +2545,12 @@ StackingContext.prototype = {
     const zIndexes = [...this.zIndexElements.keys()];
     zIndexes.sort((a, b) => a - b);
 
-    log(`${this} FlattenStart`);
-
     pushZIndexElements((z) => z < 0);
     pushElements(this.nonPositionedElements);
     pushElements(this.floatingElements);
     pushElements(this.positionedElements);
     pushZIndexElements((z) => z > 0);
 
-    log(`${this} FlattenEnd`);
     return rv;
   },
 };
