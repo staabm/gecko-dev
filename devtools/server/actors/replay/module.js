@@ -2404,7 +2404,7 @@ function StackingContext(root, left = 0, top = 0) {
 
   if (root) {
     this.addNonPositionedElement(root);
-    this.addChildren(root.raw);
+    this.addChildrenWithParent(root);
   }
 }
 
@@ -2414,9 +2414,7 @@ StackingContext.prototype = {
   },
 
   // Add elem and its descendants to this stacking context.
-  add(elem) {
-    log(`${this} Add ${elem}`);
-
+  add(elem, parentElem) {
     // Create a new stacking context for any iframes.
     if (elem.raw.tagName == "IFRAME") {
       const { left, top } = elem.raw.getBoundingClientRect();
@@ -2426,13 +2424,20 @@ StackingContext.prototype = {
 
     if (!elem.style) {
       this.addNonPositionedElement(elem);
-      this.addChildren(elem.raw);
+      this.addChildrenWithParent(elem);
       return;
     }
 
-    if (elem.style.getPropertyValue("position") != "static") {
+    const position = elem.style.getPropertyValue("position");
+    const parentDisplay = parentElem?.style?.getPropertyValue("display");
+    if (
+      position != "static" ||
+      ["flex", "inline-flex", "grid", "inline-grid"].includes(parentDisplay)
+    ) {
       const zIndex = elem.style.getPropertyValue("z-index");
-      this.addContext(elem);
+      if (position != "static" || zIndex != "auto") {
+        this.addContext(elem);
+      }
 
       if (zIndex != "auto") {
         // Elements with a zero z-index have their own stacking context but are
@@ -2444,7 +2449,14 @@ StackingContext.prototype = {
         }
       }
 
-      this.addPositionedElement(elem);
+      if (position != "static") {
+        this.addPositionedElement(elem);
+      } else {
+        this.addNonPositionedElement(elem);
+        if (!elem.context) {
+          this.addChildrenWithParent(elem);
+        }
+      }
       return;
     }
 
@@ -2464,7 +2476,7 @@ StackingContext.prototype = {
     }
 
     this.addNonPositionedElement(elem);
-    this.addChildren(elem.raw);
+    this.addChildrenWithParent(elem);
   },
 
   addContext(elem, left = 0, top = 0) {
@@ -2473,11 +2485,9 @@ StackingContext.prototype = {
       return;
     }
     elem.context = new StackingContext(elem, this.left + left, this.top + top);
-    log(`${this} NewContext ${elem} ${elem.context}`);
   },
 
   addZIndexElement(elem, index) {
-    log(`${this} ZIndex ${index} ${elem}`);
     const existing = this.zIndexElements.get(index);
     if (existing) {
       existing.push(elem);
@@ -2487,23 +2497,26 @@ StackingContext.prototype = {
   },
 
   addPositionedElement(elem) {
-    log(`${this} Positioned ${elem}`);
     this.positionedElements.push(elem);
   },
 
   addFloatingElement(elem) {
-    log(`${this} Floating ${elem}`);
     this.floatingElements.push(elem);
   },
 
   addNonPositionedElement(elem) {
-    log(`${this} NonPositioned ${elem}`);
     this.nonPositionedElements.push(elem);
   },
 
   addChildren(parentNode) {
     for (const child of parentNode.children) {
       this.add(new StackingContextElement(child, this.left, this.top));
+    }
+  },
+
+  addChildrenWithParent(parentElem) {
+    for (const child of parentElem.raw.children) {
+      this.add(new StackingContextElement(child, this.left, this.top), parentElem);
     }
   },
 
@@ -2516,7 +2529,6 @@ StackingContext.prototype = {
         if (elem.context && elem.context != this) {
           rv.push(...elem.context.flatten());
         } else {
-          log(`${this} FlattenPush ${elem}`);
           rv.push(elem);
         }
       }
@@ -2525,7 +2537,6 @@ StackingContext.prototype = {
     const pushZIndexElements = (filter) => {
       for (const z of zIndexes) {
         if (filter(z)) {
-          log(`${this} PushZIndex ${z}`);
           pushElements(this.zIndexElements.get(z));
         }
       }
@@ -2534,15 +2545,12 @@ StackingContext.prototype = {
     const zIndexes = [...this.zIndexElements.keys()];
     zIndexes.sort((a, b) => a - b);
 
-    log(`${this} FlattenStart`);
-
     pushZIndexElements((z) => z < 0);
     pushElements(this.nonPositionedElements);
     pushElements(this.floatingElements);
     pushElements(this.positionedElements);
     pushZIndexElements((z) => z > 0);
 
-    log(`${this} FlattenEnd`);
     return rv;
   },
 };
