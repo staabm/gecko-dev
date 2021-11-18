@@ -8545,6 +8545,9 @@ void PresShell::EventHandler::RecordEventHandlingResponsePerformance(
     return;
   }
 
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/3608
+  recordreplay::RecordReplayAssert("PresShell::EventHandler::RecordEventHandlingResponsePerformance #1");
+
   TimeStamp now = TimeStamp::Now();
   double millis = (now - aEvent->mTimeStamp).ToMilliseconds();
   Telemetry::Accumulate(Telemetry::INPUT_EVENT_RESPONSE_MS, millis);
