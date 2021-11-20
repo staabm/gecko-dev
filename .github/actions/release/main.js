@@ -30,15 +30,22 @@ function platformTasks(platform) {
     platform
   );
 
-  const releasePlaywrightTask = newTask(
-    `Release Playwright ${platform}`,
-    {
-      kind: "ReleaseRuntime",
-      runtime: "geckoPlaywright",
-      revision: playwrightRevision,
-    },
-    platform
-  );
+  const tasks = [releaseReplayTask];
 
-  return [releaseReplayTask, releasePlaywrightTask];
+  // Playwright builds aren't yet available for windows.
+  if (platform != "windows") {
+    const releasePlaywrightTask = newTask(
+      `Release Playwright ${platform}`,
+      {
+        kind: "ReleaseRuntime",
+        runtime: "geckoPlaywright",
+        revision: playwrightRevision,
+      },
+      platform
+    );
+
+    tasks.push(releasePlaywrightTask);
+  }
+
+  return tasks;
 }

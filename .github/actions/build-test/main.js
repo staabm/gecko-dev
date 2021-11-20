@@ -41,31 +41,33 @@ function platformTasks(platform) {
     [buildReplayTask]
   );
 
-  const buildPlaywrightTask = newTask(
-    `Build Gecko/Playwright ${platform}`,
-    {
-      kind: "BuildRuntime",
-      runtime: "geckoPlaywright",
-      revision: playwrightRevision,
-    },
-    platform
-  );
+  const tasks = [buildReplayTask, testReplayTask];
 
-  const testPlaywrightTask = newTask(
-    `Test Gecko/Playwright ${platform}`,
-    {
-      kind: "PlaywrightLiveTests",
-      runtime: "geckoPlaywright",
-      revision: playwrightRevision,
-    },
-    platform,
-    [buildPlaywrightTask]
-  );
+  // Playwright builds aren't yet available for windows.
+  if (platform != "windows") {
+    const buildPlaywrightTask = newTask(
+      `Build Gecko/Playwright ${platform}`,
+      {
+        kind: "BuildRuntime",
+        runtime: "geckoPlaywright",
+        revision: playwrightRevision,
+      },
+      platform
+    );
 
-  return [
-    buildReplayTask,
-    testReplayTask,
-    buildPlaywrightTask,
-    testPlaywrightTask
-  ];
+    const testPlaywrightTask = newTask(
+      `Test Gecko/Playwright ${platform}`,
+      {
+        kind: "PlaywrightLiveTests",
+        runtime: "geckoPlaywright",
+        revision: playwrightRevision,
+      },
+      platform,
+      [buildPlaywrightTask]
+    );
+
+    tasks.push(buildPlaywrightTask, testPlaywrightTask);
+  }
+
+  return tasks;
 }
