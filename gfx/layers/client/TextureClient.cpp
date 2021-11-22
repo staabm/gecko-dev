@@ -1810,6 +1810,13 @@ int32_t ShmemTextureReadLock::GetReadCount() {
   if (!mAllocSuccess) {
     return 0;
   }
+  if (recordreplay::HasDivergedFromRecording()) {
+    // After diverging from the recording, we won't have any read count values
+    // we can replay. Pretend there aren't any other readers so that the shmem
+    // buffer can be written to. This only happens when replaying, when there
+    // truly aren't any other readers.
+    return 1;
+  }
   ShmReadLockInfo* info = GetShmReadLockInfoPtr();
   return recordreplay::RecordReplayValue("ShmemTextureReadLock::GetReadCount",
                                          info->readCount);
