@@ -15,7 +15,6 @@
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Assertions.h"
-#include "mozilla/RecordReplay.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/Vector.h"
@@ -123,15 +122,6 @@ static GetProxyDllInfoFnT ResolveGetProxyDllInfo() {
 #endif  // !defined(MOZILLA_INTERNAL_API)
 
 UniquePtr<RegisteredProxy> RegisterProxy() {
-  // Disallow registering proxies when recording/replaying. This is both because
-  // replaying this behavior which messes with COM state is tricky, and because
-  // it's not clear what this code is doing or whether callers which register
-  // proxies use the result here for anything (e.g. PlatformChild registers
-  // proxies but never does anything with the result).
-  if (recordreplay::IsRecordingOrReplaying()) {
-    return nullptr;
-  }
-
 #if !defined(MOZILLA_INTERNAL_API)
   GetProxyDllInfoFnT GetProxyDllInfoFn = ResolveGetProxyDllInfo();
   MOZ_ASSERT(!!GetProxyDllInfoFn);
@@ -204,11 +194,6 @@ UniquePtr<RegisteredProxy> RegisterProxy() {
 
 UniquePtr<RegisteredProxy> RegisterProxy(const wchar_t* aLeafName,
                                          RegistrationFlags aFlags) {
-  // Disallow registering proxies when recording/replaying, see above.
-  if (recordreplay::IsRecordingOrReplaying()) {
-    return nullptr;
-  }
-
   wchar_t modulePathBuf[MAX_PATH + 1] = {0};
   if (!BuildLibPath(aFlags, modulePathBuf, ArrayLength(modulePathBuf),
                     aLeafName)) {
