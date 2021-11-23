@@ -10,6 +10,7 @@
 #include "Accessible-inl.h"
 #include "mozilla/a11y/PlatformChild.h"
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/RecordReplay.h"
 #include "RootAccessible.h"
 
 namespace mozilla {
@@ -20,7 +21,12 @@ static StaticAutoPtr<PlatformChild> sPlatformChild;
 DocAccessibleChild::DocAccessibleChild(DocAccessible* aDoc, IProtocol* aManager)
     : DocAccessibleChildBase(aDoc), mEmulatedWindowHandle(nullptr) {
   MOZ_COUNT_CTOR_INHERITED(DocAccessibleChild, DocAccessibleChildBase);
-  if (!sPlatformChild) {
+
+  // Avoid creating PlatformChild when replaying, to avoid registering
+  // COM proxies. Changing internal COM state isn't supported when replaying,
+  // and isn't necessary as COM call behavior is replayed from the recording.
+  if (!sPlatformChild && !recordreplay::IsReplaying()) {
+    recordreplay::AutoPassThroughThreadEvents pt;
     sPlatformChild = new PlatformChild();
     ClearOnShutdown(&sPlatformChild, ShutdownPhase::Shutdown);
   }
