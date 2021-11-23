@@ -426,6 +426,9 @@ int32_t gfxGDIFont::GetGlyphWidth(uint16_t aGID) {
   DCForMetrics dc;
   AutoSelectFont fs(dc, GetHFONT());
 
+  // For https://github.com/RecordReplay/backend/issues/3659
+  recordreplay::RecordReplayAssert("gfxGDIFont::GetGlyphWidth #1 %u", aGID);
+
   int devWidth;
   if (GetCharWidthI(dc, aGID, 1, nullptr, &devWidth)) {
     // clamp value to range [0..0x7fff], and convert to 16.16 fixed-point
@@ -445,6 +448,9 @@ bool gfxGDIFont::GetGlyphBounds(uint16_t aGID, gfxRect* aBounds, bool aTight) {
   AutoSelectFont fs(dc, GetHFONT());
 
   if (mIsBitmap) {
+    // For https://github.com/RecordReplay/backend/issues/3659
+    recordreplay::RecordReplayAssert("gfxGDIFont::GetGlyphWidth #1 %u", aGID);
+
     int devWidth;
     if (!GetCharWidthI(dc, aGID, 1, nullptr, &devWidth)) {
       return false;

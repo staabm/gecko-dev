@@ -1388,6 +1388,9 @@ bool Factory::ReadbackTexture(uint8_t* aDestData, int32_t aDestStride,
 // static
 void CriticalLogger::OutputMessage(const std::string& aString, int aLevel,
                                    bool aNoNewline) {
+  // Include critical graphics errors in record/replay logs.
+  recordreplay::PrintLog("GraphicsCriticalError %s", aString.c_str());
+
   if (Factory::GetLogForwarder()) {
     Factory::GetLogForwarder()->Log(aString);
   }
