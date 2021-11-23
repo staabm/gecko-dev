@@ -48,6 +48,10 @@ const {
   "resource://devtools/server/actors/replay/connection.js"
 );
 
+const { pingTelemetry } = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/telemetry.js"
+);
+
 ChromeUtils.defineModuleGetter(
   this,
   "Services",
@@ -1453,6 +1457,7 @@ function createRecordingButton() {
       node.refreshStatus();
 
       Services.prefs.addObserver("devtools.recordreplay.user-token", () => {
+        pingTelemetry("browser", "recording-button-refresh-status-on-user-token-change")
         node.refreshStatus();
       });
     },
@@ -1511,27 +1516,55 @@ function createRecordingButton() {
 
 function refreshRecordingButton(doc) {
   const node = doc.getElementById("record-button");
+  const refreshed = [];
   if (node) {
     node.refreshStatus();
+    refreshed.push("record-button");
   }
   const signinNode = doc.getElementById("replay-signin-button");
   if (signinNode) {
     signinNode.refreshStatus();
+    refreshed.push("replay-signin-button");
   }
+  return refreshed.join("-and-");
 }
 
+const REFRESH_PING_TELEMETRY_INTERVAL_MS = 5 * 60 * 1000;
+let gLastPingTelemetryForRefresh = Number.NEGATIVE_INFINITY;
 function refreshAllRecordingButtons() {
+  let findRecButton = "not-found";
+  let telemetryData = {};
   try {
     for (const w of Services.wm.getEnumerator("navigator:browser")) {
-      refreshRecordingButton(w.document);
+      const refreshedButtons = refreshRecordingButton(w.document);
+      if (refreshedButtons) {
+        findRecButton = `found-${refreshedButtons}`;
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    findRecButton = "threw";
+    telemetryData.message = e.message;
+    telemetryData.stack = e.stack;
+  } finally {
+    const timeDelta = Date.now() - gLastPingTelemetryForRefresh;
+    if (timeDelta > REFRESH_PING_TELEMETRY_INTERVAL_MS) {
+      pingTelemetry(
+        "browser",
+        "refresh-all-recording-buttons",
+        { findRecButton, ...telemetryData }
+      );
+      gLastPingTelemetryForRefresh = Date.now();
+    }
+  }
 }
 
 // When state changes which affects the recording buttons, we try to update the
 // buttons immediately, but make sure that the recording button state does not
 // get out of sync with the display state of the button.
-setInterval(refreshAllRecordingButtons, 2000);
+pingTelemetry("browser", "set-interval-refresh-all-recording-buttons");
+setInterval(() => {
+  refreshAllRecordingButtons();
+}, 2000);
 
 async function runTestScript() {
   const script = env.get("RECORD_REPLAY_TEST_SCRIPT");

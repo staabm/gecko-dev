@@ -346,14 +346,20 @@ if (ReplayAuth.hasOriginalApiKey()) {
 
     const timeToExpiration = expiration - Date.now();
     if (timeToExpiration <= 0) {
-      pingTelemetry("browser", "auth-expired", {expiration, authId: payload.sub});
+      pingTelemetry("browser", "auth-expired", {
+        expiration,
+        authId: payload.payload.sub,
+      });
       clearUserToken();
       return;
     }
 
     gExpirationTimer = setTimeout(
       () => {
-        pingTelemetry("browser", "auth-expired", {expiration, authId: payload.sub});
+        pingTelemetry("browser", "auth-expired", {
+          expiration,
+          authId: payload.payload.sub,
+        });
         clearUserToken();
       },
       timeToExpiration
