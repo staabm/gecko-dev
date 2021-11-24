@@ -63,6 +63,7 @@
 #include "mozilla/layers/UiCompositorControllerParent.h"
 #include "mozilla/layers/WebRenderBridgeParent.h"
 #include "mozilla/layers/AsyncImagePipelineManager.h"
+#include "mozilla/recordreplay/Graphics.h"
 #include "mozilla/webrender/WebRenderAPI.h"
 #include "mozilla/webgpu/WebGPUParent.h"
 #include "mozilla/webrender/RenderThread.h"
@@ -107,8 +108,6 @@
 #include "LayerScope.h"
 
 namespace mozilla {
-
-namespace recordreplay { TimeStamp CompositeTime(); }
 
 namespace layers {
 

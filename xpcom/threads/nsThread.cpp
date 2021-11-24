@@ -120,12 +120,6 @@ uint32_t nsThread::sMaxActiveThreads;
 const uint32_t kTelemetryWakeupCountLimit = 100;
 #endif
 
-namespace mozilla {
-  namespace recordreplay {
-    extern void MaybeCreateCheckpoint();
-  }
-}
-
 //-----------------------------------------------------------------------------
 // Because we do not have our own nsIFactory, we have to implement nsIClassInfo
 // somewhat manually.
@@ -227,7 +221,6 @@ class nsThreadStartupEvent final : public Runnable {
   ~nsThreadStartupEvent() = default;
 
   NS_IMETHOD Run() override {
-    recordreplay::RecordReplayAssert("nsThreadStartupEvent::Run");
     ReentrantMonitorAutoEnter mon(mMon);
     mInitialized = true;
     mon.Notify();
@@ -1486,8 +1479,6 @@ PerformanceCounterState::Snapshot PerformanceCounterState::RunnableWillRun(
 }
 
 void PerformanceCounterState::RunnableDidRun(Snapshot&& aSnapshot) {
-  recordreplay::RecordReplayAssert("PerformanceCounterState::RunnableDidRun Start");
-
   // First thing: Restore our mCurrentEventLoopDepth so we can use
   // IsNestedRunnable().
   mCurrentEventLoopDepth = aSnapshot.mOldEventLoopDepth;
@@ -1496,7 +1487,6 @@ void PerformanceCounterState::RunnableDidRun(Snapshot&& aSnapshot) {
   // don't.
   TimeStamp now;
   if (mCurrentPerformanceCounter || mIsMainThread || IsNestedRunnable()) {
-    recordreplay::RecordReplayAssert("PerformanceCounterState::RunnableDidRun #1");
     now = TimeStamp::Now();
   }
   if (mCurrentPerformanceCounter || mIsMainThread) {

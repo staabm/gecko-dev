@@ -20,6 +20,7 @@
 #ifdef XP_DARWIN
 #  include "mozilla/layers/TextureSync.h"  // for TextureSync
 #endif
+#include "mozilla/recordreplay/Graphics.h"
 #include "nsAString.h"
 #include "nsDebug.h"          // for NS_WARNING
 #include "nsPoint.h"          // for IntPoint
@@ -30,11 +31,6 @@
 
 namespace mozilla {
 using namespace gfx;
-
-namespace recordreplay {
-  layers::TextureHost* CreateTextureHost(layers::PTextureChild* aChild);
-}
-
 namespace layers {
 
 class Layer;

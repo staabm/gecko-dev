@@ -126,8 +126,6 @@ static mozilla::LazyLogModule sRefreshDriverLog("nsRefreshDriver");
 #  define REFRESH_WAIT_WARNING 1
 #endif
 
-namespace mozilla::recordreplay { void OnPaint(); }
-
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(nsRefreshDriver::TickReasons);
 
 namespace {
@@ -345,8 +343,6 @@ class RefreshDriverTimer {
       return;
     }
 
-    recordreplay::RecordReplayAssert("TickRefreshDrivers Start");
-
     for (nsRefreshDriver* driver : aDrivers.Clone()) {
       // don't poke this driver if it's in test mode
       if (driver->IsTestControllingRefreshesEnabled()) {
@@ -355,8 +351,6 @@ class RefreshDriverTimer {
 
       TickDriver(driver, aId, aNow);
     }
-
-    recordreplay::RecordReplayAssert("TickRefreshDrivers Done");
   }
 
   /*
@@ -810,8 +804,6 @@ class VsyncRefreshDriverTimer : public RefreshDriverTimer {
     }
 
     ++sActiveVsyncTimers;
-
-    recordreplay::RecordReplayAssert("VsyncRefreshDriverTimer::StartTimer #1");
   }
 
   void StopTimer() override {
@@ -2227,8 +2219,6 @@ void nsRefreshDriver::Tick(VsyncId aId, TimeStamp aNowTime) {
 
           LogPresShellObserver::Run run(rawPresShell, this);
 
-          recordreplay::RecordReplayAssert("nsRefreshDriver::Tick #1");
-
           RefPtr<PresShell> presShell = rawPresShell;
           presShell->mObservingStyleFlushes = false;
           presShell->FlushPendingNotifications(
@@ -2257,8 +2247,6 @@ void nsRefreshDriver::Tick(VsyncId aId, TimeStamp aNowTime) {
         }
 
         LogPresShellObserver::Run run(rawPresShell, this);
-
-        recordreplay::RecordReplayAssert("nsRefreshDriver::Tick #2");
 
         RefPtr<PresShell> presShell = rawPresShell;
         presShell->mObservingLayoutFlushes = false;

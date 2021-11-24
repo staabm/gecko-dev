@@ -3084,8 +3084,6 @@ void MediaDecoderStateMachine::SetVideoDecodeModeInternal(
     VideoDecodeMode aMode) {
   MOZ_ASSERT(OnTaskQueue());
 
-  recordreplay::RecordReplayAssert("MediaDecoderStateMachine::SetVideoDecodeModeInternal %d", aMode);
-
   LOG("SetVideoDecodeModeInternal(), VideoDecodeMode=(%s->%s), "
       "mVideoDecodeSuspended=%c",
       mVideoDecodeMode == VideoDecodeMode::Normal ? "Normal" : "Suspend",
@@ -3097,14 +3095,12 @@ void MediaDecoderStateMachine::SetVideoDecodeModeInternal(
       aMode == VideoDecodeMode::Suspend) {
     LOG("SetVideoDecodeModeInternal(), early return because preference off and "
         "set to Suspend");
-    recordreplay::RecordReplayAssert("MediaDecoderStateMachine::SetVideoDecodeModeInternal #1");
     return;
   }
 
   if (aMode == mVideoDecodeMode) {
     LOG("SetVideoDecodeModeInternal(), early return because the mode does not "
         "change");
-    recordreplay::RecordReplayAssert("MediaDecoderStateMachine::SetVideoDecodeModeInternal #2");
     return;
   }
 
@@ -3113,7 +3109,6 @@ void MediaDecoderStateMachine::SetVideoDecodeModeInternal(
 
   // Start timer to trigger suspended video decoding.
   if (mVideoDecodeMode == VideoDecodeMode::Suspend) {
-    recordreplay::RecordReplayAssert("MediaDecoderStateMachine::SetVideoDecodeModeInternal #3");
     TimeStamp target = TimeStamp::Now() + SuspendBackgroundVideoDelay();
 
     RefPtr<MediaDecoderStateMachine> self = this;
@@ -3121,24 +3116,18 @@ void MediaDecoderStateMachine::SetVideoDecodeModeInternal(
         target, [=]() { self->OnSuspendTimerResolved(); },
         []() { MOZ_DIAGNOSTIC_ASSERT(false); });
     mOnPlaybackEvent.Notify(MediaPlaybackEvent::StartVideoSuspendTimer);
-    recordreplay::RecordReplayAssert("MediaDecoderStateMachine::SetVideoDecodeModeInternal #4");
     return;
   }
 
   // Resuming from suspended decoding
 
-  recordreplay::RecordReplayAssert("MediaDecoderStateMachine::SetVideoDecodeModeInternal #5");
-
   // If suspend timer exists, destroy it.
   CancelSuspendTimer();
 
   if (mVideoDecodeSuspended) {
-    recordreplay::RecordReplayAssert("MediaDecoderStateMachine::SetVideoDecodeModeInternal #6");
     const auto target = mMediaSink->IsStarted() ? GetClock() : GetMediaTime();
     mStateObj->HandleResumeVideoDecoding(target + detail::RESUME_VIDEO_PREMIUM);
   }
-
-  recordreplay::RecordReplayAssert("MediaDecoderStateMachine::SetVideoDecodeModeInternal Done");
 }
 
 void MediaDecoderStateMachine::BufferedRangeUpdated() {

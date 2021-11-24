@@ -61,7 +61,6 @@ PlatformChild::PlatformChild()
   mozilla::mscom::MTADeletePtr<mozilla::mscom::ActivationContextRegion>
       tmpActCtxMTA;
   mozilla::mscom::EnsureMTA([actCtxResourceId, &tmpActCtxMTA]() -> void {
-    recordreplay::Diagnostic("PlatformChild::PlatformChild callback #1");
     tmpActCtxMTA.reset(
         new mozilla::mscom::ActivationContextRegion(actCtxResourceId));
   });
@@ -72,7 +71,6 @@ PlatformChild::PlatformChild()
 
   UniquePtr<mozilla::mscom::RegisteredProxy> customProxy;
   mozilla::mscom::EnsureMTA([&customProxy]() -> void {
-    recordreplay::Diagnostic("PlatformChild::PlatformChild callback #2");
     customProxy = mozilla::mscom::RegisterProxy();
   });
   mCustomProxy = std::move(customProxy);
@@ -80,7 +78,6 @@ PlatformChild::PlatformChild()
   // IA2 needs to be registered in both the main thread's STA as well as the MTA
   UniquePtr<mozilla::mscom::RegisteredProxy> ia2ProxyMTA;
   mozilla::mscom::EnsureMTA([&ia2ProxyMTA]() -> void {
-    recordreplay::Diagnostic("PlatformChild::PlatformChild callback #3");
     ia2ProxyMTA = mozilla::mscom::RegisterProxy(L"ia2marshal.dll");
   });
   mIA2ProxyMTA = std::move(ia2ProxyMTA);

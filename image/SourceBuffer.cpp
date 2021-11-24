@@ -403,6 +403,7 @@ nsresult SourceBuffer::Append(const char* aData, size_t aLength) {
     }
   }
 
+  // https://github.com/RecordReplay/backend/issues/3573
   recordreplay::Diagnostic("image::SourceBuffer::Append %p %p %zu %zu",
                            currentChunkData, aData, currentChunkLength, forCurrentChunk);
 

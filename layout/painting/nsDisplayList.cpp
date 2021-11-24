@@ -4369,11 +4369,6 @@ void nsDisplayThemedBackground::PaintInternal(nsDisplayListBuilder* aBuilder,
                                               gfxContext* aCtx,
                                               const nsRect& aBounds,
                                               nsRect* aClipRect) {
-  // This is disabled for now, see backend #305.
-  //recordreplay::RecordReplayAssert("nsDisplayThemedBackground::PaintInternal %.2f %.2f %.2f %.2f",
-  //                                 mBackgroundRect.X(), mBackgroundRect.Y(),
-  //                                 mBackgroundRect.Width(), mBackgroundRect.Height());
-
   // XXXzw this ignores aClipRect.
   nsPresContext* presContext = StyleFrame()->PresContext();
   nsITheme* theme = presContext->Theme();

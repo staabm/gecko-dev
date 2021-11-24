@@ -74,8 +74,6 @@
   extern ProtectedMemoryAllocator *gBreakpadAllocator;
 #endif
 
-namespace mozilla::recordreplay { bool IsTearingDownProcess(); }
-
 namespace google_breakpad {
 
 static union {

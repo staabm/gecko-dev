@@ -38,6 +38,7 @@
 #include "mozilla/layers/TextureClientOGL.h"
 #include "mozilla/layers/TextureClientRecycleAllocator.h"
 #include "mozilla/layers/TextureRecorded.h"
+#include "mozilla/recordreplay/Graphics.h"
 #include "nsDebug.h"  // for NS_ASSERTION, NS_WARNING, etc
 #include "nsISerialEventTarget.h"
 #include "nsISupportsImpl.h"  // for MOZ_COUNT_CTOR, etc
@@ -73,13 +74,6 @@
     do {                   \
     } while (0)
 #endif
-
-namespace mozilla::recordreplay {
-  void RegisterTextureChild(layers::PTextureChild* aChild,
-                            layers::TextureData* aData,
-                            const layers::SurfaceDescriptor& aDesc,
-                            layers::TextureFlags aFlags);
-}
 
 namespace mozilla::layers {
 
@@ -777,7 +771,6 @@ void TextureClient::Unlock() {
 }
 
 void TextureClient::EnableReadLock() {
-  recordreplay::RecordReplayAssert("TextureClient::EnableReadLock %d", !!mReadLock);
   if (!mReadLock) {
     if (mAllocator->GetTileLockAllocator()) {
       mReadLock = NonBlockingTextureReadLock::Create(mAllocator);
@@ -1355,8 +1348,6 @@ already_AddRefed<TextureClient> TextureClient::CreateForRawBufferAccess(
     gfx::IntSize aSize, gfx::BackendType aMoz2DBackend,
     LayersBackend aLayersBackend, TextureFlags aTextureFlags,
     TextureAllocationFlags aAllocFlags) {
-  recordreplay::RecordReplayAssert("TextureClient::CreateForRawBufferAccess");
-
   // also test the validity of aAllocator
   if (!aAllocator || !aAllocator->IPCOpen()) {
     return nullptr;

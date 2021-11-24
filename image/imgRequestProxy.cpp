@@ -500,16 +500,12 @@ imgRequestProxy::StartDecoding(uint32_t aFlags) {
 bool imgRequestProxy::StartDecodingWithResult(uint32_t aFlags) {
   // Flag this, so we know to request after validation if pending.
   if (IsValidating()) {
-    recordreplay::RecordReplayAssert("imgRequestProxy::StartDecodingWithResult #1");
     mDecodeRequested = true;
     return false;
   }
 
   RefPtr<Image> image = GetImage();
   if (image) {
-    nsIURI* uri = image->GetURI();
-    recordreplay::RecordReplayAssert("imgRequestProxy::StartDecodingWithResult #2 %s",
-                                     uri ? uri->GetSpecOrDefault().get() : "<no uri>");
     return image->StartDecodingWithResult(aFlags);
   }
 
@@ -517,14 +513,11 @@ bool imgRequestProxy::StartDecodingWithResult(uint32_t aFlags) {
     GetOwner()->StartDecoding();
   }
 
-  recordreplay::RecordReplayAssert("imgRequestProxy::StartDecodingWithResult #3");
   return false;
 }
 
 imgIContainer::DecodeResult imgRequestProxy::RequestDecodeWithResult(
     uint32_t aFlags) {
-  recordreplay::RecordReplayAssert("imgRequestProxy::RequestDecodeWithResult");
-
   if (IsValidating()) {
     mDecodeRequested = true;
     return imgIContainer::DECODE_REQUESTED;
@@ -695,9 +688,6 @@ imgRequestProxy::GetProducerId(uint32_t* aId) {
 
 NS_IMETHODIMP
 imgRequestProxy::GetImageStatus(uint32_t* aStatus) {
-  recordreplay::RecordReplayAssert("imgRequestProxy::GetImageStatus %lu",
-                                   recordreplay::ThingIndex(GetOwner()));
-
   if (IsValidating()) {
     // We are currently validating the image, and so our status could revert if
     // we discard the cache. We should also be deferring notifications, such
@@ -981,8 +971,6 @@ static const char* NotificationTypeToString(int32_t aType) {
 
 void imgRequestProxy::Notify(int32_t aType,
                              const mozilla::gfx::IntRect* aRect) {
-  recordreplay::RecordReplayAssert("imgRequestProxy::Notify");
-
   MOZ_ASSERT(aType != imgINotificationObserver::LOAD_COMPLETE,
              "Should call OnLoadComplete");
 

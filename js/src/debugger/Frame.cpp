@@ -1063,6 +1063,7 @@ Result<Completion> js::DebuggerGenericEval(
   RootedValue rval(cx);
   AbstractFramePtr frame = iter ? iter->abstractFramePtr() : NullFramePtr();
 
+  // https://github.com/RecordReplay/backend/issues/3079
   const char* filename = options.filename() ? options.filename() : "debugger eval code";
   mozilla::recordreplay::RecordReplayAssert("DebuggerGenericEval %s", filename);
 
@@ -1071,6 +1072,7 @@ Result<Completion> js::DebuggerGenericEval(
       filename,
       options.lineno(), &rval);
 
+  // https://github.com/RecordReplay/backend/issues/3079
   mozilla::recordreplay::RecordReplayAssert("DebuggerGenericEval Done %d", ok);
 
   Rooted<Completion> completion(cx, Completion::fromJSResult(cx, ok, rval));

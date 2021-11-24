@@ -22,6 +22,7 @@
 #include "mozilla/layers/TextureHostOGL.h"  // for TextureHostOGL
 #include "mozilla/layers/TiledContentHost.h"
 #include "mozilla/layers/PaintedLayerComposite.h"
+#include "mozilla/recordreplay/Graphics.h"
 #include "mozilla/mozalloc.h"  // for operator delete
 #include "mozilla/Unused.h"
 #include "nsDebug.h"   // for NS_WARNING, NS_ASSERTION
@@ -32,11 +33,6 @@
 #endif
 
 namespace mozilla {
-
-namespace recordreplay {
-  layers::TextureHost* CreateTextureHost(layers::PTextureChild* aChild);
-}
-
 namespace layers {
 
 class ClientTiledLayerBuffer;

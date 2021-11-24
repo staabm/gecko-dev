@@ -306,7 +306,7 @@ using namespace mozilla::widget;
 using mozilla::loader::PScriptCacheChild;
 
 namespace mozilla {
-namespace recordreplay { void FinishRecording(); }
+
 namespace dom {
 
 // IPC sender for remote GC/CC logging.
@@ -713,9 +713,11 @@ bool ContentChild::Init(MessageLoop* aIOLoop, base::ProcessId aParentPid,
   if (channel && !channel->SendBuildIDsMatchMessage(aParentBuildID)) {
     // We need to quit this process if the buildID doesn't match the parent's.
     // This can occur when an update occurred in the background.
+    // https://github.com/RecordReplay/backend/issues/3414
     recordreplay::RecordReplayAssert("ContentChild::Init #10");
     ProcessChild::QuickExit();
   }
+  // https://github.com/RecordReplay/backend/issues/3414
   recordreplay::RecordReplayAssert("ContentChild::Init #11");
 
 #if defined(__OpenBSD__) && defined(MOZ_SANDBOX)

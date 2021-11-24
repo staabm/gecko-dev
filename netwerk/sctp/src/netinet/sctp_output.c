@@ -10810,8 +10810,6 @@ do_it_again:
 	return;
 }
 
-extern void RecordReplayAssertFromC(const char* aFormat, ...);
-
 int
 sctp_output(
 	struct sctp_inpcb *inp,
@@ -10831,20 +10829,16 @@ sctp_output(
 #endif
 	int flags)
 {
-  RecordReplayAssertFromC("sctp_output start");
-
 	if (inp == NULL) {
 		SCTP_LTRACE_ERR_RET_PKT(m, inp, NULL, NULL, SCTP_FROM_SCTP_OUTPUT, EINVAL);
-    RecordReplayAssertFromC("sctp_output #1");
 		return (EINVAL);
 	}
 
 	if (inp->sctp_socket == NULL) {
 		SCTP_LTRACE_ERR_RET_PKT(m, inp, NULL, NULL, SCTP_FROM_SCTP_OUTPUT, EINVAL);
-    RecordReplayAssertFromC("sctp_output #2");
 		return (EINVAL);
 	}
-	int rv = (sctp_sosend(inp->sctp_socket,
+	return (sctp_sosend(inp->sctp_socket,
 			    addr,
 			    (struct uio *)NULL,
 			    m,
@@ -10855,8 +10849,6 @@ sctp_output(
 			    flags, p
 #endif
 			));
-  RecordReplayAssertFromC("sctp_output done %d", rv);
-  return rv;
 }
 
 void

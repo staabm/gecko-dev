@@ -67,13 +67,9 @@ Decoder::Decoder(RasterImage* aImage)
       mDecodeDone(false),
       mError(false),
       mShouldReportError(false),
-      mFinalizeFrames(true) {
-  recordreplay::RegisterThing(this);
-}
+      mFinalizeFrames(true) {}
 
 Decoder::~Decoder() {
-  recordreplay::UnregisterThing(this);
-
   MOZ_ASSERT(mProgress == NoProgress || !mImage,
              "Destroying Decoder without taking all its progress changes");
   MOZ_ASSERT(mInvalidRect.IsEmpty() || !mImage,
@@ -164,9 +160,6 @@ nsresult Decoder::Init() {
 LexerResult Decoder::Decode(IResumable* aOnResume /* = nullptr */) {
   MOZ_ASSERT(mInitialized, "Should be initialized here");
   MOZ_ASSERT(mIterator, "Should have a SourceBufferIterator");
-
-  recordreplay::RecordReplayAssert("Decoder::Decode %u",
-                                   recordreplay::ThingIndex(this));
 
   // If we're already done, don't attempt to keep decoding.
   if (GetDecodeDone()) {
@@ -340,8 +333,6 @@ RawAccessFrameRef Decoder::AllocateFrameInternal(
     const gfx::IntSize& aOutputSize, SurfaceFormat aFormat,
     const Maybe<AnimationParams>& aAnimParams,
     RawAccessFrameRef&& aPreviousFrame) {
-  recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal Start");
-
   if (HasError()) {
     return RawAccessFrameRef();
   }
@@ -398,9 +389,7 @@ RawAccessFrameRef Decoder::AllocateFrameInternal(
       // animation parameters elsewhere. For now we just drop it.
       bool blocked = ref.get() == mRestoreFrame.get();
       if (!blocked) {
-        recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal #10");
         blocked = NS_FAILED(ref->InitForDecoderRecycle(aAnimParams.ref()));
-        recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal #11");
       }
 
       if (blocked) {
@@ -418,14 +407,11 @@ RawAccessFrameRef Decoder::AllocateFrameInternal(
 
     bool nonPremult = bool(mSurfaceFlags & SurfaceFlags::NO_PREMULTIPLY_ALPHA);
     auto frame = MakeNotNull<RefPtr<imgFrame>>();
-    recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal #12");
     if (NS_FAILED(frame->InitForDecoder(aOutputSize, aFormat, nonPremult,
                                         aAnimParams, bool(mFrameRecycler)))) {
-      recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal #13");
       NS_WARNING("imgFrame::Init should succeed");
       return RawAccessFrameRef();
     }
-    recordreplay::RecordReplayAssert("Decoder::AllocateFrameInternal #14");
 
     ref = frame->RawAccessRef();
     if (!ref) {

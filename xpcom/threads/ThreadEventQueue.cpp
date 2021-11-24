@@ -67,8 +67,6 @@ bool ThreadEventQueue::PutEvent(already_AddRefed<nsIRunnable>&& aEvent,
 bool ThreadEventQueue::PutEventInternal(already_AddRefed<nsIRunnable>&& aEvent,
                                         EventQueuePriority aPriority,
                                         NestedSink* aSink) {
-  recordreplay::RecordReplayAssert("ThreadEventQueue::PutEventInternal Start");
-
   // We want to leak the reference when we fail to dispatch it, so that
   // we won't release the event in a wrong thread.
   LeakRefPtr<nsIRunnable> event(std::move(aEvent));
@@ -100,13 +98,11 @@ bool ThreadEventQueue::PutEventInternal(already_AddRefed<nsIRunnable>&& aEvent,
     MutexAutoLock lock(mLock);
 
     if (mEventsAreDoomed) {
-      recordreplay::RecordReplayAssert("ThreadEventQueue::PutEventInternal #1");
       return false;
     }
 
     if (aSink) {
       if (!aSink->mQueue) {
-        recordreplay::RecordReplayAssert("ThreadEventQueue::PutEventInternal #2");
         return false;
       }
 
@@ -128,14 +124,11 @@ bool ThreadEventQueue::PutEventInternal(already_AddRefed<nsIRunnable>&& aEvent,
     obs->OnDispatchedEvent();
   }
 
-  recordreplay::RecordReplayAssert("ThreadEventQueue::PutEventInternal Done");
   return true;
 }
 
 already_AddRefed<nsIRunnable> ThreadEventQueue::GetEvent(
     bool aMayWait, mozilla::TimeDuration* aLastEventDelay) {
-  recordreplay::RecordReplayAssert("ThreadEventQueue::GetEvent Start");
-
   nsCOMPtr<nsIRunnable> event;
   {
     // Scope for lock.  When we are about to return, we will exit this
@@ -168,8 +161,6 @@ already_AddRefed<nsIRunnable> ThreadEventQueue::GetEvent(
       mEventsAvailable.Wait();
     }
   }
-
-  recordreplay::RecordReplayAssert("ThreadEventQueue::GetEvent Done");
 
   return event.forget();
 }

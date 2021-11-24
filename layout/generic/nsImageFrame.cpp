@@ -1811,10 +1811,6 @@ void nsDisplayImage::Paint(nsDisplayListBuilder* aBuilder, gfxContext* aCtx) {
       OldImageHasDifferentRatio(*frame, *mImage, mPrevImage);
 
   uint32_t flags = imgIContainer::FLAG_NONE;
-
-  recordreplay::RecordReplayAssert("nsDisplayImage::Paint %d %d",
-                                   aBuilder->ShouldSyncDecodeImages(), oldImageIsDifferent);
-
   if (aBuilder->ShouldSyncDecodeImages() || oldImageIsDifferent) {
     flags |= imgIContainer::FLAG_SYNC_DECODE;
   }
@@ -2078,9 +2074,6 @@ ImgDrawResult nsImageFrame::PaintImage(gfxContext& aRenderingContext,
   if (mForceSyncDecoding) {
     flags |= imgIContainer::FLAG_SYNC_DECODE;
   }
-
-  recordreplay::RecordReplayAssert("nsImageFrame::PaintImage %u %u",
-                                   aFlags, mForceSyncDecoding);
 
   Maybe<SVGImageContext> svgContext;
   SVGImageContext::MaybeStoreContextPaint(svgContext, this, aImage);

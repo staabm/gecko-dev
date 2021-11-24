@@ -507,8 +507,6 @@ AsyncFetchAndSetIconForPage::AsyncFetchAndSetIconForPage(
 
 NS_IMETHODIMP
 AsyncFetchAndSetIconForPage::Run() {
-  recordreplay::RecordReplayAssert("AsyncFetchAndSetIconForPage::Run Start");
-
   MOZ_ASSERT(!NS_IsMainThread());
 
   // Try to fetch the icon from the database.
@@ -546,7 +544,6 @@ AsyncFetchAndSetIconForPage::Run() {
 
   // Fetch the icon from the network, the request starts from the main-thread.
   // When done this will associate the icon to the page and notify.
-  recordreplay::RecordReplayAssert("AsyncFetchAndSetIconForPage::Run PostEvent");
   nsCOMPtr<nsIRunnable> event =
       NewRunnableMethod("places::AsyncFetchAndSetIconForPage::FetchFromNetwork",
                         this, &AsyncFetchAndSetIconForPage::FetchFromNetwork);
@@ -556,10 +553,7 @@ AsyncFetchAndSetIconForPage::Run() {
 nsresult AsyncFetchAndSetIconForPage::FetchFromNetwork() {
   MOZ_ASSERT(NS_IsMainThread());
 
-  recordreplay::RecordReplayAssert("AsyncFetchAndSetIconForPage::FetchFromNetwork Start");
-
   if (mCanceled) {
-    recordreplay::RecordReplayAssert("AsyncFetchAndSetIconForPage::FetchFromNetwork #1");
     return NS_OK;
   }
 
@@ -613,7 +607,6 @@ nsresult AsyncFetchAndSetIconForPage::FetchFromNetwork() {
   if (NS_SUCCEEDED(rv)) {
     mRequest = channel;
   }
-  recordreplay::RecordReplayAssert("AsyncFetchAndSetIconForPage::FetchFromNetwork Done");
   return rv;
 }
 

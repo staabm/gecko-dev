@@ -225,16 +225,12 @@ class SupportChecker {
 };  // SupportChecker
 
 PDMFactory::PDMFactory() {
-  recordreplay::RecordReplayAssert("PDMFactory::PDMFactory Start");
   EnsureInit();
   CreatePDMs();
   CreateNullPDM();
-  recordreplay::RecordReplayAssert("PDMFactory::PDMFactory Done");
 }
 
-PDMFactory::~PDMFactory() {
-  recordreplay::RecordReplayAssert("PDMFactory::~PDMFactory");
-}
+PDMFactory::~PDMFactory() = default;
 
 /* static */
 void PDMFactory::EnsureInit() {

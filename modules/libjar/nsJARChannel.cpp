@@ -420,8 +420,6 @@ nsresult nsJARChannel::OpenLocalFile() {
             CreateLocalJarInput(jarCache, clonedFile, innerJarEntry,
                                 localJARURI, jarEntry, getter_AddRefs(input));
 
-        recordreplay::RecordReplayAssert("nsJARChannel::OpenLocalFile callback #2 %d", NS_SUCCEEDED(rv));
-
         nsCOMPtr<nsIRunnable> target;
         if (NS_SUCCEEDED(rv)) {
           target = NewRunnableMethod<RefPtr<nsJARInputThunk>, bool>(
@@ -445,8 +443,6 @@ nsresult nsJARChannel::ContinueOpenLocalFile(nsJARInputThunk* aInput,
                                              bool aIsSyncCall) {
   LOG(("nsJARChannel::ContinueOpenLocalFile [this=%p %p]\n", this, aInput));
 
-  recordreplay::RecordReplayAssert("nsJARChannel::ContinueOpenLocalFile Start");
-
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(mIsPending);
 
@@ -465,9 +461,7 @@ nsresult nsJARChannel::ContinueOpenLocalFile(nsJARInputThunk* aInput,
     rv = CheckPendingEvents();
   }
 
-  rv = OnOpenLocalFileComplete(rv, aIsSyncCall);
-  recordreplay::RecordReplayAssert("nsJARChannel::ContinueOpenLocalFile Done %d", rv);
-  return rv;
+  return OnOpenLocalFileComplete(rv, aIsSyncCall);
 }
 
 nsresult nsJARChannel::OnOpenLocalFileComplete(nsresult aResult,

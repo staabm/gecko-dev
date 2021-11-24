@@ -723,17 +723,13 @@ void gfxFT2FontBase::SetupVarCoords(
 }
 
 already_AddRefed<SharedFTFace> FTUserFontData::CloneFace(int aFaceIndex) {
-  recordreplay::Diagnostic("FTUserFontData::CloneFace Start");
   RefPtr<SharedFTFace> face = Factory::NewSharedFTFaceFromData(
       nullptr, mFontData, mLength, aFaceIndex, this);
-  recordreplay::Diagnostic("FTUserFontData::CloneFace #1");
   if (!face ||
       (FT_Select_Charmap(face->GetFace(), FT_ENCODING_UNICODE) != FT_Err_Ok &&
        FT_Select_Charmap(face->GetFace(), FT_ENCODING_MS_SYMBOL) !=
            FT_Err_Ok)) {
-    recordreplay::Diagnostic("FTUserFontData::CloneFace #2");
     return nullptr;
   }
-  recordreplay::Diagnostic("FTUserFontData::CloneFace Done");
   return face.forget();
 }

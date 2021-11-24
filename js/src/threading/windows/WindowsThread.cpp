@@ -80,6 +80,7 @@ ThreadId ThreadId::ThisThreadId() {
 }
 
 void ThisThread::SetName(const char* name) {
+  // RaiseException isn't currently supported when recording/replaying.
   /*
   MOZ_RELEASE_ASSERT(name);
 

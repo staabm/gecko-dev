@@ -605,9 +605,6 @@ void nsStorageInputStream::SerializeInternal(InputStreamParams& aParams,
   rv = Seek(NS_SEEK_SET, offset);
   MOZ_ASSERT(NS_SUCCEEDED(rv));
 
-  recordreplay::RecordReplayAssert("nsStorageInputStream::SerializeInternal %d",
-                                   combined.Length());
-
   StringInputStreamParams params;
   params.data() = combined;
   aParams = params;

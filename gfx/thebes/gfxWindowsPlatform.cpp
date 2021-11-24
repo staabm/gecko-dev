@@ -326,8 +326,6 @@ static void UpdateANGLEConfig() {
 }
 
 void gfxWindowsPlatform::InitAcceleration() {
-  recordreplay::Diagnostic("gfxWindowsPlatform::InitAcceleration");
-
   gfxPlatform::InitAcceleration();
 
   DeviceManagerDx::Init();
@@ -1464,11 +1462,8 @@ void gfxWindowsPlatform::InitializeDevices() {
 
   // If acceleration is disabled, we refuse to initialize anything.
   if (!gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
-    recordreplay::Diagnostic("gfxWindowsPlatform::InitializeDevices CompositingDisabled");
     return;
   }
-
-  recordreplay::Diagnostic("gfxWindowsPlatform::InitializeDevices Start");
 
   // If we previously crashed initializing devices, bail out now.
   D3D11LayersCrashGuard detectCrashes;

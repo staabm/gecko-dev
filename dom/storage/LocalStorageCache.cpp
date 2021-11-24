@@ -19,11 +19,6 @@
 #include "nsThreadUtils.h"
 
 namespace mozilla {
-
-namespace recordreplay {
-  extern void AddRecordingOperation(const char* aKind, const char* aValue);
-}
-
 namespace dom {
 
 #define DOM_STORAGE_CACHE_KEEP_ALIVE_TIME_MS 20000
@@ -169,10 +164,6 @@ void LocalStorageCache::NotifyObservers(const LocalStorage* aStorage,
 
   // We want to send a message to the parent in order to broadcast the
   // StorageEvent correctly to any child process.
-
-  recordreplay::RecordReplayAssert("LocalStorageCache::NotifyObservers %lu %lu %lu %lu",
-                                   aStorage->DocumentURI().Length(),
-                                   aKey.Length(), aOldValue.Length(), aNewValue.Length());
 
   Unused << mActor->SendNotify(aStorage->DocumentURI(), aKey, aOldValue,
                                aNewValue);

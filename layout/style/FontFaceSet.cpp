@@ -568,9 +568,6 @@ nsresult FontFaceSet::StartLoad(gfxUserFontEntry* aUserFontEntry,
                                 const gfxFontFaceSrc* aFontFaceSrc) {
   nsresult rv;
 
-  recordreplay::RecordReplayAssert("FontFaceSet::StartLoad %lu",
-                                   aFontFaceSrc->mURI->get()->GetSpecOrDefault().Length());
-
   nsCOMPtr<nsIStreamLoader> streamLoader;
   RefPtr<nsFontFaceLoader> fontLoader;
 

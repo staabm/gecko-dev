@@ -798,10 +798,6 @@ static uint32_t GetSpoofedVersion() {
   return spoofedVersion;
 }
 
-namespace mozilla::recordreplay {
-  const char* CurrentFirefoxVersion();
-}
-
 /* static */
 void nsRFPService::GetSpoofedUserAgent(nsACString& userAgent,
                                        bool isForHTTPHeader) {

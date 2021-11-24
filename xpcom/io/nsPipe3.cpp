@@ -67,7 +67,6 @@ class nsPipeEvents {
 
   inline void NotifyInputReady(nsIAsyncInputStream* aStream,
                                nsIInputStreamCallback* aCallback) {
-    recordreplay::RecordReplayAssert("nsPipeEvents::NotifyInputReady");
     mInputList.AppendElement(InputEntry(aStream, aCallback));
   }
 
@@ -1319,8 +1318,6 @@ nsPipeInputStream::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
                                 uint32_t aCount, uint32_t* aReadCount) {
   LOG(("III ReadSegments [this=%p count=%u]\n", this, aCount));
 
-  recordreplay::RecordReplayAssert("nsPipeInputStream::ReadSegments Start");
-
   nsresult rv = NS_OK;
 
   *aReadCount = 0;
@@ -1376,8 +1373,6 @@ nsPipeInputStream::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
     }
   }
 
-  recordreplay::RecordReplayAssert("nsPipeInputStream::ReadSegments Done %d", rv);
-
   return rv;
 }
 
@@ -1397,8 +1392,6 @@ nsPipeInputStream::AsyncWait(nsIInputStreamCallback* aCallback, uint32_t aFlags,
                              uint32_t aRequestedCount,
                              nsIEventTarget* aTarget) {
   LOG(("III AsyncWait [this=%p]\n", this));
-
-  recordreplay::RecordReplayAssert("nsPipeInputStream::AsyncWait Start");
 
   nsPipeEvents pipeEvents;
   {
