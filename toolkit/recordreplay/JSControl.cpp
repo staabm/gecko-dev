@@ -210,30 +210,6 @@ MOZ_EXPORT ProgressCounter RecordReplayInterface_NewTimeWarpTarget() {
 
 }  // extern "C"
 
-void OnTestCommand(const char* aString) {
-  // Ignore commands to finish the current test if we aren't recording/replaying.
-  if (!strcmp(aString, "RecReplaySendAsyncMessage Example__Finished") &&
-      !IsRecordingOrReplaying()) {
-    return;
-  }
-
-  EnsureModuleInitialized();
-
-  AutoSafeJSContext cx;
-  JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
-
-  JSString* str = JS_NewStringCopyZ(cx, aString);
-  MOZ_RELEASE_ASSERT(str);
-
-  JS::RootedValueArray<1> args(cx);
-  args[0].setString(str);
-
-  RootedValue rv(cx);
-  if (!JS_CallFunctionName(cx, *gModuleObject, "OnTestCommand", args, &rv)) {
-    MOZ_CRASH("OnTestCommand");
-  }
-}
-
 static void SendUnsupportedFeature(const char* aFeature, int aIssueNumber);
 
 extern "C" {
@@ -927,6 +903,30 @@ void OnRepaintNeeded(const char* aWhy) {
   // Measure this after calling RecordReplayOnAnnotation, as the latter can
   // update the progress counter.
   gLastRepaintNeededProgress = *ExecutionProgressCounter();
+}
+
+void OnTestCommand(const char* aString) {
+  // Ignore commands to finish the current test if we aren't recording/replaying.
+  if (!strcmp(aString, "RecReplaySendAsyncMessage Example__Finished") &&
+      !IsRecordingOrReplaying()) {
+    return;
+  }
+
+  js::EnsureModuleInitialized();
+
+  AutoSafeJSContext cx;
+  JSAutoRealm ar(cx, xpc::PrivilegedJunkScope());
+
+  JSString* str = JS_NewStringCopyZ(cx, aString);
+  MOZ_RELEASE_ASSERT(str);
+
+  JS::RootedValueArray<1> args(cx);
+  args[0].setString(str);
+
+  RootedValue rv(cx);
+  if (!JS_CallFunctionName(cx, *js::gModuleObject, "OnTestCommand", args, &rv)) {
+    MOZ_CRASH("OnTestCommand");
+  }
 }
 
 }  // namespace recordreplay

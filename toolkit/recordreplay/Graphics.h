@@ -6,9 +6,21 @@
 
 // Interfaces for use when rendering graphics while recording/replaying.
 
+#ifndef mozilla_recordreplay_Graphics_h
+#define mozilla_recordreplay_Graphics_h
+
+#include "mozilla/layers/BasicCompositor.h"
+#include "mozilla/layers/BufferTexture.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
+#include "mozilla/layers/ImageDataSerializer.h"
+#include "mozilla/layers/LayerManagerComposite.h"
+#include "mozilla/layers/LayerTransactionChild.h"
+#include "mozilla/layers/LayerTransactionParent.h"
+#include "mozilla/layers/LayersMessages.h"
+
 namespace mozilla::recordreplay {
 
-already_AddRefed<gfx::DrawTarget> DrawTargetForRemoteDrawing(const IntRect& aBounds);
+already_AddRefed<gfx::DrawTarget> DrawTargetForRemoteDrawing(const gfx::IntRect& aBounds);
 
 void RegisterTextureChild(layers::PTextureChild* aChild,
                           layers::TextureData* aData,
@@ -30,3 +42,5 @@ void SendReleaseLayer(layers::LayerTransactionChild* aChild,
                       const layers::LayerHandle& aHandle);
 
 } // namespace mozilla::recordreplay
+
+#endif // mozilla_recordreplay_Graphics_h

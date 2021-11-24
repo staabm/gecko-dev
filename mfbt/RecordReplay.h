@@ -20,7 +20,14 @@
 
 struct PLDHashTableOps;
 
+class nsIURI;
+
 namespace mozilla {
+
+class WidgetMouseEvent;
+class WidgetKeyboardEvent;
+namespace dom { class BrowserChild; }
+
 namespace recordreplay {
 
 // Record/Replay Overview.
@@ -334,8 +341,8 @@ void FinishRecording();
 void AddRecordingOperation(const char* aKind, const char* aValue);
 void CreateCheckpoint();
 void MaybeCreateCheckpoint();
-void OnMouseEvent(BrowserChild* aChild, const WidgetMouseEvent& aEvent);
-void OnKeyboardEvent(BrowserChild* aChild, const WidgetKeyboardEvent& aEvent);
+void OnMouseEvent(dom::BrowserChild* aChild, const WidgetMouseEvent& aEvent);
+void OnKeyboardEvent(dom::BrowserChild* aChild, const WidgetKeyboardEvent& aEvent);
 void OnLocationChange(dom::BrowserChild* aChild, nsIURI* aLocation, uint32_t aFlags);
 void OnPaint();
 const char* CurrentFirefoxVersion();
