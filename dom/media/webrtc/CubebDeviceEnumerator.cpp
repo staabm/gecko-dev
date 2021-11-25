@@ -58,7 +58,6 @@ CubebDeviceEnumerator::CubebDeviceEnumerator()
   mozilla::mscom::EnsureMTA();
   mozilla::mscom::EnsureMTA([&]() -> void {
 #endif
-    recordreplay::Diagnostic("CubebDeviceEnumerator::CubebDeviceEnumerator callback");
     int rv = cubeb_register_device_collection_changed(
         GetCubebContext(), CUBEB_DEVICE_TYPE_OUTPUT,
         &OutputAudioDeviceListChanged_s, this);
@@ -94,7 +93,6 @@ CubebDeviceEnumerator::~CubebDeviceEnumerator() {
 #ifdef XP_WIN
   mozilla::mscom::EnsureMTA([&]() -> void {
 #endif
-    recordreplay::Diagnostic("CubebDeviceEnumerator::~CubebDeviceEnumerator callback");
     int rv = cubeb_register_device_collection_changed(
         GetCubebContext(), CUBEB_DEVICE_TYPE_OUTPUT, nullptr, this);
     if (rv != CUBEB_OK) {
@@ -195,7 +193,6 @@ static void GetDeviceCollection(nsTArray<RefPtr<AudioDeviceInfo>>& aDeviceInfos,
 #  ifdef XP_WIN
     mozilla::mscom::EnsureMTA([&]() -> void {
 #  endif
-      recordreplay::Diagnostic("GetDeviceCollection callback");
       if (cubeb_enumerate_devices(context,
                                   aSide == Input ? CUBEB_DEVICE_TYPE_INPUT
                                                  : CUBEB_DEVICE_TYPE_OUTPUT,

@@ -45,9 +45,7 @@
 #include "GeckoProfiler.h"
 #include "nsIException.h"
 
-namespace mozilla {
-
-namespace dom {
+namespace mozilla::dom {
 
 /* static */
 void ChromeUtils::NondeterministicGetWeakMapKeys(
@@ -1379,5 +1377,4 @@ void ChromeUtils::GetAllDOMProcesses(
   }
 }
 
-}  // namespace dom
-}  // namespace mozilla
+}  // namespace mozilla::dom

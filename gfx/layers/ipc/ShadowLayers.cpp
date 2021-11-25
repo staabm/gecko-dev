@@ -34,6 +34,7 @@
 #ifdef XP_DARWIN
 #  include "mozilla/layers/TextureSync.h"
 #endif
+#include "mozilla/recordreplay/Graphics.h"
 #include "ShadowLayerUtils.h"
 #include "mozilla/ReentrantMonitor.h"
 #include "mozilla/StaticPrefs_layers.h"
@@ -47,18 +48,6 @@ namespace mozilla {
 namespace ipc {
 class Shmem;
 }  // namespace ipc
-
-namespace recordreplay {
-  void SendUpdate(layers::LayerTransactionChild* aChild,
-                  const layers::TransactionInfo& aInfo);
-  void SendNewCompositable(layers::LayerTransactionChild* aChild,
-                           const layers::CompositableHandle& aHandle,
-                           const layers::TextureInfo& aInfo);
-  void SendReleaseCompositable(layers::LayerTransactionChild* aChild,
-                               const layers::CompositableHandle& aHandle);
-  void SendReleaseLayer(layers::LayerTransactionChild* aChild,
-                        const layers::LayerHandle& aHandle);
-}
 
 namespace layers {
 
@@ -274,9 +263,6 @@ void ShadowLayerForwarder::BeginTransaction(
 }
 
 static const LayerHandle& Shadow(ShadowableLayer* aLayer) {
-  if (!aLayer->GetShadow()) {
-    recordreplay::PrintLog("ShadowableLayer missing shadow");
-  }
   return aLayer->GetShadow();
 }
 

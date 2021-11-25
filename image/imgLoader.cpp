@@ -626,8 +626,6 @@ nsProgressNotificationProxy::GetInterface(const nsIID& iid, void** result) {
 static void NewRequestAndEntry(bool aForcePrincipalCheckForCacheEntry,
                                imgLoader* aLoader, const ImageCacheKey& aKey,
                                imgRequest** aRequest, imgCacheEntry** aEntry) {
-  recordreplay::RecordReplayAssert("NewRequestAndEntry");
-
   RefPtr<imgRequest> request = new imgRequest(aLoader, aKey);
   RefPtr<imgCacheEntry> entry =
       new imgCacheEntry(aLoader, request, aForcePrincipalCheckForCacheEntry);
@@ -2152,8 +2150,6 @@ nsresult imgLoader::LoadImage(
     nsISupports* aCacheKey, nsContentPolicyType aContentPolicyType,
     const nsAString& initiatorType, bool aUseUrgentStartForChannel,
     bool aLinkPreload, imgRequestProxy** _retval) {
-  recordreplay::RecordReplayAssert("imgLoader::LoadImage %lu",
-                                   aURI->GetSpecOrDefault().Length());
   VerifyCacheSizes();
 
   NS_ASSERTION(aURI, "imgLoader::LoadImage -- NULL URI pointer");
@@ -2304,11 +2300,7 @@ nsresult imgLoader::LoadImage(
   ImageCacheKey key(aURI, attrs, aLoadingDocument);
   imgCacheTable& cache = GetCache(key);
 
-  recordreplay::RecordReplayAssert("imgLoader::LoadImage #1");
-
   if (cache.Get(key, getter_AddRefs(entry)) && entry) {
-    recordreplay::RecordReplayAssert("imgLoader::LoadImage #2");
-
     bool newChannelCreated = false;
     if (ValidateEntry(entry, aURI, aInitialDocumentURI, aReferrerInfo,
                       aLoadGroup, aObserver, aLoadingDocument, requestFlags,
@@ -2350,8 +2342,6 @@ nsresult imgLoader::LoadImage(
       entry = nullptr;
     }
   }
-
-  recordreplay::RecordReplayAssert("imgLoader::LoadImage #4");
 
   // Keep the channel in this scope, so we can adjust its notificationCallbacks
   // later when we create the proxy.

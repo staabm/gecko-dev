@@ -7,16 +7,10 @@
 // Interfaces for drawing graphics to an in process buffer when
 // recording/replaying.
 
+#include "Graphics.h"
+
 #include "ProcessRecordReplay.h"
 #include "mozilla/Base64.h"
-#include "mozilla/layers/BasicCompositor.h"
-#include "mozilla/layers/BufferTexture.h"
-#include "mozilla/layers/CompositorBridgeParent.h"
-#include "mozilla/layers/ImageDataSerializer.h"
-#include "mozilla/layers/LayerManagerComposite.h"
-#include "mozilla/layers/LayerTransactionChild.h"
-#include "mozilla/layers/LayerTransactionParent.h"
-#include "mozilla/layers/LayersMessages.h"
 #include "mozilla/StaticMutex.h"
 #include "imgIEncoder.h"
 #include "nsComponentManagerUtils.h"

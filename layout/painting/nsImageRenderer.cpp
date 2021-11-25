@@ -59,13 +59,7 @@ nsImageRenderer::nsImageRenderer(nsIFrame* aForFrame, const StyleImage* aImage,
       mSize(0, 0),
       mFlags(aFlags),
       mExtendMode(ExtendMode::CLAMP),
-      mMaskOp(StyleMaskMode::MatchSource) {
-  recordreplay::RegisterThing(this);
-}
-
-nsImageRenderer::~nsImageRenderer() {
-  recordreplay::UnregisterThing(this);
-}
+      mMaskOp(StyleMaskMode::MatchSource) {}
 
 bool nsImageRenderer::PrepareImage() {
   if (mImage->IsNone()) {
@@ -93,15 +87,10 @@ bool nsImageRenderer::PrepareImage() {
     bool frameComplete =
         request->StartDecodingWithResult(imgIContainer::FLAG_ASYNC_NOTIFY);
 
-    recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #1.2 %d %d %d",
-                                     frameComplete, mFlags, mImage->IsImageRequestType());
-
     // Boost the loading priority since we know we want to draw the image.
     if (mFlags & nsImageRenderer::FLAG_PAINTING_TO_WINDOW) {
       request->BoostPriority(imgIRequest::CATEGORY_DISPLAY);
     }
-
-    recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #1.3");
 
     // Check again to see if we finished.
     // We cannot prepare the image for rendering if it is not fully loaded.
@@ -124,8 +113,6 @@ bool nsImageRenderer::PrepareImage() {
         return false;
       }
     }
-
-    recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #1.4");
   }
 
   if (isImageRequest) {
@@ -196,8 +183,6 @@ bool nsImageRenderer::PrepareImage() {
   } else {
     MOZ_ASSERT(mImage->IsNone(), "Unknown image type?");
   }
-
-  recordreplay::RecordReplayAssert("nsImageRenderer::PrepareImage #3");
 
   return IsReady();
 }

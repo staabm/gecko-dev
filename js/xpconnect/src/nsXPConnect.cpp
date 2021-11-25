@@ -302,6 +302,7 @@ void xpc::ErrorReport::LogToConsole() {
 void xpc::ErrorReport::LogToConsoleWithStack(
     nsGlobalWindowInner* aWin, JS::Handle<mozilla::Maybe<JS::Value>> aException,
     JS::HandleObject aStack, JS::HandleObject aStackGlobal) {
+  // https://github.com/RecordReplay/backend/issues/3026
   recordreplay::RecordReplayAssert("ErrorReport::LogToConsoleWithStack");
 
   if (aStack) {

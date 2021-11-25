@@ -47,10 +47,6 @@
 #  include "nsContentUtils.h"  // For assertions.
 #endif
 
-namespace mozilla::recordreplay {
-  extern void AddRecordingOperation(const char* aKind, const char* aValue);
-}
-
 namespace mozilla::dom {
 
 using namespace mozilla::dom::indexedDB;

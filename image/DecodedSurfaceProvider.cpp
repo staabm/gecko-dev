@@ -28,11 +28,6 @@ DecodedSurfaceProvider::DecodedSurfaceProvider(NotNull<RasterImage*> aImage,
   MOZ_ASSERT(mDecoder->IsFirstFrameDecode(),
              "Use AnimationSurfaceProvider for animation decodes");
 
-  recordreplay::RegisterThing(static_cast<IDecodingTask*>(this));
-  recordreplay::RecordReplayAssert("DecodedSurfaceProvider %d %d",
-                                   recordreplay::ThingIndex(this),
-                                   recordreplay::ThingIndex(aDecoder));
-
   // Leak when recording/replaying to avoid non-deterministic behavior
   // in destructor.
   if (recordreplay::IsRecordingOrReplaying()) {
@@ -40,11 +35,7 @@ DecodedSurfaceProvider::DecodedSurfaceProvider(NotNull<RasterImage*> aImage,
   }
 }
 
-DecodedSurfaceProvider::~DecodedSurfaceProvider() {
-  recordreplay::UnregisterThing(static_cast<IDecodingTask*>(this));
-
-  DropImageReference();
-}
+DecodedSurfaceProvider::~DecodedSurfaceProvider() { DropImageReference(); }
 
 void DecodedSurfaceProvider::DropImageReference() {
   if (!mImage) {
@@ -128,10 +119,6 @@ size_t DecodedSurfaceProvider::LogicalSizeInBytes() const {
 
 void DecodedSurfaceProvider::Run() {
   MutexAutoLock lock(mMutex);
-
-  recordreplay::RecordReplayAssert("DecodedSurfaceProvider::Run %d %d",
-                                  recordreplay::ThingIndex(this),
-                                  recordreplay::ThingIndex(mDecoder));
 
   if (!mDecoder || !mImage) {
     MOZ_ASSERT_UNREACHABLE("Running after decoding finished?");

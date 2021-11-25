@@ -6134,8 +6134,6 @@ static ImgDrawResult DrawImageInternal(
     const nsRect& aFill, const nsPoint& aAnchor, const nsRect& aDirty,
     const Maybe<SVGImageContext>& aSVGContext, uint32_t aImageFlags,
     ExtendMode aExtendMode = ExtendMode::CLAMP, float aOpacity = 1.0) {
-  recordreplay::RecordReplayAssert("DrawImageInternal %u", aImageFlags);
-
   ImgDrawResult result = ImgDrawResult::SUCCESS;
 
   aImageFlags |= imgIContainer::FLAG_ASYNC_NOTIFY;
@@ -6218,8 +6216,6 @@ ImgDrawResult nsLayoutUtils::DrawSingleImage(
     const nsRect& aDirty, const Maybe<SVGImageContext>& aSVGContext,
     uint32_t aImageFlags, const nsPoint* aAnchorPoint,
     const nsRect* aSourceArea) {
-  recordreplay::RecordReplayAssert("nsLayoutUtils::DrawSingleImage %u", aImageFlags);
-
   nscoord appUnitsPerCSSPixel = AppUnitsPerCSSPixel();
   CSSIntSize pixelImageSize(
       ComputeSizeForDrawingWithFallback(aImage, aDest.Size()));

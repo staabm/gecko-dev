@@ -369,6 +369,7 @@ DataChannelConnection::~DataChannelConnection() {
 }
 
 void DataChannelConnection::Destroy() {
+  // https://github.com/RecordReplay/backend/issues/3356
   recordreplay::RecordReplayAssert("DataChannelConnection::Destroy");
 
   // Though it's probably ok to do this and close the sockets;
@@ -408,6 +409,7 @@ void DataChannelConnection::Destroy() {
 
 void DataChannelConnection::DestroyOnSTS(struct socket* aMasterSocket,
                                          struct socket* aSocket) {
+  // https://github.com/RecordReplay/backend/issues/3356
   recordreplay::RecordReplayAssert("DataChannelConnection::DestroyOnSTS Start");
 
   if (aSocket && aSocket != aMasterSocket) usrsctp_close(aSocket);
@@ -426,6 +428,7 @@ void DataChannelConnection::DestroyOnSTS(struct socket* aMasterSocket,
       "DataChannelConnection::Destroy",
       [id = mId]() { DataChannelRegistry::Deregister(id); }));
 
+  // https://github.com/RecordReplay/backend/issues/3356
   recordreplay::RecordReplayAssert("DataChannelConnection::DestroyOnSTS Done");
 }
 

@@ -188,6 +188,7 @@ static void PopulateReportBlame(JSContext* cx, JSErrorReport* report) {
     return;
   }
 
+  // https://github.com/RecordReplay/backend/issues/2325
   if (!mozilla::recordreplay::AreThreadEventsDisallowed()) {
     mozilla::recordreplay::AssertScriptedCaller("PopulateReportBlame");
   }

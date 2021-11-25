@@ -117,8 +117,6 @@ class AutoTaskDispatcher : public TaskDispatcher {
     // use-case requires it.
     MOZ_ASSERT(!HaveDirectTasks());
 
-    recordreplay::RecordReplayAssert("~AutoTaskDispatcher %zu", mTaskGroups.Length());
-
     for (size_t i = 0; i < mTaskGroups.Length(); ++i) {
       DispatchTaskGroup(std::move(mTaskGroups[i]));
     }
@@ -141,7 +139,6 @@ class AutoTaskDispatcher : public TaskDispatcher {
 
   void AddStateChangeTask(AbstractThread* aThread,
                           already_AddRefed<nsIRunnable> aRunnable) override {
-    recordreplay::RecordReplayAssert("AutoTaskDispatcher::AddStateChangeTask");
     nsCOMPtr<nsIRunnable> r = aRunnable;
     MOZ_RELEASE_ASSERT(r);
     EnsureTaskGroup(aThread).mStateChangeTasks.AppendElement(r.forget());
@@ -149,8 +146,6 @@ class AutoTaskDispatcher : public TaskDispatcher {
 
   nsresult AddTask(AbstractThread* aThread,
                    already_AddRefed<nsIRunnable> aRunnable) override {
-    recordreplay::RecordReplayAssert("AutoTaskDispatcher::AddTask");
-
     nsCOMPtr<nsIRunnable> r = aRunnable;
     MOZ_RELEASE_ASSERT(r);
     // To preserve the event order, we need to append a new group if the last
@@ -159,7 +154,6 @@ class AutoTaskDispatcher : public TaskDispatcher {
     // for the details of the issue.
     if (mTaskGroups.Length() == 0 ||
         mTaskGroups.LastElement()->mThread != aThread) {
-      recordreplay::RecordReplayAssert("AutoTaskDispatcher::AddTask #1");
       mTaskGroups.AppendElement(new PerThreadTaskGroup(aThread));
     }
 
@@ -175,8 +169,6 @@ class AutoTaskDispatcher : public TaskDispatcher {
   }
 
   nsresult DispatchTasksFor(AbstractThread* aThread) override {
-    recordreplay::RecordReplayAssert("AutoTaskDispatcher::DispatchTasksFor");
-
     nsresult rv = NS_OK;
 
     // Dispatch all groups that match |aThread|.
@@ -191,7 +183,6 @@ class AutoTaskDispatcher : public TaskDispatcher {
           rv = rv2;
         }
 
-        recordreplay::RecordReplayAssert("AutoTaskDispatcher::DispatchTasksFor #1");
         mTaskGroups.RemoveElementAt(i--);
       }
     }
@@ -256,11 +247,9 @@ class AutoTaskDispatcher : public TaskDispatcher {
   PerThreadTaskGroup& EnsureTaskGroup(AbstractThread* aThread) {
     PerThreadTaskGroup* existing = GetTaskGroup(aThread);
     if (existing) {
-      recordreplay::RecordReplayAssert("AutoTaskDispatcher::EnsureTaskGroup #1");
       return *existing;
     }
 
-    recordreplay::RecordReplayAssert("AutoTaskDispatcher::EnsureTaskGroup #2");
     mTaskGroups.AppendElement(new PerThreadTaskGroup(aThread));
     return *mTaskGroups.LastElement();
   }
@@ -277,7 +266,6 @@ class AutoTaskDispatcher : public TaskDispatcher {
   }
 
   nsresult DispatchTaskGroup(UniquePtr<PerThreadTaskGroup> aGroup) {
-    recordreplay::RecordReplayAssert("AutoTaskDispatcher::DispatchTaskGroup");
     RefPtr<AbstractThread> thread = aGroup->mThread;
 
     AbstractThread::DispatchReason reason =

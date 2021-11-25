@@ -442,15 +442,6 @@ void ClientTiledPaintedLayer::EndPaint() {
 }
 
 void ClientTiledPaintedLayer::RenderLayer() {
-  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-  if (recordreplay::HasDivergedFromRecording()) {
-    recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer %d %d %d %d",
-                           mVisibleRegion.GetBounds().ToUnknownRect().x,
-                           mVisibleRegion.GetBounds().ToUnknownRect().y,
-                           mVisibleRegion.GetBounds().ToUnknownRect().width,
-                           mVisibleRegion.GetBounds().ToUnknownRect().height);
-  }
-
   if (!ClientManager()->IsRepeatTransaction()) {
     // Only paint the mask layers on the first transaction.
     RenderMaskLayers(this);
@@ -530,19 +521,11 @@ void ClientTiledPaintedLayer::RenderLayer() {
   invalidRegion.Sub(neededRegion, GetValidRegion());
   if (invalidRegion.IsEmpty()) {
     EndPaint();
-    // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-    if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #1");
-    }
     return;
   }
 
   if (!callback) {
     ClientManager()->SetTransactionIncomplete();
-    // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-    if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #2");
-    }
     return;
   }
 
@@ -551,10 +534,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
     // can do the paint.
     BeginPaint();
     if (mPaintData.mPaintFinished) {
-      // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-      if (recordreplay::HasDivergedFromRecording()) {
-        recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #3");
-      }
       return;
     }
 
@@ -604,10 +583,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
       // There is still more high-res stuff to paint, so we're not
       // done yet. A subsequent transaction will take care of this.
       ClientManager()->SetRepeatTransaction();
-      // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-      if (recordreplay::HasDivergedFromRecording()) {
-        recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #4");
-      }
       return;
     }
   }
@@ -615,10 +590,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
   // If there is nothing to draw in low-precision, then we're done.
   if (lowPrecisionInvalidRegion.IsEmpty()) {
     EndPaint();
-    // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-    if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #5");
-    }
     return;
   }
 
@@ -633,10 +604,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
     ClientManager()->SetRepeatTransaction();
     mPaintData.mLowPrecisionPaintCount = 1;
     mPaintData.mPaintFinished = false;
-    // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-    if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #6");
-    }
     return;
   }
 
@@ -651,10 +618,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
       // There is still more low-res stuff to paint, so we're not
       // done yet. A subsequent transaction will take care of this.
       ClientManager()->SetRepeatTransaction();
-    // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-      if (recordreplay::HasDivergedFromRecording()) {
-        recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #7");
-      }
       return;
     }
   }
@@ -662,11 +625,6 @@ void ClientTiledPaintedLayer::RenderLayer() {
   // If we get here, we've done all the high- and low-precision
   // paints we wanted to do, so we can finish the paint and chill.
   EndPaint();
-
-  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-  if (recordreplay::HasDivergedFromRecording()) {
-    recordreplay::PrintLog("Diverged ClientTiledPaintedLayer::RenderLayer Done #8");
-  }
 }
 
 bool ClientTiledPaintedLayer::IsOptimizedFor(

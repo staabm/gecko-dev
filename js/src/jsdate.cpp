@@ -1736,8 +1736,6 @@ static bool date_getYear(JSContext* cx, unsigned argc, Value* vp) {
 static bool date_getFullYear(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
 
-  mozilla::recordreplay::AssertScriptedCaller("date_getFullYear");
-
   auto* unwrapped = UnwrapAndTypeCheckThis<DateObject>(cx, args, "getFullYear");
   if (!unwrapped) {
     return false;
@@ -2014,8 +2012,6 @@ static bool date_getUTCMilliseconds(JSContext* cx, unsigned argc, Value* vp) {
 static bool date_getTimezoneOffset(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
 
-  mozilla::recordreplay::AssertScriptedCaller("date_getTimezoneOffset");
-
   auto* unwrapped =
       UnwrapAndTypeCheckThis<DateObject>(cx, args, "getTimezoneOffset");
   if (!unwrapped) {
@@ -2088,8 +2084,6 @@ static bool GetMinsOrDefault(JSContext* cx, const CallArgs& args, unsigned i,
 /* ES6 20.3.4.23. */
 static bool date_setMilliseconds(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
-
-  mozilla::recordreplay::AssertScriptedCaller("date_setMilliseconds");
 
   // Step 1.
   Rooted<DateObject*> unwrapped(
@@ -2929,11 +2923,7 @@ static bool FormatDate(JSContext* cx, double utcTime, FormatSpec format,
 
   MOZ_ASSERT(NumbersAreIdentical(TimeClip(utcTime).toDouble(), utcTime));
 
-  mozilla::recordreplay::RecordReplayAssert("FormatDate %.2f %d", utcTime, (int)format);
-
   double localTime = LocalTime(utcTime);
-
-  mozilla::recordreplay::RecordReplayAssert("FormatDate #1");
 
   int offset = 0;
   RootedString timeZoneComment(cx);

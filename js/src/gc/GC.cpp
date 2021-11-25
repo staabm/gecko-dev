@@ -7615,13 +7615,11 @@ void GCRuntime::gc(JSGCInvocationKind gckind, JS::GCReason reason) {
 void GCRuntime::startGC(JSGCInvocationKind gckind, JS::GCReason reason,
                         int64_t millis) {
   MOZ_ASSERT(!isIncrementalGCInProgress());
-  mozilla::recordreplay::Diagnostic("GCRuntime::startGC Start");
   if (!JS::IsIncrementalGCEnabled(rt->mainContextFromOwnThread())) {
     gc(gckind, reason);
     return;
   }
   collect(false, defaultBudget(reason, millis), Some(gckind), reason);
-  mozilla::recordreplay::Diagnostic("GCRuntime::startGC Done");
 }
 
 void GCRuntime::gcSlice(JS::GCReason reason, int64_t millis) {

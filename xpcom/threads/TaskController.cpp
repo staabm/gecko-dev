@@ -151,8 +151,6 @@ void TaskController::InitializeThreadPool() {
                          PR_JOINABLE_THREAD, 512u * 1024u),
          nullptr});
   }
-
-  recordreplay::RecordReplayAssert("TaskController::InitializeThreadPool DONE");
 }
 
 void TaskController::SetPerformanceCounterState(
@@ -308,8 +306,6 @@ void TaskController::RunPoolThread() {
 }
 
 void TaskController::AddTask(already_AddRefed<Task>&& aTask) {
-  recordreplay::RecordReplayAssert("TaskController::AddTask Start");
-
   RefPtr<Task> task(aTask);
 
   if (!task->IsMainThreadOnly()) {
@@ -334,7 +330,6 @@ void TaskController::AddTask(already_AddRefed<Task>&& aTask) {
   }
 
 #ifdef MOZ_GECKO_PROFILER
-  recordreplay::RecordReplayAssert("TaskController::AddTask #1");
   task->mInsertionTime = TimeStamp::Now();
 #endif
 
@@ -380,9 +375,6 @@ void TaskController::ProcessPendingMTTask(bool aMayWait) {
   MOZ_ASSERT(NS_IsMainThread());
   MutexAutoLock lock(mGraphMutex);
 
-  recordreplay::RecordReplayAssert("TaskController::ProcessPendingMTTask Start %d",
-                                   mMayHaveMainThreadTask);
-
   for (;;) {
     // We only ever process one event here. However we may sometimes
     // not actually process a real event because of suspended tasks.
@@ -409,11 +401,8 @@ void TaskController::ProcessPendingMTTask(bool aMayWait) {
   }
 
   if (mMayHaveMainThreadTask) {
-    recordreplay::RecordReplayAssert("TaskController::ProcessPendingMTTask #1");
     EnsureMainThreadTasksScheduled();
   }
-
-  recordreplay::RecordReplayAssert("TaskController::ProcessPendingMTTask Done");
 }
 
 void TaskController::ReprioritizeTask(Task* aTask, uint32_t aPriority) {
@@ -749,9 +738,7 @@ bool TaskController::DoExecuteNextTaskOnlyMainThreadInternal(
 
         {
           LogTask::Run log(task);
-          recordreplay::RecordReplayAssert("TaskController::DoExecuteNextTaskOnlyMainThreadInternal RunTask Start");
           result = task->Run();
-          recordreplay::RecordReplayAssert("TaskController::DoExecuteNextTaskOnlyMainThreadInternal RunTask Done");
         }
 
         // Task itself should keep manager alive.
@@ -824,8 +811,6 @@ Task* TaskController::GetFinalDependency(Task* aTask) {
 void TaskController::MaybeInterruptTask(Task* aTask) {
   mGraphMutex.AssertCurrentThreadOwns();
 
-  recordreplay::RecordReplayAssert("TaskController::MaybeInterruptTask Start");
-
   if (!aTask) {
     return;
   }
@@ -839,7 +824,6 @@ void TaskController::MaybeInterruptTask(Task* aTask) {
         aTask->IsMainThreadOnly() == firstDependency->IsMainThreadOnly()) {
       // This task has the same or a higher priority as one of its dependencies,
       // never any need to interrupt.
-      recordreplay::RecordReplayAssert("TaskController::MaybeInterruptTask #1");
       return;
     }
   }
@@ -848,7 +832,6 @@ void TaskController::MaybeInterruptTask(Task* aTask) {
 
   if (finalDependency->mInProgress) {
     // No need to wake anything, we can't schedule this task right now anyway.
-    recordreplay::RecordReplayAssert("TaskController::MaybeInterruptTask #2");
     return;
   }
 

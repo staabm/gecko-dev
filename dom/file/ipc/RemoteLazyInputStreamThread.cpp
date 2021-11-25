@@ -45,15 +45,12 @@ class MigrateActorRunnable final : public Runnable {
 
   NS_IMETHOD
   Run() override {
-    recordreplay::RecordReplayAssert("MigrateActorRunnable::Run Start");
-
     MOZ_ASSERT(mActor->State() ==
                RemoteLazyInputStreamChild::eInactiveMigrating);
 
     PBackgroundChild* actorChild =
         BackgroundChild::GetOrCreateForCurrentThread();
     if (!actorChild) {
-      recordreplay::RecordReplayAssert("MigrateActorRunnable::Run #1");
       return NS_OK;
     }
 
@@ -62,7 +59,6 @@ class MigrateActorRunnable final : public Runnable {
       mActor->Migrated();
     }
 
-    recordreplay::RecordReplayAssert("MigrateActorRunnable::Run Done");
     return NS_OK;
   }
 

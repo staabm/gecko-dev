@@ -168,15 +168,6 @@ using namespace mozilla::docshell;
 using namespace mozilla::widget;
 using mozilla::layers::GeckoContentController;
 
-namespace mozilla {
-  namespace recordreplay {
-    void CreateCheckpoint();
-    void OnMouseEvent(BrowserChild* aChild, const WidgetMouseEvent& aEvent);
-    void OnKeyboardEvent(BrowserChild* aChild, const WidgetKeyboardEvent& aEvent);
-    void OnLocationChange(dom::BrowserChild* aChild, nsIURI* aLocation, uint32_t aFlags);
-  }
-}
-
 NS_IMPL_ISUPPORTS(ContentListener, nsIDOMEventListener)
 
 static const char BEFORE_FIRST_PAINT[] = "before-first-paint";
@@ -3575,8 +3566,6 @@ NS_IMETHODIMP BrowserChild::OnStateChange(nsIWebProgress* aWebProgress,
                                           nsIRequest* aRequest,
                                           uint32_t aStateFlags,
                                           nsresult aStatus) {
-  recordreplay::RecordReplayAssert("BrowserChild::OnStateChange");
-
   if (!IPCOpen() || !mShouldSendWebProgressEventsToParent) {
     return NS_OK;
   }
@@ -3964,8 +3953,6 @@ void BrowserChild::NotifyContentBlockingEvent(
   Unused << SendNotifyContentBlockingEvent(aEvent, requestData, aBlocked,
                                            PromiseFlatCString(aTrackingOrigin),
                                            aTrackingFullHashes, aReason);
-
-  recordreplay::RecordReplayAssert("BrowserChild::NotifyContentBlockingEvent Done");
 }
 
 BrowserChildMessageManager::BrowserChildMessageManager(

@@ -74,8 +74,6 @@ MOZ_DECLARE_RELOCATE_USING_MOVE_CONSTRUCTOR(mozilla::PaintedLayerData);
 
 namespace mozilla {
 
-namespace recordreplay { extern void OnRepaintNeeded(const char* aWhy); }
-
 class PaintedDisplayItemLayerUserData;
 
 static nsTHashtable<nsPtrHashKey<DisplayItemData>>* sAliveDisplayItemDatas;
@@ -2035,8 +2033,6 @@ class MaskImageData {
   }
 
   gfx::DrawTarget* CreateDrawTarget() {
-    recordreplay::RecordReplayAssert("MaskImageData::CreateDrawTarget");
-
     if (mDrawTarget) {
       return mDrawTarget;
     }
@@ -7044,19 +7040,6 @@ void FrameLayerBuilder::PaintItems(std::vector<AssignedDisplayItem>& aItems,
 
     const nsRect paintRect = visibleRect.Intersect(boundRect);
 
-    // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-    if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("Diverged FrameLayerBuilder::PaintItems ITEM %d %d %d %d PAINTED %d %d %d %d",
-                             (int)visibleRect.x,
-                             (int)visibleRect.y,
-                             (int)visibleRect.width,
-                             (int)visibleRect.height,
-                             (int)paintRect.x,
-                             (int)paintRect.y,
-                             (int)paintRect.width,
-                             (int)paintRect.height);
-    }
-
     if (paintRect.IsEmpty() || emptyEffectLevel > 0) {
       // In order for this branch to be hit, either this item has an empty paint
       // rect and nothing would be drawn, or an effect marker before this
@@ -7184,22 +7167,11 @@ void FrameLayerBuilder::PaintItems(std::vector<AssignedDisplayItem>& aItems,
     }
 #endif
 
-    // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-    if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("Diverged FrameLayerBuilder::PaintItems ITEM_START %s",
-                             paintedItem->Name());
-    }
-
     if (itemPaintsOwnClip) {
       MOZ_ASSERT(itemClip);
       paintedItem->PaintWithClip(aBuilder, aContext, *itemClip);
     } else {
       paintedItem->Paint(aBuilder, aContext);
-    }
-
-    // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-    if (recordreplay::HasDivergedFromRecording()) {
-      recordreplay::PrintLog("Diverged FrameLayerBuilder::PaintItems ITEM_DONE");
     }
   }
 
@@ -7270,19 +7242,6 @@ void FrameLayerBuilder::DrawPaintedLayer(PaintedLayer* aLayer,
                                          DrawRegionClip aClip,
                                          const nsIntRegion& aRegionToInvalidate,
                                          void* aCallbackData) {
-  // Diagnostics for https://github.com/RecordReplay/backend/issues/3145
-  if (recordreplay::HasDivergedFromRecording()) {
-    recordreplay::PrintLog("Diverged FrameLayerBuilder::DrawPaintedLayer DRAW %d %d %d %d DIRTY %d %d %d %d",
-                           aRegionToDraw.GetBounds().ToUnknownRect().x,
-                           aRegionToDraw.GetBounds().ToUnknownRect().y,
-                           aRegionToDraw.GetBounds().ToUnknownRect().width,
-                           aRegionToDraw.GetBounds().ToUnknownRect().height,
-                           aDirtyRegion.GetBounds().ToUnknownRect().x,
-                           aDirtyRegion.GetBounds().ToUnknownRect().y,
-                           aDirtyRegion.GetBounds().ToUnknownRect().width,
-                           aDirtyRegion.GetBounds().ToUnknownRect().height);
-  }
-
   DrawTarget& aDrawTarget = *aContext->GetDrawTarget();
 
   AUTO_PROFILER_LABEL("FrameLayerBuilder::DrawPaintedLayer",

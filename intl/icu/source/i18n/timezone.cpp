@@ -44,8 +44,6 @@
 #include "uassert.h"
 #include "ustr_imp.h"
 
-#include "mozilla/RecordReplay.h"
-
 #ifdef U_DEBUG_TZ
 # include <stdio.h>
 # include "uresimp.h" // for debugging
@@ -345,7 +343,6 @@ UOBJECT_DEFINE_ABSTRACT_RTTI_IMPLEMENTATION(TimeZone)
 TimeZone::TimeZone()
     :   UObject(), fID()
 {
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::TimeZone #1");
 }
 
 // -------------------------------------
@@ -353,7 +350,6 @@ TimeZone::TimeZone()
 TimeZone::TimeZone(const UnicodeString &id)
     :   UObject(), fID(id)
 {
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::TimeZone #2");
 }
 
 // -------------------------------------
@@ -367,7 +363,6 @@ TimeZone::~TimeZone()
 TimeZone::TimeZone(const TimeZone &source)
     :   UObject(source), fID(source.fID)
 {
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::TimeZone #3");
 }
 
 // -------------------------------------
@@ -461,8 +456,6 @@ TimeZone::createTimeZone(const UnicodeString& ID)
 TimeZone* U_EXPORT2
 TimeZone::detectHostTimeZone()
 {
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone");
-
     // We access system timezone data through uprv_tzset(), uprv_tzname(), and others,
     // which have platform specific implementations in putil.cpp
     int32_t rawOffset = 0;
@@ -481,28 +474,19 @@ TimeZone::detectHostTimeZone()
     // function maps the Windows Time Zone name to an ICU timezone ID.
     hostID = uprv_tzname(0);
 
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #1 %s", hostID);
-
     // Invert sign because UNIX semantics are backwards
     rawOffset = uprv_timezone() * -U_MILLIS_PER_SECOND;
-
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #2 %d", rawOffset);
 
     TimeZone* hostZone = NULL;
 
     UnicodeString hostStrID(hostID, -1, US_INV);
 
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #3 %u", hostStrID.length());
-
     if (hostStrID.length() == 0) {
-        mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #4");
         // The host time zone detection (or remapping) above has failed and
         // we have no name at all. Fallback to using the Unknown zone.
         hostStrID = UnicodeString(TRUE, UNKNOWN_ZONE_ID, UNKNOWN_ZONE_ID_LENGTH);
         hostDetectionSucceeded = FALSE;
     }
-
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #5");
 
     hostZone = createSystemTimeZone(hostStrID);
 
@@ -513,29 +497,20 @@ TimeZone::detectHostTimeZone()
 
     int32_t hostIDLen = hostStrID.length();
 
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #6 %d %d %d",
-                                              !!hostZone, rawOffset, hostIDLen);
-
     if (hostZone != NULL && rawOffset != hostZone->getRawOffset()
         && (3 <= hostIDLen && hostIDLen <= 4))
     {
-        mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #7");
         // Uh oh. This probably wasn't a good id.
         // It was probably an ambiguous abbreviation
         delete hostZone;
         hostZone = NULL;
     }
 
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #7");
-
     // Construct a fixed standard zone with the host's ID
     // and raw offset.
     if (hostZone == NULL && hostDetectionSucceeded) {
-        mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #8");
         hostZone = new SimpleTimeZone(rawOffset, hostStrID);
     }
-
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #9");
 
     // If we _still_ don't have a time zone, use the Unknown zone.
     //
@@ -543,13 +518,10 @@ TimeZone::detectHostTimeZone()
     // new SimpleTimeZone(...) above fails, the following
     // code may also fail.
     if (hostZone == NULL) {
-        mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #10");
         // Unknown zone uses static allocated memory, so it must always exist.
         // However, clone() allocates memory and can fail.
         hostZone = TimeZone::getUnknown().clone();
     }
-
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::detectHostTimeZone #11");
 
     return hostZone;
 }
@@ -572,8 +544,6 @@ static void U_CALLCONV initDefault()
     ucln_i18n_registerCleanup(UCLN_I18N_TIMEZONE, timeZone_cleanup);
 
     Mutex lock(&gDefaultZoneMutex);
-
-    mozilla::recordreplay::RecordReplayAssert("TimeZone initDefault %d", !!DEFAULT_ZONE);
 
     // If setDefault() has already been called we can skip getting the
     // default zone information from the system.
@@ -599,8 +569,6 @@ static void U_CALLCONV initDefault()
     U_ASSERT(DEFAULT_ZONE == NULL);
 
     DEFAULT_ZONE = default_zone;
-
-    mozilla::recordreplay::RecordReplayAssert("TimeZone initDefault #1 %d", !!DEFAULT_ZONE);
 }
 
 // -------------------------------------
@@ -608,11 +576,9 @@ static void U_CALLCONV initDefault()
 TimeZone* U_EXPORT2
 TimeZone::createDefault()
 {
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::createDefault");
     umtx_initOnce(gDefaultZoneInitOnce, initDefault);
     {
         Mutex lock(&gDefaultZoneMutex);
-        mozilla::recordreplay::RecordReplayAssert("TimeZone::createDefault #1 %d", !!DEFAULT_ZONE);
         return (DEFAULT_ZONE != NULL) ? DEFAULT_ZONE->clone() : NULL;
     }
 }
@@ -626,7 +592,6 @@ TimeZone::adoptDefault(TimeZone* zone)
     {
         {
             Mutex lock(&gDefaultZoneMutex);
-            mozilla::recordreplay::RecordReplayAssert("TimeZone::adoptDefault");
             TimeZone *old = DEFAULT_ZONE;
             DEFAULT_ZONE = zone;
             delete old;
@@ -1244,8 +1209,6 @@ TimeZone::getDSTSavings()const {
 UnicodeString&
 TimeZone::getDisplayName(UBool inDaylight, EDisplayType style, const Locale& locale, UnicodeString& result) const
 {
-    mozilla::recordreplay::RecordReplayAssert("TimeZone::getDisplayName");
-
     UErrorCode status = U_ZERO_ERROR;
     UDate date = Calendar::getNow();
     UTimeZoneFormatTimeType timeType = UTZFMT_TIME_TYPE_UNKNOWN;
@@ -1314,18 +1277,15 @@ TimeZone::getDisplayName(UBool inDaylight, EDisplayType style, const Locale& loc
         default:
             UPRV_UNREACHABLE;
         }
-        mozilla::recordreplay::RecordReplayAssert("TimeZone::getDisplayName #1");
         LocalPointer<TimeZoneNames> tznames(TimeZoneNames::createInstance(locale, status));
         if (U_FAILURE(status)) {
             result.remove();
             return result;
         }
         UnicodeString canonicalID(ZoneMeta::getCanonicalCLDRID(*this));
-        mozilla::recordreplay::RecordReplayAssert("TimeZone::getDisplayName #1.1 %d", canonicalID.isEmpty());
         tznames->getDisplayName(canonicalID, nameType, date, result);
         if (result.isEmpty()) {
             // Fallback to localized GMT
-            mozilla::recordreplay::RecordReplayAssert("TimeZone::getDisplayName #2");
             LocalPointer<TimeZoneFormat> tzfmt(TimeZoneFormat::createInstance(locale, status));
             offset = inDaylight && useDaylightTime() ? getRawOffset() + getDSTSavings() : getRawOffset();
             if (style == LONG) {
@@ -1334,7 +1294,6 @@ TimeZone::getDisplayName(UBool inDaylight, EDisplayType style, const Locale& loc
                 tzfmt->formatOffsetShortLocalizedGMT(offset, result, status);
             }
         }
-        mozilla::recordreplay::RecordReplayAssert("TimeZone::getDisplayName #3");
     }
     if (U_FAILURE(status)) {
         result.remove();

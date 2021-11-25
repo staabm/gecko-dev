@@ -140,17 +140,13 @@ nsresult RasterImage::Init(const char* aMimeType, uint32_t aFlags) {
 //******************************************************************************
 NS_IMETHODIMP_(void)
 RasterImage::RequestRefresh(const TimeStamp& aTime) {
-  recordreplay::RecordReplayAssert("RasterImage::RequestRefresh Start");
-
   if (HadRecentRefresh(aTime)) {
-    recordreplay::RecordReplayAssert("RasterImage::RequestRefresh #1");
     return;
   }
 
   EvaluateAnimation();
 
   if (!mAnimating) {
-    recordreplay::RecordReplayAssert("RasterImage::RequestRefresh #2");
     return;
   }
 
@@ -178,8 +174,6 @@ RasterImage::RequestRefresh(const TimeStamp& aTime) {
     StoreAnimationFinished(true);
     EvaluateAnimation();
   }
-
-  recordreplay::RecordReplayAssert("RasterImage::RequestRefresh Done");
 }
 
 //******************************************************************************
@@ -324,8 +318,6 @@ LookupResult RasterImage::LookupFrame(const UnorientedIntSize& aSize,
                                       bool aMarkUsed) {
   MOZ_ASSERT(NS_IsMainThread());
 
-  recordreplay::RecordReplayAssert("RasterImage::LookupFrame %u", aFlags);
-
   // If we're opaque, we don't need to care about premultiplied alpha, because
   // that can only matter for frames with transparency.
   if (IsOpaque()) {
@@ -464,8 +456,6 @@ RasterImage::WillDrawOpaqueNow() {
 }
 
 void RasterImage::OnSurfaceDiscarded(const SurfaceKey& aSurfaceKey) {
-  recordreplay::RecordReplayAssert("RasterImage::OnSurfaceDiscarded");
-
   MOZ_ASSERT(mProgressTracker);
 
   bool animatedFramesDiscarded =
@@ -1083,10 +1073,7 @@ RasterImage::StartDecoding(uint32_t aFlags, uint32_t aWhichFrame) {
 
 bool RasterImage::StartDecodingWithResult(uint32_t aFlags,
                                           uint32_t aWhichFrame) {
-  recordreplay::RecordReplayAssert("RasterImage::StartDecodingWithResult Start");
-
   if (mError) {
-    recordreplay::RecordReplayAssert("RasterImage::StartDecodingWithResult #1");
     return false;
   }
 
@@ -1100,9 +1087,7 @@ bool RasterImage::StartDecodingWithResult(uint32_t aFlags,
   LookupResult result =
       RequestDecodeForSizeInternal(ToUnoriented(mSize), flags, aWhichFrame);
   DrawableSurface surface = std::move(result.Surface());
-  bool rv = surface && surface->IsFinished();
-  recordreplay::RecordReplayAssert("RasterImage::StartDecodingWithResult #3 %d", rv);
-  return rv;
+  return surface && surface->IsFinished();
 }
 
 imgIContainer::DecodeResult RasterImage::RequestDecodeWithResult(
@@ -1177,8 +1162,6 @@ LookupResult RasterImage::RequestDecodeForSizeInternal(
 
 static bool LaunchDecodingTask(IDecodingTask* aTask, RasterImage* aImage,
                                uint32_t aFlags, bool aHaveSourceData) {
-  recordreplay::RecordReplayAssert("LaunchDecodingTask %u %d", aFlags, aHaveSourceData);
-
   if (aHaveSourceData) {
     nsCString uri(aImage->GetURIString());
 

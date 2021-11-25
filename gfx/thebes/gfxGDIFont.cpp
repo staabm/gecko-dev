@@ -412,6 +412,7 @@ uint32_t gfxGDIFont::GetGlyph(uint32_t aUnicode, uint32_t aVarSelector) {
 }
 
 int32_t gfxGDIFont::GetGlyphWidth(uint16_t aGID) {
+  // For https://github.com/RecordReplay/backend/issues/3659
   recordreplay::RecordReplayAssert("gfxGDIFont::GetGlyphWidth %u", aGID);
 
   if (!mGlyphWidths) {
@@ -442,6 +443,7 @@ int32_t gfxGDIFont::GetGlyphWidth(uint16_t aGID) {
 }
 
 bool gfxGDIFont::GetGlyphBounds(uint16_t aGID, gfxRect* aBounds, bool aTight) {
+  // For https://github.com/RecordReplay/backend/issues/3659
   recordreplay::RecordReplayAssert("gfxGDIFont::GetGlyphBounds %u", aGID);
 
   DCForMetrics dc;

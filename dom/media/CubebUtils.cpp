@@ -517,7 +517,6 @@ cubeb* GetCubebContextUnlocked() {
 #ifdef XP_WIN
     mozilla::mscom::EnsureMTA([&]() -> void {
 #endif
-      recordreplay::Diagnostic("GetCubebContextUnlocked callback");
       rv = cubeb_init(&sCubebContext, sBrandName, sCubebBackendName);
 #ifdef XP_WIN
     });

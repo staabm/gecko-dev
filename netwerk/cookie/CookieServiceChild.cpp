@@ -34,11 +34,6 @@
 using namespace mozilla::ipc;
 
 namespace mozilla {
-
-namespace recordreplay {
-  extern void AddRecordingOperation(const char* aKind, const char* aValue);
-}
-
 namespace net {
 
 // Pref string constants
@@ -265,6 +260,7 @@ uint32_t CookieServiceChild::CountCookiesFromHashTable(
 
 void CookieServiceChild::RecordDocumentCookie(Cookie* aCookie,
                                               const OriginAttributes& aAttrs) {
+  // https://github.com/RecordReplay/backend/issues/2541
   recordreplay::RecordReplayAssert("CookieServiceChild::RecordDocumentCookie");
 
   nsAutoCString baseDomain;
@@ -299,6 +295,7 @@ void CookieServiceChild::RecordDocumentCookie(Cookie* aCookie,
     }
   }
 
+  // https://github.com/RecordReplay/backend/issues/2541
   recordreplay::RecordReplayAssert("CookieServiceChild::RecordDocumentCookie #1");
 
   int64_t currentTime = PR_Now() / PR_USEC_PER_SEC;
