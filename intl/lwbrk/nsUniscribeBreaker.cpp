@@ -17,6 +17,10 @@ void NS_GetComplexLineBreaks(const char16_t* aText, uint32_t aLength,
                              uint8_t* aBreakBefore) {
   NS_ASSERTION(aText, "aText shouldn't be null");
 
+  if (RecordReplayMaybeGetComplexLineBreaks(aText, aLength, aBreakBefore)) {
+    return;
+  }
+
   int outItems = 0;
   HRESULT result;
   AutoTArray<SCRIPT_ITEM, 64> items;

@@ -8,26 +8,16 @@
 #include "nsDebug.h"
 #include "nsINode.h"
 #include "nscore.h"
-#include "mozilla/RecordReplay.h"
 
 void NS_GetComplexLineBreaks(const char16_t* aText, uint32_t aLength,
                              uint8_t* aBreakBefore) {
   NS_ASSERTION(aText, "aText shouldn't be null");
 
-  memset(aBreakBefore, 0, aLength * sizeof(uint8_t));
-
-  // When diverged from the recording, the CoreFoundation calls below might not
-  // be present in the recording, and may cause the current operation to fail.
-  // Emulate these calls by placing breaks at the start of any non-space token
-  // which follows some spaces.
-  if (mozilla::recordreplay::HasDivergedFromRecording()) {
-    for (size_t i = 1; i < aLength; i++) {
-      if (mozilla::dom::IsSpaceCharacter(aText[i - 1]) && !mozilla::dom::IsSpaceCharacter(aText[i])) {
-        aBreakBefore[i] = true;
-      }
-    }
+  if (RecordReplayMaybeGetComplexLineBreaks(aText, aLength, aBreakBefore)) {
     return;
   }
+
+  memset(aBreakBefore, 0, aLength * sizeof(uint8_t));
 
   CFStringRef str = ::CFStringCreateWithCharactersNoCopy(
       kCFAllocatorDefault, reinterpret_cast<const UniChar*>(aText), aLength,

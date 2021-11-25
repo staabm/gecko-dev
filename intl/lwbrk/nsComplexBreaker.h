@@ -15,4 +15,12 @@
 void NS_GetComplexLineBreaks(const char16_t* aText, uint32_t aLength,
                              uint8_t* aBreakBefore);
 
+// This is used on some platforms when diverged from the recording. In this case
+// system calls made while computing line breaks might not be present in the
+// recording, and may cause the computation to fail. The breaks will be computed
+// without performing system calls by placing breaks at the start of any
+// non-space token which follows some spaces. Returns whether the breaks were filled in.
+bool RecordReplayMaybeGetComplexLineBreaks(const char16_t* aText, uint32_t aLength,
+                                           uint8_t* aBreakBefore);
+
 #endif /* nsComplexBreaker_h__ */
