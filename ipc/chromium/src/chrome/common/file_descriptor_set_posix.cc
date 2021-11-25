@@ -14,8 +14,6 @@
 FileDescriptorSet::FileDescriptorSet() : consumed_descriptor_highwater_(0) {}
 
 FileDescriptorSet::~FileDescriptorSet() {
-  mozilla::recordreplay::RecordReplayAssert("~FileDescriptorSet Start");
-
   if (consumed_descriptor_highwater_ == descriptors_.size()) return;
 
   CHROMIUM_LOG(WARNING)
@@ -31,13 +29,8 @@ FileDescriptorSet::~FileDescriptorSet() {
   // kernel resources.
   for (unsigned i = consumed_descriptor_highwater_; i < descriptors_.size();
        ++i) {
-    if (descriptors_[i].auto_close) {
-      mozilla::recordreplay::RecordReplayAssert("~FileDescriptorSet Close %d", descriptors_[i].fd);
-      IGNORE_EINTR(close(descriptors_[i].fd));
-    }
+    if (descriptors_[i].auto_close) IGNORE_EINTR(close(descriptors_[i].fd));
   }
-
-  mozilla::recordreplay::RecordReplayAssert("~FileDescriptorSet Done");
 }
 
 void FileDescriptorSet::CopyFrom(const FileDescriptorSet& other) {
@@ -110,17 +103,12 @@ void FileDescriptorSet::GetDescriptors(int* buffer) const {
 }
 
 void FileDescriptorSet::CommitAll() {
-  mozilla::recordreplay::RecordReplayAssert("FileDescriptorSet::CommitAll Start");
   for (std::vector<base::FileDescriptor>::iterator i = descriptors_.begin();
        i != descriptors_.end(); ++i) {
-    if (i->auto_close) {
-      mozilla::recordreplay::RecordReplayAssert("FileDescriptorSet::CommitAll Close %d", i->fd);
-      IGNORE_EINTR(close(i->fd));
-    }
+    if (i->auto_close) IGNORE_EINTR(close(i->fd));
   }
   descriptors_.clear();
   consumed_descriptor_highwater_ = 0;
-  mozilla::recordreplay::RecordReplayAssert("FileDescriptorSet::CommitAll Done");
 }
 
 void FileDescriptorSet::SetDescriptors(const int* buffer, unsigned count) {

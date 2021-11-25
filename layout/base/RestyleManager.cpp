@@ -65,8 +65,6 @@ using namespace mozilla::layers;
 
 namespace mozilla {
 
-namespace recordreplay { extern void OnRepaintNeeded(const char* aWhy); }
-
 RestyleManager::RestyleManager(nsPresContext* aPresContext)
     : mPresContext(aPresContext),
       mRestyleGeneration(1),

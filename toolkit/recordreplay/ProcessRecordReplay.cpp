@@ -165,6 +165,10 @@ extern char gRecordReplayDriver[];
 extern int gRecordReplayDriverSize;
 extern char gBuildId[];
 
+const char* GetBuildId() {
+  return gBuildId;
+}
+
 static const char* GetTempDirectory() {
 #ifndef XP_WIN
   const char* tmpdir = getenv("TMPDIR");

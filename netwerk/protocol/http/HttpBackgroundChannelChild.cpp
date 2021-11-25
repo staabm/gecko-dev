@@ -215,30 +215,20 @@ IPCResult HttpBackgroundChannelChild::RecvOnTransportAndData(
     const nsresult& aChannelStatus, const nsresult& aTransportStatus,
     const uint64_t& aOffset, const uint32_t& aCount,
     const nsDependentCSubstring& aData, const bool& aDataFromSocketProcess) {
-  recordreplay::RecordReplayAssert("HttpBackgroundChannelChild::RecvOnTransportAndData Start");
-
   RefPtr<HttpBackgroundChannelChild> self = this;
   nsCString data(aData);
   std::function<void()> callProcessOnTransportAndData =
       [self, aChannelStatus, aTransportStatus, aOffset, aCount, data,
        aDataFromSocketProcess]() {
-        recordreplay::RecordReplayAssert("HttpBackgroundChannelChild::RecvOnTransportAndData Callback Start");
-
         LOG(
             ("HttpBackgroundChannelChild::RecvOnTransportAndData [this=%p, "
              "aDataFromSocketProcess=%d, mFirstODASource=%d]\n",
              self.get(), aDataFromSocketProcess, self->mFirstODASource));
         MOZ_ASSERT(OnSocketThread());
 
-        recordreplay::RecordReplayAssert("HttpBackgroundChannelChild::RecvOnTransportAndData Callback #0.1 %d",
-                                         !!self->mChannelChild);
-
         if (NS_WARN_IF(!self->mChannelChild)) {
           return;
         }
-
-        recordreplay::RecordReplayAssert("HttpBackgroundChannelChild::RecvOnTransportAndData Callback #0.2 %d %d",
-                                         self->mFirstODASource, aDataFromSocketProcess);
 
         if (((self->mFirstODASource == ODA_FROM_SOCKET) &&
              !aDataFromSocketProcess) ||
@@ -253,16 +243,11 @@ IPCResult HttpBackgroundChannelChild::RecvOnTransportAndData(
         nsresult channelStatus;
         self->mChannelChild->GetStatus(&channelStatus);
         if (NS_FAILED(channelStatus)) {
-          recordreplay::RecordReplayAssert("HttpBackgroundChannelChild::RecvOnTransportAndData Callback #0.3");
           return;
         }
 
-        recordreplay::RecordReplayAssert("HttpBackgroundChannelChild::RecvOnTransportAndData Callback #1");
-
         self->mChannelChild->ProcessOnTransportAndData(
             aChannelStatus, aTransportStatus, aOffset, aCount, data);
-
-        recordreplay::RecordReplayAssert("HttpBackgroundChannelChild::RecvOnTransportAndData Callback Done");
       };
 
   // Bug 1641336: Race only happens if the data is from socket process.
@@ -278,9 +263,6 @@ IPCResult HttpBackgroundChannelChild::RecvOnTransportAndData(
   }
 
   callProcessOnTransportAndData();
-
-  recordreplay::RecordReplayAssert("HttpBackgroundChannelChild::RecvOnTransportAndData Done");
-
   return IPC_OK();
 }
 

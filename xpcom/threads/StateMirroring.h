@@ -217,9 +217,6 @@ class Canonical {
       bool same = mInitialValue.ref() == mValue;
       mInitialValue.reset();
 
-      recordreplay::RecordReplayAssert("Canonical::Impl::DoNotify Start %d %zu",
-                                       same, mMirrors.Length());
-
       if (same) {
         MIRROR_LOG("%s [%p] unchanged - not sending update", mName, this);
         return;
@@ -229,8 +226,6 @@ class Canonical {
         mMirrors[i]->OwnerThread()->DispatchStateChange(
             MakeNotifier(mMirrors[i]));
       }
-
-      recordreplay::RecordReplayAssert("Canonical::Impl::DoNotify Done");
     }
 
     already_AddRefed<nsIRunnable> MakeNotifier(AbstractMirror<T>* aMirror) {

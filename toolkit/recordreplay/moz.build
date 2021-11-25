@@ -21,4 +21,8 @@ LOCAL_INCLUDES += [
     '/toolkit/crashreporter/google-breakpad/src',
 ]
 
+EXPORTS.mozilla.recordreplay += [
+    "Graphics.h",
+]
+
 FINAL_LIBRARY = 'xul'

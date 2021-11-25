@@ -136,10 +136,6 @@
 
 using mozilla::dom::Promise;
 
-namespace mozilla::recordreplay {
-  const char* CurrentFirefoxVersion();
-}
-
 namespace mozilla::net {
 
 LazyLogModule gHttpLog("nsHttp");

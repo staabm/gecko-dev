@@ -273,10 +273,7 @@ class nsImageFrame : public nsAtomicContainerFrame, public nsIReflowCallback {
   void NotifyNewCurrentRequest(imgIRequest* aRequest, nsresult aStatus);
 
   /// Always sync decode our image when painting if @aForce is true.
-  void SetForceSyncDecoding(bool aForce) {
-    mozilla::recordreplay::RecordReplayAssert("nsImageFrame::SetForceSyncDecoding %d", aForce);
-    mForceSyncDecoding = aForce;
-  }
+  void SetForceSyncDecoding(bool aForce) { mForceSyncDecoding = aForce; }
 
   /**
    * Computes the predicted dest rect that we'll draw into, in app units, based

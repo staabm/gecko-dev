@@ -40,6 +40,7 @@
 #include "common/mac/macho_utilities.h"
 #include "common/mac/scoped_task_suspend-inl.h"
 #include "google_breakpad/common/minidump_exception_mac.h"
+#include "mozilla/RecordReplay.h"
 
 #ifdef MOZ_PHC
 #include "replace_malloc_bridge.h"
@@ -73,8 +74,6 @@
   #include "protected_memory_allocator.h"
   extern ProtectedMemoryAllocator *gBreakpadAllocator;
 #endif
-
-namespace mozilla::recordreplay { bool IsTearingDownProcess(); }
 
 namespace google_breakpad {
 

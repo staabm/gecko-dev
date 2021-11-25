@@ -344,14 +344,6 @@ using mozilla::TimeStamp;
 using mozilla::dom::GamepadHandle;
 using mozilla::dom::cache::CacheStorage;
 
-namespace mozilla {
-  namespace recordreplay {
-    namespace js {
-      void OnTestCommand(const char* aString);
-    }
-  }
-}
-
 #define FORWARD_TO_OUTER(method, args, err_rval)                     \
   PR_BEGIN_MACRO                                                     \
   nsGlobalWindowOuter* outer = GetOuterWindowInternal();             \
@@ -822,8 +814,6 @@ uint32_t nsGlobalWindowInner::RequestIdleCallback(
     JSContext* aCx, IdleRequestCallback& aCallback,
     const IdleRequestOptions& aOptions, ErrorResult& aError) {
   AssertIsOnMainThread();
-
-  recordreplay::AssertScriptedCaller("nsGlobalWindowInner::RequestIdleCallback");
 
   if (IsDying()) {
     return 0;
@@ -3677,7 +3667,7 @@ void nsGlobalWindowInner::Dump(const nsAString& aStr) {
   if (!strncmp(cstr, "RecReplay", 9)) {
     char* env = getenv("RECORD_REPLAY_TEST_SCRIPT");
     if (env) {
-      recordreplay::js::OnTestCommand(cstr);
+      recordreplay::OnTestCommand(cstr);
       return;
     }
   }
@@ -6099,8 +6089,6 @@ int32_t nsGlobalWindowInner::SetTimeoutOrInterval(
     JSContext* aCx, Function& aFunction, int32_t aTimeout,
     const Sequence<JS::Value>& aArguments, bool aIsInterval,
     ErrorResult& aError) {
-  recordreplay::AssertScriptedCaller("nsGlobalWindowInner::SetTimeoutOrInterval");
-
   nsGlobalWindowInner* inner = InnerForSetTimeoutOrInterval(aError);
   if (!inner) {
     return -1;

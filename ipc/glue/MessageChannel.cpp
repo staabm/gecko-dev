@@ -1057,6 +1057,7 @@ bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
   nsCString parentBuildID(aParentBuildID);
   nsCString childBuildID(mozilla::PlatformBuildID());
 
+  // https://github.com/RecordReplay/backend/issues/3414
   recordreplay::RecordReplayAssert("MessageChannel::SendBuildIDsMatchMessage %s %s",
                                    parentBuildID.get(), childBuildID.get());
 
@@ -1078,10 +1079,12 @@ bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
 
   MonitorAutoLock lock(*mMonitor);
   if (!Connected()) {
+    // https://github.com/RecordReplay/backend/issues/3414
     recordreplay::RecordReplayAssert("MessageChannel::SendBuildIDsMatchMessage #2");
     ReportConnectionError("MessageChannel", msg.get());
     return false;
   }
+  // https://github.com/RecordReplay/backend/issues/3414
   recordreplay::RecordReplayAssert("MessageChannel::SendBuildIDsMatchMessage #3");
   mLink->SendMessage(std::move(msg));
   return true;

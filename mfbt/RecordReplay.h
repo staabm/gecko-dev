@@ -20,7 +20,14 @@
 
 struct PLDHashTableOps;
 
+class nsIURI;
+
 namespace mozilla {
+
+class WidgetMouseEvent;
+class WidgetKeyboardEvent;
+namespace dom { class BrowserChild; }
+
 namespace recordreplay {
 
 // Record/Replay Overview.
@@ -322,6 +329,27 @@ static inline void NotifyActivity();
 // browser feature, and message the user to notify them the page might not work right.
 // Issue numbers are from https://github.com/RecordReplay/gecko-dev/issues
 MFBT_API void ReportUnsupportedFeature(const char* aFeature, int aIssueNumber);
+
+///////////////////////////////////////////////////////////////////////////////
+// Gecko interface
+///////////////////////////////////////////////////////////////////////////////
+
+// These methods are for use by Gecko, and can't be called from SpiderMonkey
+// or non-XUL methods without link errors.
+
+void FinishRecording();
+void AddRecordingOperation(const char* aKind, const char* aValue);
+void CreateCheckpoint();
+void MaybeCreateCheckpoint();
+void OnMouseEvent(dom::BrowserChild* aChild, const WidgetMouseEvent& aEvent);
+void OnKeyboardEvent(dom::BrowserChild* aChild, const WidgetKeyboardEvent& aEvent);
+void OnLocationChange(dom::BrowserChild* aChild, nsIURI* aLocation, uint32_t aFlags);
+void OnPaint();
+const char* CurrentFirefoxVersion();
+const char* GetBuildId();
+void OnTestCommand(const char* aString);
+void OnRepaintNeeded(const char* aWhy);
+bool IsTearingDownProcess();
 
 ///////////////////////////////////////////////////////////////////////////////
 // API inline function implementation

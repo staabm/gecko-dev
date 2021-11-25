@@ -2338,15 +2338,6 @@ already_AddRefed<gfxTextRun> BuildTextRunsScanner::BuildTextRunForFrames(
       char16_t* bufEnd = nsTextFrameUtils::TransformText(
           frag->Get2b() + contentStart, contentLength, bufStart, compression,
           &mNextRunContextInfo, &skipChars, &analysisFlags);
-
-      std::string str;
-      for (char16_t* ptr = bufStart; ptr < bufEnd; ptr++) {
-        char buf[50];
-        snprintf(buf, sizeof(buf), " %u", *ptr);
-        str += buf;
-      }
-      recordreplay::RecordReplayAssert("BuildTextRunsScanner::BuildTextRunForFrames #8 %s", str.c_str());
-
       aTextBuffer = bufEnd;
       currentTransformedTextOffset =
           bufEnd - static_cast<const char16_t*>(textPtr);
@@ -2369,14 +2360,6 @@ already_AddRefed<gfxTextRun> BuildTextRunsScanner::BuildTextRunForFrames(
                          tempBuf.Elements(), end - tempBuf.Elements());
         currentTransformedTextOffset = static_cast<char16_t*>(aTextBuffer) -
                                        static_cast<const char16_t*>(textPtr);
-
-        std::string str;
-        for (uint8_t* ptr = tempBuf.Elements(); ptr < end; ptr++) {
-          char buf[50];
-          snprintf(buf, sizeof(buf), " %u", *ptr);
-          str += buf;
-        }
-        recordreplay::RecordReplayAssert("BuildTextRunsScanner::BuildTextRunForFrames #9 %s", str.c_str());
       } else {
         uint8_t* bufStart = static_cast<uint8_t*>(aTextBuffer);
         uint8_t* end = nsTextFrameUtils::TransformText(
@@ -2386,14 +2369,6 @@ already_AddRefed<gfxTextRun> BuildTextRunsScanner::BuildTextRunForFrames(
         aTextBuffer = end;
         currentTransformedTextOffset =
             end - static_cast<const uint8_t*>(textPtr);
-
-        std::string str;
-        for (uint8_t* ptr = bufStart; ptr < end; ptr++) {
-          char buf[50];
-          snprintf(buf, sizeof(buf), " %u", *ptr);
-          str += buf;
-        }
-        recordreplay::RecordReplayAssert("BuildTextRunsScanner::BuildTextRunForFrames #10 %s", str.c_str());
       }
     }
     flags2 |= analysisFlags;

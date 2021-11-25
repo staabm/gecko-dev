@@ -55,8 +55,6 @@ stun_ifaddr_is_disallowed_v6(int flags) {
   return flags & (IN6_IFF_ANYCAST | IN6_IFF_TENTATIVE | IN6_IFF_DUPLICATED | IN6_IFF_DETACHED | IN6_IFF_DEPRECATED);
 }
 
-extern void RecordReplayAssertFromC(const char* aFormat, ...);
-
 int stun_getaddrs_filtered(nr_local_addr addrs[], int maxaddrs, int *count)
 {
   int r,_status,flags;
@@ -67,8 +65,6 @@ int stun_getaddrs_filtered(nr_local_addr addrs[], int maxaddrs, int *count)
 
   if (maxaddrs <= 0)
     ABORT(R_BAD_ARGS);
-
-  RecordReplayAssertFromC("stun_getaddrs_filtered");
 
   if (getifaddrs(&if_addrs_head) == -1) {
     r_log(NR_LOG_STUN, LOG_ERR, "getifaddrs error e = %d", errno);

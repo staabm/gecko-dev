@@ -199,8 +199,6 @@ PostMessageEvent::Run() {
   // Create the event
   RefPtr<MessageEvent> event = new MessageEvent(eventTarget, nullptr, nullptr);
 
-  recordreplay::RecordReplayAssert("PostMessageEvent::Run #1");
-
   Nullable<WindowProxyOrMessagePortOrServiceWorker> source;
   if (mSource) {
     source.SetValue().SetAsWindowProxy() = mSource;
@@ -209,7 +207,6 @@ PostMessageEvent::Run() {
   Sequence<OwningNonNull<MessagePort>> ports;
   if (!holder->TakeTransferredPortsAsSequence(ports)) {
     DispatchError(cx, targetWindow, eventTarget);
-    recordreplay::RecordReplayAssert("PostMessageEvent::Run #2");
     return NS_OK;
   }
 
@@ -218,7 +215,6 @@ PostMessageEvent::Run() {
                           source, ports);
 
   Dispatch(targetWindow, event);
-  recordreplay::RecordReplayAssert("PostMessageEvent::Run #3");
   return NS_OK;
 }
 

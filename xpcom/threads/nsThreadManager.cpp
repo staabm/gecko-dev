@@ -626,8 +626,6 @@ nsThreadManager::NewNamedThread(const nsACString& aName, uint32_t aStackSize,
                                 nsIThread** aResult) {
   // Note: can be called from arbitrary threads
 
-  recordreplay::RecordReplayAssert("nsThreadManager::NewNamedThread");
-
   // No new threads during Shutdown
   if (NS_WARN_IF(!mInitialized)) {
     return NS_ERROR_NOT_INITIALIZED;

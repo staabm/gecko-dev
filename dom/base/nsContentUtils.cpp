@@ -3530,9 +3530,6 @@ nsresult nsContentUtils::LoadImage(
     int32_t aLoadFlags, const nsAString& initiatorType,
     imgRequestProxy** aRequest, nsContentPolicyType aContentPolicyType,
     bool aUseUrgentStartForChannel, bool aLinkPreload) {
-  recordreplay::RecordReplayAssert("nsContentUtils::LoadImage %lu",
-                                   aURI->GetSpecOrDefault().Length());
-
   MOZ_ASSERT(aURI, "Must have a URI");
   MOZ_ASSERT(aContext, "Must have a context");
   MOZ_ASSERT(aLoadingDocument, "Must have a document");

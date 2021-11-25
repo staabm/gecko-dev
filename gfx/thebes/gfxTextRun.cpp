@@ -2436,14 +2436,6 @@ already_AddRefed<gfxTextRun> gfxFontGroup::MakeTextRun(
     const uint8_t* aString, uint32_t aLength, const Parameters* aParams,
     gfx::ShapedTextFlags aFlags, nsTextFrameUtils::Flags aFlags2,
     gfxMissingFontRecorder* aMFR) {
-  std::string str;
-  for (uint32_t i = 0; i < aLength; i++) {
-    char buf[50];
-    snprintf(buf, sizeof(buf), " %u", aString[i]);
-    str += buf;
-  }
-  recordreplay::RecordReplayAssert("gfxFontGroup::MakeTextRun %s", str.c_str());
-
   if (aLength == 0) {
     return MakeEmptyTextRun(aParams, aFlags, aFlags2);
   }

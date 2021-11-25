@@ -107,7 +107,7 @@ class nsImageRenderer {
 
   nsImageRenderer(nsIFrame* aForFrame, const mozilla::StyleImage* aImage,
                   uint32_t aFlags);
-  ~nsImageRenderer();
+  ~nsImageRenderer() = default;
   /**
    * Populates member variables to get ready for rendering.
    * @return true iff the image is ready, and there is at least a pixel to

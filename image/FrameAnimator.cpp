@@ -199,8 +199,6 @@ RefreshResult FrameAnimator::AdvanceFrame(AnimationState& aState,
                                           TimeStamp aTime) {
   AUTO_PROFILER_LABEL("FrameAnimator::AdvanceFrame", GRAPHICS);
 
-  recordreplay::RecordReplayAssert("FrameAnimator::AdvanceFrame Start");
-
   RefreshResult ret;
 
   // Determine what the next frame is, taking into account looping.
@@ -230,7 +228,6 @@ RefreshResult FrameAnimator::AdvanceFrame(AnimationState& aState,
 
     // If we're done, exit early.
     if (ret.mAnimationFinished) {
-      recordreplay::RecordReplayAssert("FrameAnimator::AdvanceFrame #1");
       return ret;
     }
   }
@@ -247,7 +244,6 @@ RefreshResult FrameAnimator::AdvanceFrame(AnimationState& aState,
     // would then jump to a random point in the animation to try to catch up.
     // But we were never behind in the animation.
     aState.mCurrentAnimationFrameTime = aTime;
-    recordreplay::RecordReplayAssert("FrameAnimator::AdvanceFrame #2");
     return ret;
   }
 
@@ -271,7 +267,6 @@ RefreshResult FrameAnimator::AdvanceFrame(AnimationState& aState,
     // through the animation. We will wait until the next refresh driver tick
     // and try again.
     aState.mCurrentAnimationFrameTime = aTime;
-    recordreplay::RecordReplayAssert("FrameAnimator::AdvanceFrame #3");
     return ret;
   }
 
@@ -321,8 +316,6 @@ RefreshResult FrameAnimator::AdvanceFrame(AnimationState& aState,
     }
   }
 
-  recordreplay::RecordReplayAssert("FrameAnimator::AdvanceFrame #4");
-
   // Set currentAnimationFrameIndex at the last possible moment
   aState.mCurrentAnimationFrameIndex = nextFrameIndex;
   aState.mCompositedFrameRequested = false;
@@ -331,8 +324,6 @@ RefreshResult FrameAnimator::AdvanceFrame(AnimationState& aState,
 
   // If we're here, we successfully advanced the frame.
   ret.mFrameAdvanced = true;
-
-  recordreplay::RecordReplayAssert("FrameAnimator::AdvanceFrame Done");
 
   return ret;
 }
@@ -362,10 +353,7 @@ RefreshResult FrameAnimator::RequestRefresh(AnimationState& aState,
   // By default, an empty RefreshResult.
   RefreshResult ret;
 
-  recordreplay::RecordReplayAssert("FrameAnimator::RequestRefresh Start");
-
   if (aState.IsDiscarded()) {
-    recordreplay::RecordReplayAssert("FrameAnimator::RequestRefresh #1");
     aState.MaybeAdvanceAnimationFrameTime(aTime);
     return ret;
   }
@@ -415,12 +403,8 @@ RefreshResult FrameAnimator::RequestRefresh(AnimationState& aState,
   while (currentFrameEndTime <= aTime) {
     TimeStamp oldFrameEndTime = currentFrameEndTime;
 
-    recordreplay::RecordReplayAssert("FrameAnimator::RequestRefresh #2");
-
     RefreshResult frameRes =
         AdvanceFrame(aState, result.Surface(), currentFrame, aTime);
-
-    recordreplay::RecordReplayAssert("FrameAnimator::RequestRefresh #3");
 
     // Accumulate our result for returning to callers.
     ret.Accumulate(frameRes);
@@ -453,8 +437,6 @@ RefreshResult FrameAnimator::RequestRefresh(AnimationState& aState,
   }
 
   MOZ_ASSERT(!aState.mIsCurrentlyDecoded || !aState.mCompositedFrameInvalid);
-
-  recordreplay::RecordReplayAssert("FrameAnimator::RequestRefresh Done");
 
   return ret;
 }

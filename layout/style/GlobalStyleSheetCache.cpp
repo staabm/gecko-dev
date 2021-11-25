@@ -701,7 +701,6 @@ void GlobalStyleSheetCache::BuildPreferenceSheet(
       shm->Map(kSharedMemorySize, reinterpret_cast<void*>(aAddress));
   Telemetry::Accumulate(Telemetry::SHARED_MEMORY_UA_SHEETS_MAPPED_CHILD,
                         contentMapped);
-
   if (contentMapped) {
     sSharedMemory = shm.release();
   }

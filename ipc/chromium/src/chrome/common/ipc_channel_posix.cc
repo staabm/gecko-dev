@@ -586,10 +586,6 @@ bool Channel::ChannelImpl::ProcessOutgoingMessages() {
 #endif
     Message* msg = output_queue_.FirstElement().get();
 
-    mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessOutgoingMessages #1 %s %lu",
-                                              IPC::StringFromIPCMessageType(msg->type()),
-                                              msg->Buffers().Size());
-
     struct msghdr msgh = {0};
 
     static const int tmp =
@@ -657,9 +653,6 @@ bool Channel::ChannelImpl::ProcessOutgoingMessages() {
 
     // Store remaining segments to write into iovec.
     while (!iter.Done()) {
-      mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessOutgoingMessages #2 %lu",
-                                                iter.RemainingInSegment());
-
       char* data = iter.Data();
       size_t size = iter.RemainingInSegment();
 
@@ -679,9 +672,6 @@ bool Channel::ChannelImpl::ProcessOutgoingMessages() {
 
     ssize_t bytes_written =
         HANDLE_EINTR(corrected_sendmsg(pipe_, &msgh, MSG_DONTWAIT));
-
-    mozilla::recordreplay::RecordReplayAssert("ChannelImpl::ProcessOutgoingMessages #3 %d %d",
-                                              amt_to_write, bytes_written);
 
 #if !defined(OS_MACOSX)
     // On OSX CommitAll gets called later, once we get the
