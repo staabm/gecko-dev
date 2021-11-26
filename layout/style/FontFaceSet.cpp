@@ -1171,6 +1171,14 @@ RawServoFontFaceRule* FontFaceSet::FindRuleForUserFontEntry(
 nsresult FontFaceSet::LogMessage(gfxUserFontEntry* aUserFontEntry,
                                  const char* aMessage, uint32_t aFlags,
                                  nsresult aStatus) {
+  if (recordreplay::HasDivergedFromRecording()) {
+    // When diverged from the recording, avoid logging to stderr so that we
+    // don't interact with the system in new ways. The log message can still
+    // be printed to the record/replay log to help with diagnostics.
+    recordreplay::PrintLog("FontFaceSet::LogMessage %s", aMessage);
+    return NS_OK;
+  }
+
   MOZ_ASSERT(NS_IsMainThread() ||
              ServoStyleSet::IsCurrentThreadInServoTraversal());
 
