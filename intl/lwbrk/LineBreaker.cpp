@@ -7,6 +7,7 @@
 
 #include "jisx4051class.h"
 #include "nsComplexBreaker.h"
+#include "nsINode.h"
 #include "nsTArray.h"
 #include "nsUnicodeProperties.h"
 #include "mozilla/ArrayUtils.h"
@@ -1166,4 +1167,18 @@ void LineBreaker::GetJISx4051Breaks(const uint8_t* aChars, uint32_t aLength,
     if (allowBreak) state.NotifyBreakBefore();
     lastClass = cl;
   }
+}
+
+bool RecordReplayMaybeGetComplexLineBreaks(const char16_t* aText, uint32_t aLength,
+                                           uint8_t* aBreakBefore) {
+  if (!mozilla::recordreplay::HasDivergedFromRecording()) {
+    return false;
+  }
+  memset(aBreakBefore, 0, aLength * sizeof(uint8_t));
+  for (size_t i = 1; i < aLength; i++) {
+    if (mozilla::dom::IsSpaceCharacter(aText[i - 1]) && !mozilla::dom::IsSpaceCharacter(aText[i])) {
+      aBreakBefore[i] = true;
+    }
+  }
+  return true;
 }
