@@ -63,6 +63,11 @@ static nsresult SystemWantsDarkTheme(int32_t& darkThemeEnabled) {
     return NS_OK;
   }
 
+  // We can't query the registry after diverging from the recording.
+  if (recordreplay::HasDivergedFromRecording()) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
   nsresult rv = NS_OK;
   nsCOMPtr<nsIWindowsRegKey> personalizeKey =
       do_CreateInstance("@mozilla.org/windows-registry-key;1", &rv);
@@ -876,6 +881,11 @@ void nsLookAndFeel::DoSetCache(const LookAndFeelCache& aCache) {
 /* static */
 nsresult nsLookAndFeel::GetAccentColor(nscolor& aColor) {
   nsresult rv;
+
+  // We can't query the registry after diverging from the recording.
+  if (recordreplay::HasDivergedFromRecording()) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
 
   if (!mDwmKey) {
     mDwmKey = do_CreateInstance("@mozilla.org/windows-registry-key;1", &rv);
