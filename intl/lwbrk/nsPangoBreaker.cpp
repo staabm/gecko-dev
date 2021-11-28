@@ -14,6 +14,10 @@ void NS_GetComplexLineBreaks(const char16_t* aText, uint32_t aLength,
                              uint8_t* aBreakBefore) {
   NS_ASSERTION(aText, "aText shouldn't be null");
 
+  if (RecordReplayMaybeGetComplexLineBreaks(aText, aLength, aBreakBefore)) {
+    return;
+  }
+
   memset(aBreakBefore, false, aLength * sizeof(uint8_t));
 
   AutoTArray<PangoLogAttr, 2000> attrBuffer;
