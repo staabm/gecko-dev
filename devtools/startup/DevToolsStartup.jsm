@@ -1428,6 +1428,12 @@ function createRecordingButton() {
       }
 
       const { selectedBrowser } = node.ownerDocument.defaultView.gBrowser;
+      if (!isLoggedIn()) {
+        pingTelemetry("browser", "recording-button-click-while-logged-out");
+        openSigninPage(selectedBrowser);
+        return;
+      }
+
       toggleRecording(selectedBrowser);
       node.refreshStatus();
     },
@@ -1479,20 +1485,7 @@ function createRecordingButton() {
     type: "button",
     tooltiptext: "replay-signin-button.tooltiptext2",
     onClick(evt) {
-      const { gBrowser } = evt.target.ownerDocument.defaultView;
-      const url = "https://app.replay.io/?signin=true";
-      const options = { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() };
-
-      // open a new tab to authenticate if not on a replay (or auth0 replay) host
-      const host = gBrowser.selectedBrowser.documentURI.host;
-      if (getRecordingState(gBrowser.selectedBrowser) === RecordingState.READY && (
-        /(\.|^)replay.io$/.test(host) ||
-        "webreplay.us.auth0.com" === host
-      )) {
-        gBrowser.loadURI(url, options);
-      } else {
-        gBrowser.selectedTab = gBrowser.addTab(url, options);
-      }
+      openSigninPage(evt.target.ownerDocument.defaultView.gBrowser);
     },
     onCreated(node) {
       node.refreshStatus = () => {
@@ -1512,6 +1505,22 @@ function createRecordingButton() {
     dump(`CloudReplayStatus ${status}\n`);
     refreshAllRecordingButtons();
   });
+}
+
+function openSigninPage(gBrowser) {
+  const url = "https://app.replay.io/?signin=true";
+  const options = { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() };
+
+  // open a new tab to authenticate if not on a replay (or auth0 replay) host
+  const host = gBrowser.selectedBrowser.documentURI.host;
+  if (getRecordingState(gBrowser.selectedBrowser) === RecordingState.READY && (
+    /(\.|^)replay.io$/.test(host) ||
+    "webreplay.us.auth0.com" === host
+  )) {
+    gBrowser.loadURI(url, options);
+  } else {
+    gBrowser.selectedTab = gBrowser.addTab(url, options);
+  }
 }
 
 function refreshRecordingButton(doc) {
