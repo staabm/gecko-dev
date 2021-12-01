@@ -509,11 +509,15 @@ nsresult TimerThread::AddTimer(nsTimerImpl* aTimer) {
   MonitorAutoLock lock(mMonitor);
 
   if (!aTimer->mEventTarget) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/3787
+    recordreplay::RecordReplayAssert("TimerThread::AddTimer #1");
     return NS_ERROR_NOT_INITIALIZED;
   }
 
   nsresult rv = Init();
   if (NS_FAILED(rv)) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/3787
+    recordreplay::RecordReplayAssert("TimerThread::AddTimer #2");
     return rv;
   }
 
@@ -627,8 +631,13 @@ TimeStamp TimerThread::FindNextFireTimeForCurrentThread(TimeStamp aDefault,
 bool TimerThread::AddTimerInternal(nsTimerImpl* aTimer) {
   mMonitor.AssertCurrentThreadOwns();
   if (mShutdown) {
+    // Diagnostic for https://github.com/RecordReplay/backend/issues/3787
+    recordreplay::RecordReplayAssert("TimerThread::AddTimerInternal #1");
     return false;
   }
+
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/3787
+  recordreplay::RecordReplayAssert("TimerThread::AddTimerInternal #2");
 
   TimeStamp now = TimeStamp::Now();
 

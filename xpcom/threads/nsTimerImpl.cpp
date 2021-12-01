@@ -311,6 +311,9 @@ nsresult nsTimerImpl::InitCommon(const TimeDuration& aDelay, uint32_t aType,
   mCallback.swap(newCallback);
   ++mGeneration;
 
+  // Diagnostic for https://github.com/RecordReplay/backend/issues/3787
+  recordreplay::RecordReplayAssert("nsTimerImpl::InitCommon #1");
+
   mType = (uint8_t)aType;
   mDelay = aDelay;
   mTimeout = TimeStamp::Now() + mDelay;
