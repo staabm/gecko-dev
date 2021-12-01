@@ -641,9 +641,11 @@ bool Debugger::getFrame(JSContext* cx, const FrameIter& iter,
   AbstractFramePtr referent = iter.abstractFramePtr();
   MOZ_ASSERT_IF(referent.hasScript(), !referent.script()->selfHosted());
 
-  if (referent.hasScript() &&
-      !referent.script()->ensureHasAnalyzedArgsUsage(cx)) {
-    return false;
+  if (referent.hasScript()) {
+    AutoRealm ar(cx, referent.script());
+    if (!referent.script()->ensureHasAnalyzedArgsUsage(cx)) {
+      return false;
+    }
   }
 
   FrameMap::AddPtr p = frames.lookupForAdd(referent);
