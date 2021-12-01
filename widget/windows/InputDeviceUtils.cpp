@@ -6,6 +6,8 @@
 
 #include "InputDeviceUtils.h"
 
+#include "mozilla/RecordReplay.h"
+
 #define INITGUID
 #include <dbt.h>
 #include <hidclass.h>
