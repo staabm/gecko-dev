@@ -37,6 +37,11 @@ void InputDeviceUtils::UnregisterNotification(HDEVNOTIFY aHandle) {
 
 DWORD
 InputDeviceUtils::CountMouseDevices() {
+  // Avoid calling complex system functions while we're diverged from the recording.
+  if (recordreplay::HasDivergedFromRecording()) {
+    return 1;
+  }
+
   HDEVINFO hdev =
       SetupDiGetClassDevs(&GUID_DEVINTERFACE_MOUSE, nullptr, nullptr,
                           DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
