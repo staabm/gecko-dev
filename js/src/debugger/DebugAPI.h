@@ -343,6 +343,14 @@ class DebugAPI {
   static inline void notifyParticipatesInGC(GlobalObject* global,
                                             uint64_t majorGCNumber);
 
+  /*
+   * Get any instrumentation ID which has been associated with a script using
+   * the specified debugger object.
+   */
+  static bool getScriptInstrumentationId(JSContext* cx, HandleObject dbgObject,
+                                         HandleScript script,
+                                         MutableHandleValue rval);
+
  private:
   static bool stepModeEnabledSlow(JSScript* script);
   static bool hasBreakpointsAtSlow(JSScript* script, jsbytecode* pc);

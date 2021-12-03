@@ -39,14 +39,19 @@ WarpSnapshot::WarpSnapshot(JSContext* cx, TempAllocator& alloc,
 #endif
 }
 
-WarpScriptSnapshot::WarpScriptSnapshot(JSScript* script,
-                                       const WarpEnvironment& env,
-                                       WarpOpSnapshotList&& opSnapshots,
-                                       ModuleObject* moduleObject)
+WarpScriptSnapshot::WarpScriptSnapshot(
+    JSScript* script, const WarpEnvironment& env,
+    WarpOpSnapshotList&& opSnapshots, ModuleObject* moduleObject,
+    JSObject* instrumentationCallback,
+    mozilla::Maybe<int32_t> instrumentationScriptId,
+    mozilla::Maybe<bool> instrumentationActive)
     : script_(script),
       environment_(env),
       opSnapshots_(std::move(opSnapshots)),
       moduleObject_(moduleObject),
+      instrumentationCallback_(instrumentationCallback),
+      instrumentationScriptId_(instrumentationScriptId),
+      instrumentationActive_(instrumentationActive),
       isArrowFunction_(script->isFunction() && script->function()->isArrow()) {}
 
 #ifdef JS_JITSPEW
@@ -245,6 +250,10 @@ void WarpScriptSnapshot::trace(JSTracer* trc) {
 
   if (moduleObject_) {
     TraceWarpGCPtr(trc, moduleObject_, "warp-module-obj");
+  }
+
+  if (instrumentationCallback_) {
+    TraceWarpGCPtr(trc, instrumentationCallback_, "warp-instr-callback");
   }
 }
 

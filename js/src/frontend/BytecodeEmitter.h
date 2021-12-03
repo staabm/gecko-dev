@@ -49,6 +49,7 @@
 #include "vm/CheckIsObjectKind.h"          // CheckIsObjectKind
 #include "vm/FunctionPrefixKind.h"         // FunctionPrefixKind
 #include "vm/GeneratorResumeKind.h"        // GeneratorResumeKind
+#include "vm/Instrumentation.h"            // InstrumentationKind
 #include "vm/JSFunction.h"                 // JSFunction
 #include "vm/JSScript.h"       // JSScript, BaseScript, MemberInitializers
 #include "vm/Runtime.h"        // ReportOutOfMemory
@@ -305,6 +306,10 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
 
   // The end location of a function body that is being emitted.
   mozilla::Maybe<uint32_t> functionBodyEndPos = {};
+
+  // Mask of operation kinds which need instrumentation. This is obtained from
+  // the compile options and copied here for efficiency.
+  uint32_t instrumentationKinds = 0;
 
   /*
    * Note that BytecodeEmitters are magic: they own the arena "top-of-stack"
@@ -1012,7 +1017,10 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
 
   [[nodiscard]] bool emitExportDefault(BinaryNode* exportNode);
 
-  [[nodiscard]] bool emitReturnRval() { return emit1(JSOp::RetRval); }
+  [[nodiscard]] bool emitReturnRval() {
+    return emitInstrumentation(InstrumentationKind::Exit) &&
+           emit1(JSOp::RetRval);
+  }
 
   [[nodiscard]] bool emitCheckPrivateField(ThrowCondition throwCondition,
                                            ThrowMsgKind msgKind) {
@@ -1087,6 +1095,10 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
       JSContext* cx);
 
  private:
+  [[nodiscard]] bool emitInstrumentationSlow(
+      InstrumentationKind kind,
+      const std::function<bool(uint32_t)>& pushOperandsCallback);
+
   [[nodiscard]] bool allowSelfHostedIter(ParseNode* parseNode);
 
   [[nodiscard]] bool emitSelfHostedGetBuiltinConstructorOrPrototype(

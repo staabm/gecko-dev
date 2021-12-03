@@ -235,6 +235,10 @@ bool BytecodeEmitter::markStepBreakpoint() {
     return true;
   }
 
+  if (!emitInstrumentation(InstrumentationKind::Breakpoint)) {
+    return false;
+  }
+
   if (!newSrcNote(SrcNoteType::StepSep)) {
     return false;
   }
@@ -261,6 +265,10 @@ bool BytecodeEmitter::markSimpleBreakpoint() {
   // having two breakpoints with the same line/column position.
   // Note: This assumes that the position for the call has already been set.
   if (!bytecodeSection().isDuplicateLocation()) {
+    if (!emitInstrumentation(InstrumentationKind::Breakpoint)) {
+      return false;
+    }
+
     if (!newSrcNote(SrcNoteType::Breakpoint)) {
       return false;
     }
@@ -2384,6 +2392,11 @@ bool BytecodeEmitter::allocateResumeIndexRange(
 }
 
 bool BytecodeEmitter::emitYieldOp(JSOp op) {
+  // All yield operations pop or suspend the current frame.
+  if (!emitInstrumentation(InstrumentationKind::Exit)) {
+    return false;
+  }
+
   if (op == JSOp::FinalYieldRval) {
     return emit1(JSOp::FinalYieldRval);
   }
@@ -6362,7 +6375,10 @@ bool BytecodeEmitter::emitReturn(UnaryNode* returnNode) {
       return false;
     }
   } else if (top + BytecodeOffsetDiff(JSOpLength_Return) !=
-             bytecodeSection().offset()) {
+                 bytecodeSection().offset() ||
+             // If we are instrumenting, make sure we use RetRval and add any
+             // instrumentation for the frame exit.
+             instrumentationKinds) {
     bytecodeSection().code()[top.value()] = jsbytecode(JSOp::SetRval);
     if (!emitReturnRval()) {
       return false;
@@ -11119,37 +11135,6 @@ MOZ_NEVER_INLINE bool BytecodeEmitter::emitInstrumentationSlow(
             bytecodeSection().code().length());
 
   return true;
-}
-
-MOZ_NEVER_INLINE bool BytecodeEmitter::emitInstrumentationForOpcodeSlow(
-    JSOp op, GCThingIndex atomIndex) {
-  MOZ_ASSERT(instrumentationKinds);
-
-  switch (op) {
-    case JSOp::GetProp:
-      return emitInstrumentationSlow(
-          InstrumentationKind::GetProperty, [=](uint32_t pushed) {
-            return emitDupAt(pushed) && emitAtomOp(JSOp::String, atomIndex);
-          });
-    case JSOp::SetProp:
-    case JSOp::StrictSetProp:
-      return emitInstrumentationSlow(
-          InstrumentationKind::SetProperty, [=](uint32_t pushed) {
-            return emitDupAt(pushed + 1) &&
-                   emitAtomOp(JSOp::String, atomIndex) && emitDupAt(pushed + 2);
-          });
-    case JSOp::GetElem:
-      return emitInstrumentationSlow(
-          InstrumentationKind::GetElement,
-          [=](uint32_t pushed) { return emitDupAt(pushed + 1, 2); });
-    case JSOp::SetElem:
-    case JSOp::StrictSetElem:
-      return emitInstrumentationSlow(
-          InstrumentationKind::SetElement,
-          [=](uint32_t pushed) { return emitDupAt(pushed + 2, 3); });
-    default:
-      return true;
-  }
 }
 
 bool BytecodeEmitter::emitTree(

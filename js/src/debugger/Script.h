@@ -33,6 +33,9 @@ class DebuggerScript : public NativeObject {
   enum {
     OWNER_SLOT,
 
+    // Holds any instrumentation ID that has been assigned to the script.
+    INSTRUMENTATION_ID_SLOT,
+
     RESERVED_SLOTS,
   };
 
@@ -55,6 +58,10 @@ class DebuggerScript : public NativeObject {
   static bool construct(JSContext* cx, unsigned argc, Value* vp);
 
   struct CallData;
+
+  Value getInstrumentationId() const {
+    return getSlot(INSTRUMENTATION_ID_SLOT);
+  }
 
   bool isInstance() const;
   Debugger* owner() const;

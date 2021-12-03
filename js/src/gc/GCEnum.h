@@ -136,6 +136,7 @@ enum class GCAbortReason {
   _(DebuggerFrameIterData)                 \
   _(DebuggerOnStepHandler)                 \
   _(DebuggerOnPopHandler)                  \
+  _(RealmInstrumentation)                  \
   _(ICUObject)                             \
   _(FinalizationRegistryRecordVector)      \
   _(FinalizationRegistryRegistrations)     \
