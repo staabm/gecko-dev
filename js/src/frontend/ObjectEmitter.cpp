@@ -360,7 +360,7 @@ bool PropertyEmitter::emitInitIndexOrComputed(JSOp op) {
   //                [stack] CTOR? OBJ CTOR? KEY VAL
 
   // Assert the value being written to the object.
-  if (!bce_->maybeEmitRecordReplayAssert(bce_->cx->parserNames().element)) {
+  if (!bce_->maybeEmitRecordReplayAssert("element")) {
     return false;
   }
 

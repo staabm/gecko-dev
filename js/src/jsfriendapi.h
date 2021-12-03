@@ -736,7 +736,7 @@ extern JS_PUBLIC_API uint64_t GetGCHeapUsageForObjectZone(JSObject* obj);
  * Return whether a global object's realm has had instrumentation enabled by a
  * Debugger.
  */
-extern JS_FRIEND_API bool GlobalHasInstrumentation(JSObject* global);
+extern JS_PUBLIC_API bool GlobalHasInstrumentation(JSObject* global);
 
 class JS_PUBLIC_API CompartmentTransplantCallback {
  public:

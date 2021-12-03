@@ -1102,13 +1102,13 @@ XDRResult js::XDRScript(XDRState<mode>* xdr, HandleScope scriptEnclosingScope,
   // instructions.
   if (xdr->hasOptions() ? !!xdr->options().instrumentationKinds
                         : !!cx->global()->getInstrumentationHolder()) {
-    return xdr->fail(JS::TranscodeResult_Failure);
+    return xdr->fail(JS::TranscodeResult::Failure);
   }
 
   // When recording/replaying, whether globals are instrumented can vary between
   // recording and replaying.
   if (mozilla::recordreplay::IsRecordingOrReplaying()) {
-    return xdr->fail(JS::TranscodeResult_Failure);
+    return xdr->fail(JS::TranscodeResult::Failure);
   }
 
   if (mode == XDR_ENCODE) {
@@ -3197,8 +3197,8 @@ XDRResult ScriptSource::XDR(XDRState<mode>* xdr,
       MOZ_ASSERT(source->filename());
 
       // Note the content of sources decoded when recording or replaying.
-      if (!MaybeNoteContentParse(xdr->cx(), ss)) {
-        return xdr->fail(JS::TranscodeResult_Throw);
+      if (!MaybeNoteContentParse(xdr->cx(), source)) {
+        return xdr->fail(JS::TranscodeResult::Throw);
       }
     }
   }

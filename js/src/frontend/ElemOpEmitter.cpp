@@ -55,7 +55,7 @@ bool ElemOpEmitter::emitGet() {
   MOZ_ASSERT(state_ == State::Key);
 
   // Assert the key in the get.
-  if (!bce_->maybeEmitRecordReplayAssert(bce_->cx->parserNames().element)) {
+  if (!bce_->maybeEmitRecordReplayAssert("element")) {
     return false;
   }
 
@@ -116,7 +116,7 @@ bool ElemOpEmitter::emitGet() {
   }
 
   // Assert the value read by the get.
-  if (!bce_->maybeEmitRecordReplayAssert(bce_->cx->parserNames().element)) {
+  if (!bce_->maybeEmitRecordReplayAssert("element")) {
     return false;
   }
 
@@ -132,7 +132,7 @@ bool ElemOpEmitter::prepareForRhs() {
   MOZ_ASSERT_IF(isCompoundAssignment(), state_ == State::Get);
 
   // Assert the element written by the set.
-  if (!bce_->maybeEmitRecordReplayAssert(bce_->cx->parserNames().element)) {
+  if (!bce_->maybeEmitRecordReplayAssert("element")) {
     return false;
   }
 
@@ -209,7 +209,7 @@ bool ElemOpEmitter::emitAssignment() {
   MOZ_ASSERT_IF(isPropInit(), !isSuper());
 
   // Assert the value written by the set.
-  if (!bce_->maybeEmitRecordReplayAssert(bce_->cx->parserNames().element)) {
+  if (!bce_->maybeEmitRecordReplayAssert("element")) {
     return false;
   }
 

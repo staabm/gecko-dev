@@ -2231,6 +2231,12 @@
   can_recover: true
   clone: true
 
+- name: ExecutionProgress
+  gen_boilerplate: false
+
+- name: RecordReplayAssertValue
+  gen_boilerplate: false
+
 - name: WasmNeg
   gen_boilerplate: false
 

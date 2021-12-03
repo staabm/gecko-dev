@@ -491,7 +491,7 @@ bool BytecodeEmitter::emitCall(JSOp op, uint16_t argc,
     return false;
   }
   if (allowRecordReplayAssert &&
-      !maybeEmitRecordReplayAssert(cx->parserNames().callFunction)) {
+      !maybeEmitRecordReplayAssert("callFunction")) {
     return false;
   }
   return true;
@@ -971,11 +971,6 @@ bool BytecodeEmitter::emitAtomOp(JSOp op, TaggedParserAtomIndex atom) {
 
 bool BytecodeEmitter::emitAtomOp(JSOp op, GCThingIndex atomIndex) {
   MOZ_ASSERT(JOF_OPTYPE(op) == JOF_ATOM);
-
-  if (shouldInstrument != ShouldInstrument::No &&
-      !emitInstrumentationForOpcode(op, atomIndex)) {
-    return false;
-  }
 
   if (!emitGCIndexOp(op, atomIndex)) {
     return false;
@@ -11085,13 +11080,10 @@ MOZ_NEVER_INLINE bool BytecodeEmitter::emitInstrumentationSlow(
   }
   //            [stack] CALLBACK UNDEFINED
 
-  const ParserAtom* atom = RealmInstrumentation::getInstrumentationKindName(
-      cx, compilationState.parserAtoms, kind);
-  if (!atom) {
-    return false;
-  }
+  const char* kindName = RealmInstrumentation::getInstrumentationKindName(kind);
+  TaggedParserAtomIndex kindIndex = parserAtoms().internAscii(cx, kindName, strlen(kindName));
 
-  if (!emitAtomOp(JSOp::String, atom)) {
+  if (!emitAtomOp(JSOp::String, kindIndex)) {
     return false;
   }
   //            [stack] CALLBACK UNDEFINED KIND

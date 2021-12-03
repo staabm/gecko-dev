@@ -628,7 +628,7 @@ bool frontend::SourceAwareCompiler<Unit>::createSourceAndParser(JSContext* cx) {
   // Note the contents of any compiled scripts when recording/replaying.
   if (mozilla::recordreplay::IsRecordingOrReplaying()) {
     mozilla::recordreplay::NoteContentParse(
-        this, stencil.input.options.filename(), "application/javascript",
+        this, options.filename(), "application/javascript",
         sourceBuffer_.units(), sourceBuffer_.length());
   }
 

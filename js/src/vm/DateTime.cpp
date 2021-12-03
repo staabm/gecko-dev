@@ -6,6 +6,7 @@
 
 #include "vm/DateTime.h"
 
+#include "mozilla/RecordReplay.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/TextUtils.h"
 

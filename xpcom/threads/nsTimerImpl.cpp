@@ -381,7 +381,7 @@ nsresult nsTimerImpl::InitCommon(const TimeDuration& aDelay, uint32_t aType,
   ++mGeneration;
 
   // Diagnostic for https://github.com/RecordReplay/backend/issues/3787
-  recordreplay::RecordReplayAssert("nsTimerImpl::InitCommon #1");
+  mozilla::recordreplay::RecordReplayAssert("nsTimerImpl::InitCommon #1");
 
   mType = (uint8_t)aType;
   mDelay = aDelay;

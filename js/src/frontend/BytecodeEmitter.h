@@ -1043,29 +1043,21 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
     return false;
   }
 
-  MOZ_MUST_USE bool emitExecutionProgress() {
+  [[nodiscard]] bool emitExecutionProgress() {
     if (shouldEmitInstrumentation()) {
       return emit1(JSOp::ExecutionProgress);
     }
     return true;
   }
 
-  MOZ_MUST_USE bool emitInstrumentation(InstrumentationKind kind) {
+  [[nodiscard]] bool emitInstrumentation(InstrumentationKind kind) {
     if (shouldEmitInstrumentation()) {
       return emitInstrumentationSlow(kind, std::function<bool(uint32_t)>());
     }
     return true;
   }
 
-  MOZ_MUST_USE bool emitInstrumentationForOpcode(JSOp op,
-                                                 GCThingIndex atomIndex) {
-    if (shouldEmitInstrumentation()) {
-      return emitInstrumentationForOpcodeSlow(op, atomIndex);
-    }
-    return true;
-  }
-
-  MOZ_MUST_USE bool maybeEmitRecordReplayAssert(GCThingIndex atomIndex) {
+  [[nodiscard]] bool maybeEmitRecordReplayAssert(GCThingIndex atomIndex) {
     if (shouldEmitInstrumentation() &&
         ShouldEmitRecordReplayAssert(parser->options().filename(),
                                      bytecodeSection().currentLine(),
@@ -1075,12 +1067,23 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
     return true;
   }
 
-  MOZ_MUST_USE bool maybeEmitRecordReplayAssert(const ParserAtom* atom) {
+  [[nodiscard]] bool maybeEmitRecordReplayAssert(TaggedParserAtomIndex atom) {
     if (shouldEmitInstrumentation() &&
         ShouldEmitRecordReplayAssert(parser->options().filename(),
                                      bytecodeSection().currentLine(),
                                      bytecodeSection().lastColumn())) {
       return emitDupAt(0) && emitAtomOp(JSOp::RecordReplayAssert, atom);
+    }
+    return true;
+  }
+
+  [[nodiscard]] bool maybeEmitRecordReplayAssert(const char* atom) {
+    if (shouldEmitInstrumentation() &&
+        ShouldEmitRecordReplayAssert(parser->options().filename(),
+                                     bytecodeSection().currentLine(),
+                                     bytecodeSection().lastColumn())) {
+      TaggedParserAtomIndex index = parserAtoms().internAscii(cx, atom, strlen(atom));
+      return emitDupAt(0) && emitAtomOp(JSOp::RecordReplayAssert, index);
     }
     return true;
   }

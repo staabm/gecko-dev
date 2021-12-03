@@ -290,7 +290,7 @@ XDRResult XDRState<mode>::codeScript(MutableHandleScript scriptp) {
   // when recording/replaying due to execution progress and instrumentation
   // opcodes.
   if (mozilla::recordreplay::IsRecordingOrReplaying()) {
-    return fail(JS::TranscodeResult_Failure);
+    return fail(JS::TranscodeResult::Failure);
   }
 
   TraceLoggerThread* logger = TraceLoggerForCurrentThread(cx());

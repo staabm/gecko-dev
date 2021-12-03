@@ -608,19 +608,6 @@ void nsRFPService::GetSpoofedUserAgent(nsACString& userAgent,
   // https://developer.mozilla.org/en-US/docs/Web/API/NavigatorID/userAgent
   // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/User-Agent
 
-<<<<<<< HEAD
-  const char* spoofedVersion = recordreplay::CurrentFirefoxVersion();
-  const char* spoofedOS = isForHTTPHeader ? SPOOFED_HTTP_UA_OS : SPOOFED_UA_OS;
-  userAgent.Assign(nsPrintfCString(
-      "Mozilla/5.0 (%s; rv:%s) Gecko/%s Firefox/%s", spoofedOS,
-      spoofedVersion, LEGACY_UA_GECKO_TRAIL, spoofedVersion));
-||||||| b7c85e09aa5a
-  uint32_t spoofedVersion = GetSpoofedVersion();
-  const char* spoofedOS = isForHTTPHeader ? SPOOFED_HTTP_UA_OS : SPOOFED_UA_OS;
-  userAgent.Assign(nsPrintfCString(
-      "Mozilla/5.0 (%s; rv:%d.0) Gecko/%s Firefox/%d.0", spoofedOS,
-      spoofedVersion, LEGACY_UA_GECKO_TRAIL, spoofedVersion));
-=======
   // These magic numbers are the lengths of the UA string literals below.
   // Assume three-digit Firefox version numbers so we have room to grow.
   size_t preallocatedLength =
@@ -631,7 +618,7 @@ void nsRFPService::GetSpoofedUserAgent(nsACString& userAgent,
       2;
   userAgent.SetCapacity(preallocatedLength);
 
-  uint32_t spoofedVersion = GetSpoofedVersion();
+  const char* spoofedVersion = recordreplay::CurrentFirefoxVersion();
 
   // "Mozilla/5.0 (%s; rv:%d.0) Gecko/%d Firefox/%d.0"
   userAgent.AssignLiteral("Mozilla/5.0 (");
@@ -643,22 +630,19 @@ void nsRFPService::GetSpoofedUserAgent(nsACString& userAgent,
   }
 
   userAgent.AppendLiteral("; rv:");
-  userAgent.AppendInt(spoofedVersion);
-  userAgent.AppendLiteral(".0) Gecko/");
+  userAgent.Append(spoofedVersion);
+  userAgent.AppendLiteral(") Gecko/");
 
 #if defined(ANDROID)
-  userAgent.AppendInt(spoofedVersion);
-  userAgent.AppendLiteral(".0");
+  userAgent.Append(spoofedVersion);
 #else
   userAgent.AppendLiteral(LEGACY_UA_GECKO_TRAIL);
 #endif
 
   userAgent.AppendLiteral(" Firefox/");
-  userAgent.AppendInt(spoofedVersion);
-  userAgent.AppendLiteral(".0");
+  userAgent.Append(spoofedVersion);
 
   MOZ_ASSERT(userAgent.Length() <= preallocatedLength);
->>>>>>> esr91
 }
 
 static const char* gCallbackPrefs[] = {
