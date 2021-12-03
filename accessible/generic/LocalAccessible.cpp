@@ -118,10 +118,15 @@ LocalAccessible::LocalAccessible(nsIContent* aContent, DocAccessible* aDoc)
       mHideEventTarget(false) {
   mBits.groupInfo = nullptr;
   mIndexOfEmbeddedChild = -1;
+
+  // Assign an ID to this Accessible for use in UniqueID().
+  recordreplay::RegisterThing(this);
 }
 
 LocalAccessible::~LocalAccessible() {
   NS_ASSERTION(!mDoc, "LastRelease was never called!?!");
+
+  recordreplay::UnregisterThing(this);
 }
 
 ENameValueFlag LocalAccessible::Name(nsString& aName) const {
