@@ -278,7 +278,6 @@ class MutableScriptFlags : public EnumFlags<MutableScriptFlagsEnum> {
   _(ImmutableFlags, funHasExtensibleScope, FunHasExtensibleScope)             \
   _(ImmutableFlags, functionHasThisBinding, FunctionHasThisBinding)           \
   _(ImmutableFlags, needsHomeObject, NeedsHomeObject)                         \
-  _(ImmutableFlags, isDefaultClassConstructor, IsDefaultClassConstructor)     \
   _(ImmutableFlags, isDerivedClassConstructor, IsDerivedClassConstructor)     \
   _(ImmutableFlags, isSyntheticFunction, IsSyntheticFunction)                 \
   _(ImmutableFlags, useMemberInitializers, UseMemberInitializers)             \

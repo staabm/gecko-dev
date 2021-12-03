@@ -247,9 +247,6 @@ enum class ImmutableScriptFlagsEnum : uint32_t {
   // Large self-hosted methods that should be inlined anyway by the JIT for
   // performance reasons can be marked with this flag.
   IsInlinableLargeFunction = 1 << 28,
-
-  // This is a default class constructor cloned from a self hosted script.
-  IsDefaultClassConstructor = 1 << 29,
 };
 
 enum class MutableScriptFlagsEnum : uint32_t {
