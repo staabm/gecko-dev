@@ -19,9 +19,14 @@ Port::Port(uint64_t next_sequence_num_to_send,
       message_queue(next_sequence_num_to_receive),
       remove_proxy_on_last_message(false),
       peer_closed(false),
-      peer_lost_unexpectedly(false) {}
+      peer_lost_unexpectedly(false) {
+  // Registering new ports is needed for sorting, see port_locker.cc
+  mozilla::recordreplay::RegisterThing(this);
+}
 
-Port::~Port() = default;
+Port::~Port() {
+  mozilla::recordreplay::UnregisterThing(this);
+}
 
 }  // namespace ports
 }  // namespace core
