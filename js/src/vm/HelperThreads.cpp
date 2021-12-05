@@ -1373,7 +1373,11 @@ bool GlobalHelperThreadState::ensureInitialized() {
     i = 0;
   }
 
-  useInternalThreadPool_ = !dispatchTaskCallback;
+  // For now we use the internal thread pool when recording/replaying, as helper
+  // thread tasks are scheduled at non-deterministic points and we don't support
+  // scheduling non-deterministic tasks on gecko threads yet.
+  // See https://github.com/RecordReplay/backend/issues/1091
+  useInternalThreadPool_ = !dispatchTaskCallback || mozilla::recordreplay::IsRecordingOrReplaying();
   if (useInternalThreadPool(lock)) {
     if (!InternalThreadPool::Initialize(threadCount, lock)) {
       return false;
