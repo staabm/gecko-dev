@@ -52,10 +52,10 @@ class MOZ_RAII AutoWritableJitCodeFallible {
   }
 
   ~AutoWritableJitCodeFallible() {
-    mozilla::TimeStamp startTime = mozilla::TimeStamp::Now();
+    mozilla::TimeStamp startTime = js::ReallyNow();
     auto timer = mozilla::MakeScopeExit([&] {
       if (Realm* realm = rt_->mainContextFromOwnThread()->realm()) {
-        realm->timers.protectTime += mozilla::TimeStamp::Now() - startTime;
+        realm->timers.protectTime += js::ReallyNow() - startTime;
       }
     });
 
