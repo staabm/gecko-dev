@@ -17,6 +17,7 @@
 #include "mozilla/Likely.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Maybe.h"
+#include "mozilla/RecordReplay.h"
 #include "mozilla/ChaosMode.h"
 
 using namespace mozilla;
@@ -178,9 +179,14 @@ PLDHashTable::HashShift(uint32_t aEntrySize, uint32_t aLength) {
   return kPLDHashNumberBits - log2;
 }
 
+static bool RecordReplayKeyEqualsEntryCallback(const void* aKey, const void* aEntry, void* aPrivate) {
+  const PLDHashTableOps* ops = (const PLDHashTableOps*)aPrivate;
+  return ops->matchEntry((const PLDHashEntryHdr*)aEntry, aKey);
+}
+
 PLDHashTable::PLDHashTable(const PLDHashTableOps* aOps, uint32_t aEntrySize,
                            uint32_t aLength)
-    : mOps(recordreplay::GeneratePLDHashTableCallbacks(aOps)),
+    : mOps(aOps),
       mEntryStore(),
       mGeneration(0),
       mHashShift(HashShift(aEntrySize, aLength)),
@@ -193,6 +199,7 @@ PLDHashTable::PLDHashTable(const PLDHashTableOps* aOps, uint32_t aEntrySize,
   if (aEntrySize != uint32_t(mEntrySize)) {
     MOZ_CRASH("Entry size is too large");
   }
+  recordreplay::NewStableHashTable(this, RecordReplayKeyEqualsEntryCallback, (void*)aOps);
 }
 
 PLDHashTable& PLDHashTable::operator=(PLDHashTable&& aOther) {
@@ -206,13 +213,11 @@ PLDHashTable& PLDHashTable::operator=(PLDHashTable&& aOther) {
   // makes sense to assign in cases where they match. An exception is when we
   // are recording or replaying the execution, in which case custom ops are
   // generated for each table.
-  MOZ_RELEASE_ASSERT(mOps == aOther.mOps || !mOps ||
-                     recordreplay::IsRecordingOrReplaying());
+  MOZ_RELEASE_ASSERT(mOps == aOther.mOps || !mOps);
   MOZ_RELEASE_ASSERT(mEntrySize == aOther.mEntrySize || !mEntrySize);
 
   // Reconstruct |this|.
-  const PLDHashTableOps* ops =
-      recordreplay::UnwrapPLDHashTableCallbacks(aOther.mOps);
+  const PLDHashTableOps* ops = aOther.mOps;
   this->~PLDHashTable();
   new (KnownNotNull, this) PLDHashTable(ops, aOther.mEntrySize, 0);
 
@@ -225,7 +230,7 @@ PLDHashTable& PLDHashTable::operator=(PLDHashTable&& aOther) {
   mChecker = std::move(aOther.mChecker);
 #endif
 
-  recordreplay::MovePLDHashTableContents(aOther.mOps, mOps);
+  recordreplay::MoveStableHashTable(&aOther, this);
 
   // Clear up |aOther| so its destruction will be a no-op and it reports being
   // empty.
@@ -288,8 +293,9 @@ PLDHashTable::~PLDHashTable() {
   AutoDestructorOp op(mChecker);
 #endif
 
+  recordreplay::DeleteStableHashTable(this);
+
   if (!mEntryStore.IsAllocated()) {
-    recordreplay::DestroyPLDHashTableCallbacks(mOps);
     return;
   }
 
@@ -302,14 +308,12 @@ PLDHashTable::~PLDHashTable() {
     });
   }
 
-  recordreplay::DestroyPLDHashTableCallbacks(mOps);
-
   // Entry storage is freed last, by ~EntryStore().
 }
 
 void PLDHashTable::ClearAndPrepareForLength(uint32_t aLength) {
   // Get these values before the destructor clobbers them.
-  const PLDHashTableOps* ops = recordreplay::UnwrapPLDHashTableCallbacks(mOps);
+  const PLDHashTableOps* ops = mOps;
   uint32_t entrySize = mEntrySize;
 
   this->~PLDHashTable();
@@ -472,6 +476,7 @@ bool PLDHashTable::ChangeTable(int32_t aDeltaLog2) {
           Slot newSlot = FindFreeSlot(key);
           MOZ_ASSERT(newSlot.IsFree());
           moveEntry(this, slot.ToEntry(), newSlot.ToEntry());
+          recordreplay::StableHashTableMoveEntry(this, slot.ToEntry(), newSlot.ToEntry());
           newSlot.SetKeyHash(key);
         }
       });
@@ -485,6 +490,10 @@ PLDHashTable::ComputeKeyHash(const void* aKey) const {
   MOZ_ASSERT(mEntryStore.IsAllocated());
 
   PLDHashNumber keyHash = mozilla::ScrambleHashCode(mOps->hashKey(aKey));
+
+  if (recordreplay::IsRecordingOrReplaying()) {
+    keyHash = recordreplay::LookupStableHashCode(this, aKey, keyHash, nullptr);
+  }
 
   // Avoid 0 and 1 hash codes, they indicate free and removed entries.
   if (keyHash < 2) {
@@ -582,6 +591,7 @@ void PLDHashTable::RawRemove(Slot& aSlot) {
     PLDHashEntryHdr* entry = aSlot.ToEntry();
     mOps->clearEntry(this, entry);
   }
+  recordreplay::StableHashTableDeleteEntry(this, aSlot.ToEntry());
   if (keyHash & kCollisionFlag) {
     aSlot.MarkRemoved();
     mRemovedCount++;
@@ -738,6 +748,8 @@ void PLDHashTable::EntryHandle::OccupySlot() {
   }
   mSlot.SetKeyHash(keyHash);
   mTable->mEntryCount++;
+
+  recordreplay::StableHashTableAddEntryForLastLookup(mTable, Entry());
 }
 
 PLDHashTable::Iterator::Iterator(Iterator&& aOther)
