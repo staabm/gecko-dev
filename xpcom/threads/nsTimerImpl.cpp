@@ -56,15 +56,15 @@ class TimerThreadWrapper {
   uint32_t AllowedEarlyFiringMicroseconds();
 
  private:
-  static mozilla::StaticMutex sMutex;
+  static mozilla::OrderedStaticMutex sMutex;
   TimerThread* mThread;
 };
 
-mozilla::StaticMutex TimerThreadWrapper::sMutex;
+mozilla::OrderedStaticMutex TimerThreadWrapper::sMutex;
 
 nsresult TimerThreadWrapper::Init() {
   nsresult rv;
-  mozilla::StaticMutexAutoLock lock(sMutex);
+  mozilla::OrderedStaticMutexAutoLock lock(sMutex);
   mThread = new TimerThread();
 
   NS_ADDREF(mThread);
@@ -81,7 +81,7 @@ void TimerThreadWrapper::Shutdown() {
   RefPtr<TimerThread> thread;
 
   {
-    mozilla::StaticMutexAutoLock lock(sMutex);
+    mozilla::OrderedStaticMutexAutoLock lock(sMutex);
     if (!mThread) {
       return;
     }
@@ -92,13 +92,13 @@ void TimerThreadWrapper::Shutdown() {
   thread->Shutdown();
 
   {
-    mozilla::StaticMutexAutoLock lock(sMutex);
+    mozilla::OrderedStaticMutexAutoLock lock(sMutex);
     NS_RELEASE(mThread);
   }
 }
 
 nsresult TimerThreadWrapper::AddTimer(nsTimerImpl* aTimer) {
-  mozilla::StaticMutexAutoLock lock(sMutex);
+  mozilla::OrderedStaticMutexAutoLock lock(sMutex);
   if (mThread) {
     return mThread->AddTimer(aTimer);
   }
@@ -106,7 +106,7 @@ nsresult TimerThreadWrapper::AddTimer(nsTimerImpl* aTimer) {
 }
 
 nsresult TimerThreadWrapper::RemoveTimer(nsTimerImpl* aTimer) {
-  mozilla::StaticMutexAutoLock lock(sMutex);
+  mozilla::OrderedStaticMutexAutoLock lock(sMutex);
   if (mThread) {
     return mThread->RemoveTimer(aTimer);
   }
@@ -115,14 +115,14 @@ nsresult TimerThreadWrapper::RemoveTimer(nsTimerImpl* aTimer) {
 
 TimeStamp TimerThreadWrapper::FindNextFireTimeForCurrentThread(
     TimeStamp aDefault, uint32_t aSearchBound) {
-  mozilla::StaticMutexAutoLock lock(sMutex);
+  mozilla::OrderedStaticMutexAutoLock lock(sMutex);
   return mThread
              ? mThread->FindNextFireTimeForCurrentThread(aDefault, aSearchBound)
              : TimeStamp();
 }
 
 uint32_t TimerThreadWrapper::AllowedEarlyFiringMicroseconds() {
-  mozilla::StaticMutexAutoLock lock(sMutex);
+  mozilla::OrderedStaticMutexAutoLock lock(sMutex);
   return mThread ? mThread->AllowedEarlyFiringMicroseconds() : 0;
 }
 
