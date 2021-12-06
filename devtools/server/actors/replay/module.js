@@ -2341,12 +2341,8 @@ function Target_topFrameLocation() {
 //
 // https://www.w3.org/TR/CSS21/zindex.html
 //
-//   This reference talks about element kinds like floating and non-zindexed
-//   positioned descendants having a context that acts like a normal stacking
-//   context except for the treatment of descendants that actually create a
-//   normal stacking context. This language is confusing and the initial attempt
-//   to implement it gave poor results on pages so it is ignored here and these
-//   elements are treated as having a normal stacking context instead.
+//   We try to follow this reference, although not all of its rules are
+//   implemented yet.
 //
 // https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Positioning/Understanding_z_index/The_stacking_context
 //
@@ -2381,8 +2377,16 @@ StackingContextElement.prototype = {
 let gNextStackingContextId = 1;
 
 // Information about all the nodes in the same stacking context.
-function StackingContext(root, left = 0, top = 0) {
+// The spec says that some elements should be treated as if they
+// "created a new stacking context, but any positioned descendants and
+// descendants which actually create a new stacking context should be
+// considered part of the parent stacking context, not this new one".
+// For these elements we also create a StackingContext but pass the
+// parent stacking context to the constructor as the "realStackingContext".
+function StackingContext(root, left = 0, top = 0, realStackingContext) {
   this.id = gNextStackingContextId++;
+
+  this.realStackingContext = realStackingContext || this;
 
   // Offset relative to the outer window of the window containing this context.
   this.left = left;
@@ -2402,8 +2406,8 @@ function StackingContext(root, left = 0, top = 0) {
   // Arrays of elements with non-zero z-indexes, indexed by that z-index.
   this.zIndexElements = new Map();
 
+  this.root = root;
   if (root) {
-    this.addNonPositionedElement(root);
     this.addChildrenWithParent(root);
   }
 }
@@ -2435,22 +2439,22 @@ StackingContext.prototype = {
       ["flex", "inline-flex", "grid", "inline-grid"].includes(parentDisplay)
     ) {
       const zIndex = elem.style.getPropertyValue("z-index");
-      if (position != "static" || zIndex != "auto") {
-        this.addContext(elem);
-      }
-
       if (zIndex != "auto") {
+        this.addContext(elem);
         // Elements with a zero z-index have their own stacking context but are
         // grouped with other positioned children with an auto z-index.
         const index = +zIndex | 0;
         if (index) {
-          this.addZIndexElement(elem, index);
+          this.realStackingContext.addZIndexElement(elem, index);
           return;
         }
       }
 
       if (position != "static") {
-        this.addPositionedElement(elem);
+        this.realStackingContext.addPositionedElement(elem);
+        if (!elem.context) {
+          this.addContext(elem, 0, 0, this.realStackingContext);
+        }
       } else {
         this.addNonPositionedElement(elem);
         if (!elem.context) {
@@ -2462,7 +2466,7 @@ StackingContext.prototype = {
 
     if (elem.style.getPropertyValue("float") != "none") {
       // Group the element and its descendants.
-      this.addContext(elem);
+      this.addContext(elem, 0, 0, this.realStackingContext);
       this.addFloatingElement(elem);
       return;
     }
@@ -2470,7 +2474,7 @@ StackingContext.prototype = {
     const display = elem.style.getPropertyValue("display");
     if (display == "inline-block" || display == "inline-table") {
       // Group the element and its descendants.
-      this.addContext(elem);
+      this.addContext(elem, 0, 0, this.realStackingContext);
       this.addNonPositionedElement(elem);
       return;
     }
@@ -2479,12 +2483,12 @@ StackingContext.prototype = {
     this.addChildrenWithParent(elem);
   },
 
-  addContext(elem, left = 0, top = 0) {
+  addContext(elem, left = 0, top = 0, realStackingContext) {
     if (elem.context) {
       assert(!left && !top);
       return;
     }
-    elem.context = new StackingContext(elem, this.left + left, this.top + top);
+    elem.context = new StackingContext(elem, this.left + left, this.top + top, realStackingContext);
   },
 
   addZIndexElement(elem, index) {
@@ -2545,6 +2549,9 @@ StackingContext.prototype = {
     const zIndexes = [...this.zIndexElements.keys()];
     zIndexes.sort((a, b) => a - b);
 
+    if (this.root) {
+      pushElements([this.root]);
+    }
     pushZIndexElements((z) => z < 0);
     pushElements(this.nonPositionedElements);
     pushElements(this.floatingElements);
