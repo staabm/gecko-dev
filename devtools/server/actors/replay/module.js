@@ -2019,7 +2019,7 @@ function nodeContents(node) {
   return {
     nodeType: node.nodeType,
     nodeName: node.nodeName,
-    nodeValue: node.nodeValue ? node.nodeValue : undefined,
+    nodeValue: typeof node.nodeValue === "string" ? node.nodeValue : undefined,
     isConnected: node.isConnected,
     attributes,
     pseudoType,
