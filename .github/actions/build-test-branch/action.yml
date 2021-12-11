@@ -1,0 +1,6 @@
+name: "Build/Test Branch"
+description: "Trigger build/test run on branch"
+
+runs:
+  using: "node12"
+  main: "./main.js"
