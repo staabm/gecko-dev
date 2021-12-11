@@ -36,8 +36,8 @@ gfx::SurfaceFormat WaylandShmBuffer::mFormat = gfx::SurfaceFormat::B8G8R8A8;
 #ifdef MOZ_LOGGING
 // Removed PR_GetEnv calls here as they cause nspr to be initialized
 // before the record/replay driver can attach.
-int WindowBackBuffer::mDumpSerial = 0;
-char* WindowBackBuffer::mDumpDir = nullptr;
+int WaylandShmBuffer::mDumpSerial = 0;
+char* WaylandShmBuffer::mDumpDir = nullptr;
 #endif
 
 static int WaylandAllocateShmMemory(int aSize) {
