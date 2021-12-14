@@ -23,8 +23,14 @@ const { CryptoUtils } = ChromeUtils.import(
 const ReplayAuth = ChromeUtils.import(
   "resource://devtools/server/actors/replay/auth.js"
 );
+const { queryAPIServer } = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/api-server.js"
+);
 const { pingTelemetry } = ChromeUtils.import(
   "resource://devtools/server/actors/replay/telemetry.js"
+);
+const { getenv, setenv } = ChromeUtils.import(
+  "resource://devtools/server/actors/replay/env.js"
 );
 
 ChromeUtils.defineModuleGetter(
@@ -54,20 +60,7 @@ XPCOMUtils.defineLazyModuleGetters(this, {
 
 let updateStatusCallback = null;
 let connectionStatus = "cloudConnecting.label";
-
-function getenv(name) {
-  const env = Cc["@mozilla.org/process/environment;1"].getService(
-    Ci.nsIEnvironment
-  );
-  return env.get(name);
-}
-
-function setenv(name, value) {
-  const env = Cc["@mozilla.org/process/environment;1"].getService(
-    Ci.nsIEnvironment
-  );
-  return env.set(name, value);
-}
+let gShouldValidateUrl = null;
 
 // Return whether all tabs are automatically being recorded.
 function isRecordingAllTabs() {
@@ -309,6 +302,7 @@ function isLoggedIn() {
 
 async function saveRecordingToken(token) {
   ReplayAuth.setReplayUserToken(token);
+  gShouldValidateUrl = null;
 }
 
 function isRunningTest() {
@@ -533,6 +527,117 @@ class Recording extends EventEmitter {
   }
 }
 
+async function checkShouldValidateUrl() {
+  if (gShouldValidateUrl === null) {
+    const resp = await queryAPIServer(`
+      query GetOrgs {
+        viewer {
+          workspaces {
+            edges {
+              node {
+                isOrganization
+                settings {
+                  features
+                }
+              }
+            }
+          }
+        }
+      }
+    `);
+
+    if (resp.errors) {
+      throw new Error("Unexpected error checking Replay user permissions");
+    }
+
+    const workspaces = resp.data.viewer?.workspaces.edges;
+    gShouldValidateUrl = !workspaces ? false : workspaces.some(w => {
+      if (w.node.isOrganization) {
+        const {allowList, blockList} = w.node.settings?.features?.recording || {};
+
+        return (Array.isArray(allowList) && allowList.length > 0) || (Array.isArray(blockList) && blockList.length > 0);
+      }
+
+      return false;
+    });
+  }
+
+  return gShouldValidateUrl;
+}
+
+async function canRecordUrl(url) {
+  try {
+    const shouldValidate = await checkShouldValidateUrl();
+    if (!shouldValidate) return true;
+
+    const resp = await queryAPIServer(`
+      query CanRecord ($url: String!) {
+        viewer {
+          canRecordUrl(url: $url)
+        }
+      }
+    `, {
+      url
+    });
+
+    if (resp.errors) {
+      throw new Error(resp.errors[0].message);
+    }
+
+    return resp.data.viewer.canRecordUrl;
+  } catch (e) {
+    // Fallback to allowing recordings if the backend errors but log to telemetry
+    console.error(e);
+    pingTelemetry("recording", "can-record-failed", { why: e.message || "", url });
+
+    return true;
+  }
+}
+
+function getLocationListener(key) {
+  return {
+    key,
+    QueryInterface: ChromeUtils.generateQI([
+      "nsIWebProgressListener",
+      "nsISupportsWeakReference",
+    ]),
+    onLocationChange(aWebProgress, _, aLocation) {
+      if(!aWebProgress.isTopLevel) return;
+
+      // Always allow blank and new tab
+      if (aLocation.displaySpec === "about:blank" || aLocation.displaySpec === "https://app.replay.io/browser/new-tab") {
+        return;
+      }
+
+      canRecordUrl(aLocation.displaySpec).then((canRecord) => {
+        if (canRecord) return;
+
+        const browser = getRecordingBrowser(this.key);
+        const message = `The URL ${aLocation.displaySpec} may not be recorded according to your organization's policy.`;
+        showInvalidatedRecordingNotification(browser, message);
+        const remoteTab = browser.frameLoader.remoteTab;
+        if (remoteTab) {
+          remoteTab.finishRecording("Organization Policy Violation");
+        }
+      });
+    }
+  }
+}
+
+Services.obs.addObserver(
+  subject => {
+    const {state, entry, browser} = subject.wrappedJSObject;
+    if (browser && entry) {
+      if (state === RecordingState.STARTING) {
+        browser.addProgressListener(entry.locationListener);
+      } else if (state === RecordingState.READY) {
+        browser.removeProgressListener(entry.locationListener)
+      }
+    }
+  },
+  "recordreplay-recording-changed"
+);
+
 const RecordingState = {
   READY: 0,
   STARTING: 1,
@@ -552,13 +657,15 @@ function getRecordingBrowser(key) {
 
 function updateRecordingState(key, state) {
   const current = recordings.get(key);
+  const locationListener = current && current.locationListener || getLocationListener(key);
   const timestamps = current && current.timestamps || {};
   timestamps[state] = Date.now();
 
   const entry = {
     state,
     recording: current ? current.recording : null,
-    timestamps
+    timestamps,
+    locationListener,
   };
   recordings.set(key, entry);
   return entry;
@@ -573,14 +680,17 @@ function addRecordingInstance(key, recording) {
 }
 
 function setRecordingState(key, state) {
+  let entry = null;
   if (state === RecordingState.READY) {
+    entry = recordings.get(key);
     recordings.delete(key);
   } else {
-    updateRecordingState(key, state);
+    entry = updateRecordingState(key, state);
   }
 
   Services.obs.notifyObservers({
     browser: getRecordingBrowser(key),
+    entry,
     state
   }, "recordreplay-recording-changed");
 }
@@ -611,6 +721,10 @@ function remapRecordingState(browser, key) {
 
   if (recordings.has(key)) {
     const entry = recordings.get(key);
+    // Remap the key used by the listener so it can find the browser
+    if (entry.locationListener) {
+      entry.locationListener.key = newKey;
+    }
     recordings.delete(key);
     recordings.set(newKey, entry);
   }
@@ -769,9 +883,7 @@ function setRecordingFinished(browser, url) {
   SessionStore.setTabState(tab, state);
 
   if (url) {
-    browser.loadURI(url, {
-      triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
-    });
+    openInNewTab(browser, url);
   }
 
   remapRecordingState(browser, key);
@@ -901,10 +1013,38 @@ function handleRecordingStarted(pmm) {
   });
 }
 
+function showInvalidatedRecordingNotification(browser, message = `The current recording is not allowed by your organization's policy.`) {
+  const notificationBox = browser.getTabBrowser().getNotificationBox(browser);
+  let notification = notificationBox.getNotificationWithValue(
+    "replay-invalidated-recording"
+  );
+  if (notification) {
+    return;
+  }
+
+  notificationBox.appendNotification(
+    message,
+    "replay-invalidated-recording",
+    undefined,
+    notificationBox.PRIORITY_WARNING_HIGH,
+  );
+}
+
+function hideInvalidatedRecordingNotification(browser) {
+  const notificationBox = browser.getTabBrowser().getNotificationBox(browser);
+  const notification = notificationBox.getNotificationWithValue(
+    "replay-invalidated-recording"
+  );
+
+  if (notification) {
+    notificationBox.removeNotification(notification)
+  }
+}
+
 function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
   const notificationBox = browser.getTabBrowser().getNotificationBox(browser);
   let notification = notificationBox.getNotificationWithValue(
-    "unsupported-feature"
+    "replay-unsupported-feature"
   );
   if (notification) {
     return;
@@ -914,7 +1054,7 @@ function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
 
   notificationBox.appendNotification(
     message,
-    "unsupported-feature",
+    "replay-unsupported-feature",
     undefined,
     notificationBox.PRIORITY_WARNING_HIGH,
     [{
@@ -929,7 +1069,7 @@ function showUnsupportedFeatureNotification(browser, feature, issueNumber) {
 function hideUnsupportedFeatureNotification(browser) {
   const notificationBox = browser.getTabBrowser().getNotificationBox(browser);
   const notification = notificationBox.getNotificationWithValue(
-    "unsupported-feature"
+    "replay-unsupported-feature"
   );
 
   if (notification) {
