@@ -905,11 +905,6 @@ RefPtr<IDWriteFactory> Factory::EnsureDWriteFactory() {
 
   mDWriteFactoryInitialized = true;
 
-  // For now using IDWriteFactory isn't supported when recording/replaying.
-  if (recordreplay::IsRecordingOrReplaying()) {
-    return nullptr;
-  }
-
   HMODULE dwriteModule = LoadLibrarySystem32(L"dwrite.dll");
   decltype(DWriteCreateFactory)* createDWriteFactory =
       (decltype(DWriteCreateFactory)*)GetProcAddress(dwriteModule,
