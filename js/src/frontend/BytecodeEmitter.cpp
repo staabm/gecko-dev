@@ -2415,6 +2415,11 @@ bool BytecodeEmitter::emitYieldOp(JSOp op) {
 
   SET_RESUMEINDEX(bytecodeSection().code(off), resumeIndex);
 
+  BytecodeOffset unusedOffset;
+  if (!emitJumpTargetOp(JSOp::AfterYield, &unusedOffset)) {
+    return false;
+  }
+
   if (!emitExecutionProgress()) {
     return false;
   }
@@ -2423,8 +2428,7 @@ bool BytecodeEmitter::emitYieldOp(JSOp op) {
     return false;
   }
 
-  BytecodeOffset unusedOffset;
-  return emitJumpTargetOp(JSOp::AfterYield, &unusedOffset);
+  return true;
 }
 
 bool BytecodeEmitter::emitPushResumeKind(GeneratorResumeKind kind) {
