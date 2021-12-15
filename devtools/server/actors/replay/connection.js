@@ -221,6 +221,11 @@ gCommandSocket.onStateChange = state => {
   }
 }
 
+// when the browser restarts itself (usually after an update), the
+// environment variables are retained. We want to ensure that this
+// variable doesn't contain an outdated token, so we clear it here
+// and rely on the initialization code in this file to set it again
+// if an API key or a current token is found.
 setenv("RECORD_REPLAY_AUTH", null);
 let gTokenChangeCallbacks = null;
 function setAccessToken(token, isAPIKey) {

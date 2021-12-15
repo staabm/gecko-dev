@@ -308,6 +308,8 @@ MOZ_EXPORT void RecordReplayInterface_Initialize(int* aArgc, char*** aArgv) {
   MOZ_RELEASE_ASSERT(dispatchAddress.isSome());
 
   Maybe<std::string> apiKey;
+  // this environment variable is set by server/actors/replay/connection.js
+  // to contain the API key or user token
   const char* val = getenv("RECORD_REPLAY_AUTH");
   if (val && val[0]) {
     apiKey.emplace(val);
