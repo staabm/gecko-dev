@@ -2351,7 +2351,7 @@ function Target_topFrameLocation() {
 //   mostly ignored here.
 
 // Information about an element needed to add it to a stacking context.
-function StackingContextElement(node, parent, offset, style, bounds, clipBounds) {
+function StackingContextElement(node, parent, offset, style, clipBounds) {
   assert(node.nodeType == Node.ELEMENT_NODE);
 
   // Underlying element.
@@ -2363,9 +2363,8 @@ function StackingContextElement(node, parent, offset, style, bounds, clipBounds)
   // the parent StackingContextElement
   this.parent = parent;
 
-  // Style and layout information for the node.
+  // Style and clipping information for the node.
   this.style = style;
-  this.bounds = bounds;
   this.clipBounds = clipBounds;
 
   // Any stacking context at which this element is the root.
@@ -2373,28 +2372,91 @@ function StackingContextElement(node, parent, offset, style, bounds, clipBounds)
 }
 
 StackingContextElement.prototype = {
-  getClippedBounds() {
-    let { left, top, right, bottom } = this.bounds;
-    if (this.clipBounds.left !== undefined) {
-      left = Math.max(left, this.clipBounds.left);
-    }
-    if (this.clipBounds.top !== undefined) {
-      top = Math.max(top, this.clipBounds.top);
-    }
-    if (this.clipBounds.right !== undefined) {
-      right = Math.min(right, this.clipBounds.right);
-    }
-    if (this.clipBounds.bottom !== undefined) {
-      bottom = Math.min(bottom, this.clipBounds.bottom);
-    }
-    return { left, top, right, bottom };
+  isPositioned() {
+    return this.style.getPropertyValue("position") != "static";
+  },
+
+  isAbsolutelyPositioned() {
+    return ["absolute", "fixed"].includes(this.style.getPropertyValue("position"));
+  },
+
+  isTable() {
+    return ["table", "inline-table"].includes(this.style.getPropertyValue("display"));
+  },
+
+  isFlexOrGridContainer() {
+    return ["flex", "inline-flex", "grid", "inline-grid"].includes(
+      this.style.getPropertyValue("display")
+    );
+  },
+
+  isBlockElement() {
+    return ["block", "table", "flex", "grid"].includes(this.style.getPropertyValue("display"));
+  },
+
+  isFloat() {
+    return this.style.getPropertyValue("float") != "none";
   },
 
   getPositionedAncestor() {
-    if (this.style.getPropertyValue("position") != "static") {
+    if (this.isPositioned()) {
       return this;
     }
     return this.parent?.getPositionedAncestor();
+  },
+
+  // see https://developer.mozilla.org/en-US/docs/Web/Guide/CSS/Block_formatting_context
+  getFormattingContextElement() {
+    if (!this.parent) {
+      return this;
+    }
+    if (this.isFloat()) {
+      return this;
+    }
+    if (this.isAbsolutelyPositioned()) {
+      return this;
+    }
+    if (
+      [
+        "inline-block",
+        "table-cell",
+        "table-caption",
+        "table",
+        "table-row",
+        "table-row-group",
+        "table-header-group",
+        "table-footer-group",
+        "inline-table",
+        "flow-root",
+      ].includes(this.style.getPropertyValue("display"))
+    ) {
+      return this;
+    }
+    if (
+      this.isBlockElement() &&
+      !(
+        ["visible", "clip"].includes(this.style.getPropertyValue("overflow-x")) &&
+        ["visible", "clip"].includes(this.style.getPropertyValue("overflow-y"))
+      )
+    ) {
+      return this;
+    }
+    if (["layout", "content", "paint"].includes(this.style.getPropertyValue("contain"))) {
+      return this;
+    }
+    if (this.parent.isFlexOrGridContainer() && !this.isFlexOrGridContainer() && !this.isTable()) {
+      return this;
+    }
+    if (
+      this.style.getPropertyValue("column-count") != "auto" ||
+      this.style.getPropertyValue("column-width") != "auto"
+    ) {
+      return this;
+    }
+    if (this.style.getPropertyValue("column-span") == "all") {
+      return this;
+    }
+    return this.parent.getFormattingContextElement();
   },
 
   toString() {
@@ -2446,7 +2508,6 @@ StackingContext.prototype = {
 
   // Add node and its descendants to this stacking context.
   add(node, parentElem, offset) {
-    const bounds = node.getBoundingClientRect();
     const style = getWindow().getComputedStyle(node);
     const position = style.getPropertyValue("position");
     let clipBounds;
@@ -2458,15 +2519,29 @@ StackingContext.prototype = {
       clipBounds = parentElem?.clipBounds || {};
     }
     clipBounds = Object.assign({}, clipBounds);
+    const elem = new StackingContextElement(node, parentElem, offset, style, clipBounds);
     if (style.getPropertyValue("overflow-x") != "visible") {
-      clipBounds.left = clipBounds.left !== undefined ? Math.max(bounds.left, clipBounds.left) : bounds.left;
-      clipBounds.right = clipBounds.right !== undefined ? Math.min(bounds.right, clipBounds.right) : bounds.right;
+      const clipBounds2 = elem.getFormattingContextElement().raw.getBoundingClientRect();
+      elem.clipBounds.left =
+        clipBounds.left !== undefined
+          ? Math.max(clipBounds2.left, clipBounds.left)
+          : clipBounds2.left;
+      elem.clipBounds.right =
+        clipBounds.right !== undefined
+          ? Math.min(clipBounds2.right, clipBounds.right)
+          : clipBounds2.right;
     }
     if (style.getPropertyValue("overflow-y") != "visible") {
-      clipBounds.top = clipBounds.top !== undefined ? Math.max(bounds.top, clipBounds.top) : bounds.top;
-      clipBounds.bottom = clipBounds.bottom !== undefined ? Math.min(bounds.bottom, clipBounds.bottom) : bounds.bottom;
+      const clipBounds2 = elem.getFormattingContextElement().raw.getBoundingClientRect();
+      elem.clipBounds.top =
+        clipBounds.top !== undefined
+          ? Math.max(clipBounds2.top, clipBounds.top)
+          : clipBounds2.top;
+      elem.clipBounds.bottom =
+        clipBounds.bottom !== undefined
+          ? Math.min(clipBounds2.bottom, clipBounds.bottom)
+          : clipBounds2.bottom;
     }
-    const elem = new StackingContextElement(node, parentElem, offset, style, bounds, clipBounds);
 
     // Create a new stacking context for any iframes.
     if (elem.raw.tagName == "IFRAME") {
@@ -2512,7 +2587,7 @@ StackingContext.prototype = {
       return;
     }
 
-    if (elem.style.getPropertyValue("float") != "none") {
+    if (elem.isFloat()) {
       // Group the element and its descendants.
       this.addContext(elem, this.realStackingContext);
       this.addFloatingElement(elem);
@@ -2614,6 +2689,15 @@ StackingContext.prototype = {
   },
 };
 
+function shiftRect(rect, offset) {
+  return {
+    left: rect.left !== undefined ? offset.left + rect.left : undefined,
+    top: rect.top !== undefined ? offset.top + rect.top : undefined,
+    right: rect.right !== undefined ? offset.left + rect.right : undefined,
+    bottom: rect.bottom !== undefined ? offset.top + rect.bottom : undefined,
+  };
+}
+
 function DOM_getAllBoundingClientRects() {
   const cx = new StackingContext();
 
@@ -2626,21 +2710,58 @@ function DOM_getAllBoundingClientRects() {
   entries.reverse();
 
   const elements = entries
-    .map((elem) => {
+    .map(elem => {
       const id = getObjectIdRaw(elem.raw);
-      const { left, top, right, bottom } = elem.getClippedBounds();
+
+      const { left, top, right, bottom } = shiftRect(elem.raw.getBoundingClientRect(), elem.offset);
       if (left >= right || top >= bottom) {
         return null;
       }
+
+      const clipBounds = shiftRect(elem.clipBounds, elem.offset);
+      // ignore elements that are completely outside their clipBounds
+      if (
+        clipBounds.left > right ||
+        clipBounds.top > bottom ||
+        clipBounds.right < left ||
+        clipBounds.bottom < top
+      ) {
+        return null;
+      }
+      // only return the clipBounds that actually affect this element
+      if (clipBounds.left === undefined || clipBounds.left <= left) {
+        delete clipBounds.left;
+      }
+      if (clipBounds.top === undefined || clipBounds.top <= top) {
+        delete clipBounds.top;
+      }
+      if (clipBounds.right === undefined || clipBounds.right >= right) {
+        delete clipBounds.right;
+      }
+      if (clipBounds.bottom === undefined || clipBounds.bottom >= bottom) {
+        delete clipBounds.bottom;
+      }
+
+      const rects = [...elem.raw.getClientRects()]
+        .map(rect => shiftRect(rect, elem.offset))
+        .map(({ left, top, right, bottom }) => {
+          if (left >= right || top >= bottom) {
+            return null;
+          }
+          return [left, top, right, bottom];
+        })
+        .filter((v) => !!v);
+
       const v = {
         node: id,
-        rect: [
-          elem.offset.left + left,
-          elem.offset.top + top,
-          elem.offset.left + right,
-          elem.offset.top + bottom,
-        ],
+        rect: [left, top, right, bottom],
       };
+      if (rects.length > 1) {
+        v.rects = rects;
+      }
+      if (Object.keys(clipBounds).length > 0) {
+        v.clipBounds = clipBounds;
+      }
       if (elem.style?.getPropertyValue("visibility") === "hidden") {
         v.visibility = "hidden";
       }
