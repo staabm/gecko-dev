@@ -188,7 +188,7 @@ class Port {
 
   ~Port();
 
-  mozilla::Mutex lock_{"Port State"};
+  mozilla::Mutex lock_{"Port State", /* aOrdered */ true};
 };
 
 }  // namespace ports
