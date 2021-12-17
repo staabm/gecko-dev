@@ -54,6 +54,8 @@ const {
   initialize: initReactDevtools,
 } = require("devtools/server/actors/replay/react-devtools/contentScript");
 
+const { StackingContext } = require("devtools/server/actors/replay/stacking-context");
+
 let gWindow;
 function getWindow() {
   if (!gWindow) {
@@ -2323,302 +2325,20 @@ function Target_topFrameLocation() {
 // DOM Commands
 ///////////////////////////////////////////////////////////////////////////////
 
-// Mouse Targets Overview
-//
-// Mouse target data is used to figure out which element to highlight when the
-// mouse is hovered/clicked on different parts of the screen when the element
-// picker is used. To determine this, we need to know the bounding client rects
-// of every element (easy) and the order in which different elements are stacked
-// (not easy).
-//
-// To figure out the order in which elements are stacked, we reconstruct the
-// stacking contexts on the page and the order in which elements are laid out
-// within those stacking contexts, allowing us to assemble a sorted array of
-// elements such that for any two elements that overlap, the frontmost element
-// appears first in the array.
-//
-// References:
-//
-// https://www.w3.org/TR/CSS21/zindex.html
-//
-//   We try to follow this reference, although not all of its rules are
-//   implemented yet.
-//
-// https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Positioning/Understanding_z_index/The_stacking_context
-//
-//   This is helpful but the rules for when stacking contexts are created are
-//   quite baroque and don't seem to match up with the spec above, so they are
-//   mostly ignored here.
-
-// Information about an element needed to add it to a stacking context.
-function StackingContextElement(node, parent, offset, style, bounds, clipBounds) {
-  assert(node.nodeType == Node.ELEMENT_NODE);
-
-  // Underlying element.
-  this.raw = node;
-
-  // Offset relative to the outer window of the window containing this context.
-  this.offset = offset;
-
-  // the parent StackingContextElement
-  this.parent = parent;
-
-  // Style and layout information for the node.
-  this.style = style;
-  this.bounds = bounds;
-  this.clipBounds = clipBounds;
-
-  // Any stacking context at which this element is the root.
-  this.context = null;
+function shiftRect(rect, offset) {
+  return {
+    left: rect.left !== undefined ? offset.left + rect.left : undefined,
+    top: rect.top !== undefined ? offset.top + rect.top : undefined,
+    right: rect.right !== undefined ? offset.left + rect.right : undefined,
+    bottom: rect.bottom !== undefined ? offset.top + rect.bottom : undefined,
+  };
 }
-
-StackingContextElement.prototype = {
-  getClippedBounds() {
-    let { left, top, right, bottom } = this.bounds;
-    if (this.clipBounds.left !== undefined) {
-      left = Math.max(left, this.clipBounds.left);
-    }
-    if (this.clipBounds.top !== undefined) {
-      top = Math.max(top, this.clipBounds.top);
-    }
-    if (this.clipBounds.right !== undefined) {
-      right = Math.min(right, this.clipBounds.right);
-    }
-    if (this.clipBounds.bottom !== undefined) {
-      bottom = Math.min(bottom, this.clipBounds.bottom);
-    }
-    return { left, top, right, bottom };
-  },
-
-  getPositionedAncestor() {
-    if (this.style.getPropertyValue("position") != "static") {
-      return this;
-    }
-    return this.parent?.getPositionedAncestor();
-  },
-
-  toString() {
-    return getObjectIdRaw(this.raw);
-  },
-};
-
-let gNextStackingContextId = 1;
-
-// Information about all the nodes in the same stacking context.
-// The spec says that some elements should be treated as if they
-// "created a new stacking context, but any positioned descendants and
-// descendants which actually create a new stacking context should be
-// considered part of the parent stacking context, not this new one".
-// For these elements we also create a StackingContext but pass the
-// parent stacking context to the constructor as the "realStackingContext".
-function StackingContext(root, offset, realStackingContext) {
-  this.id = gNextStackingContextId++;
-
-  this.realStackingContext = realStackingContext || this;
-
-  // Offset relative to the outer window of the window containing this context.
-  this.offset = offset || { left: 0, top: 0 };
-
-  // The arrays below are filled in tree order (preorder depth first traversal).
-
-  // All non-positioned, non-floating elements.
-  this.nonPositionedElements = [];
-
-  // All floating elements.
-  this.floatingElements = [];
-
-  // All positioned elements with an auto or zero z-index.
-  this.positionedElements = [];
-
-  // Arrays of elements with non-zero z-indexes, indexed by that z-index.
-  this.zIndexElements = new Map();
-
-  this.root = root;
-  if (root) {
-    this.addChildrenWithParent(root);
-  }
-}
-
-StackingContext.prototype = {
-  toString() {
-    return `StackingContext:${this.id}`;
-  },
-
-  // Add node and its descendants to this stacking context.
-  add(node, parentElem, offset) {
-    const bounds = node.getBoundingClientRect();
-    const style = getWindow().getComputedStyle(node);
-    const position = style.getPropertyValue("position");
-    let clipBounds;
-    if (position == "absolute") {
-      clipBounds = parentElem?.getPositionedAncestor()?.clipBounds || {};
-    } else if (position == "fixed") {
-      clipBounds = {};
-    } else {
-      clipBounds = parentElem?.clipBounds || {};
-    }
-    clipBounds = Object.assign({}, clipBounds);
-    if (style.getPropertyValue("overflow-x") != "visible") {
-      clipBounds.left = clipBounds.left !== undefined ? Math.max(bounds.left, clipBounds.left) : bounds.left;
-      clipBounds.right = clipBounds.right !== undefined ? Math.min(bounds.right, clipBounds.right) : bounds.right;
-    }
-    if (style.getPropertyValue("overflow-y") != "visible") {
-      clipBounds.top = clipBounds.top !== undefined ? Math.max(bounds.top, clipBounds.top) : bounds.top;
-      clipBounds.bottom = clipBounds.bottom !== undefined ? Math.min(bounds.bottom, clipBounds.bottom) : bounds.bottom;
-    }
-    const elem = new StackingContextElement(node, parentElem, offset, style, bounds, clipBounds);
-
-    // Create a new stacking context for any iframes.
-    if (elem.raw.tagName == "IFRAME") {
-      const { left, top } = elem.raw.getBoundingClientRect();
-      this.addContext(elem, undefined, left, top);
-      elem.context.addChildren(elem.raw.contentWindow.document);
-    }
-
-    if (!elem.style) {
-      this.addNonPositionedElement(elem);
-      this.addChildrenWithParent(elem);
-      return;
-    }
-
-    const parentDisplay = elem.parent?.style?.getPropertyValue("display");
-    if (
-      position != "static" ||
-      ["flex", "inline-flex", "grid", "inline-grid"].includes(parentDisplay)
-    ) {
-      const zIndex = elem.style.getPropertyValue("z-index");
-      if (zIndex != "auto") {
-        this.addContext(elem);
-        // Elements with a zero z-index have their own stacking context but are
-        // grouped with other positioned children with an auto z-index.
-        const index = +zIndex | 0;
-        if (index) {
-          this.realStackingContext.addZIndexElement(elem, index);
-          return;
-        }
-      }
-
-      if (position != "static") {
-        this.realStackingContext.addPositionedElement(elem);
-        if (!elem.context) {
-          this.addContext(elem, this.realStackingContext);
-        }
-      } else {
-        this.addNonPositionedElement(elem);
-        if (!elem.context) {
-          this.addChildrenWithParent(elem);
-        }
-      }
-      return;
-    }
-
-    if (elem.style.getPropertyValue("float") != "none") {
-      // Group the element and its descendants.
-      this.addContext(elem, this.realStackingContext);
-      this.addFloatingElement(elem);
-      return;
-    }
-
-    const display = elem.style.getPropertyValue("display");
-    if (display == "inline-block" || display == "inline-table") {
-      // Group the element and its descendants.
-      this.addContext(elem, this.realStackingContext);
-      this.addNonPositionedElement(elem);
-      return;
-    }
-
-    this.addNonPositionedElement(elem);
-    this.addChildrenWithParent(elem);
-  },
-
-  addContext(elem, realStackingContext, left = 0, top = 0) {
-    if (elem.context) {
-      assert(!left && !top);
-      return;
-    }
-    const offset = {
-      left: this.offset.left + left,
-      top: this.offset.top + top,
-    };
-    elem.context = new StackingContext(elem, offset, realStackingContext);
-  },
-
-  addZIndexElement(elem, index) {
-    const existing = this.zIndexElements.get(index);
-    if (existing) {
-      existing.push(elem);
-    } else {
-      this.zIndexElements.set(index, [elem]);
-    }
-  },
-
-  addPositionedElement(elem) {
-    this.positionedElements.push(elem);
-  },
-
-  addFloatingElement(elem) {
-    this.floatingElements.push(elem);
-  },
-
-  addNonPositionedElement(elem) {
-    this.nonPositionedElements.push(elem);
-  },
-
-  addChildren(parentNode) {
-    for (const child of parentNode.children) {
-      this.add(child, undefined, this.offset);
-    }
-  },
-
-  addChildrenWithParent(parentElem) {
-    for (const child of parentElem.raw.children) {
-      this.add(child, parentElem, this.offset);
-    }
-  },
-
-  // Get the elements in this context ordered back-to-front.
-  flatten() {
-    const rv = [];
-
-    const pushElements = (elems) => {
-      for (const elem of elems) {
-        if (elem.context && elem.context != this) {
-          rv.push(...elem.context.flatten());
-        } else {
-          rv.push(elem);
-        }
-      }
-    };
-
-    const pushZIndexElements = (filter) => {
-      for (const z of zIndexes) {
-        if (filter(z)) {
-          pushElements(this.zIndexElements.get(z));
-        }
-      }
-    };
-
-    const zIndexes = [...this.zIndexElements.keys()];
-    zIndexes.sort((a, b) => a - b);
-
-    if (this.root) {
-      pushElements([this.root]);
-    }
-    pushZIndexElements((z) => z < 0);
-    pushElements(this.nonPositionedElements);
-    pushElements(this.floatingElements);
-    pushElements(this.positionedElements);
-    pushZIndexElements((z) => z > 0);
-
-    return rv;
-  },
-};
 
 function DOM_getAllBoundingClientRects() {
-  const cx = new StackingContext();
+  const window = getWindow();
+  const cx = new StackingContext(window);
 
-  const { document } = getWindow();
-  cx.addChildren(document);
+  cx.addChildren(window.document);
 
   const entries = cx.flatten();
 
@@ -2626,21 +2346,58 @@ function DOM_getAllBoundingClientRects() {
   entries.reverse();
 
   const elements = entries
-    .map((elem) => {
+    .map(elem => {
       const id = getObjectIdRaw(elem.raw);
-      const { left, top, right, bottom } = elem.getClippedBounds();
+
+      const { left, top, right, bottom } = shiftRect(elem.raw.getBoundingClientRect(), elem.offset);
       if (left >= right || top >= bottom) {
         return null;
       }
+
+      const clipBounds = shiftRect(elem.clipBounds, elem.offset);
+      // ignore elements that are completely outside their clipBounds
+      if (
+        clipBounds.left > right ||
+        clipBounds.top > bottom ||
+        clipBounds.right < left ||
+        clipBounds.bottom < top
+      ) {
+        return null;
+      }
+      // only return the clipBounds that actually affect this element
+      if (clipBounds.left === undefined || clipBounds.left <= left) {
+        delete clipBounds.left;
+      }
+      if (clipBounds.top === undefined || clipBounds.top <= top) {
+        delete clipBounds.top;
+      }
+      if (clipBounds.right === undefined || clipBounds.right >= right) {
+        delete clipBounds.right;
+      }
+      if (clipBounds.bottom === undefined || clipBounds.bottom >= bottom) {
+        delete clipBounds.bottom;
+      }
+
+      const rects = [...elem.raw.getClientRects()]
+        .map(rect => shiftRect(rect, elem.offset))
+        .map(({ left, top, right, bottom }) => {
+          if (left >= right || top >= bottom) {
+            return null;
+          }
+          return [left, top, right, bottom];
+        })
+        .filter((v) => !!v);
+
       const v = {
         node: id,
-        rect: [
-          elem.offset.left + left,
-          elem.offset.top + top,
-          elem.offset.left + right,
-          elem.offset.top + bottom,
-        ],
+        rect: [left, top, right, bottom],
       };
+      if (rects.length > 1) {
+        v.rects = rects;
+      }
+      if (Object.keys(clipBounds).length > 0) {
+        v.clipBounds = clipBounds;
+      }
       if (elem.style?.getPropertyValue("visibility") === "hidden") {
         v.visibility = "hidden";
       }

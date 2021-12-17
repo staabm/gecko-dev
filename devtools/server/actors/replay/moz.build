@@ -17,6 +17,7 @@ DevToolsModules(
     'globals.js',
     'module.js',
     'network-helpers.jsm',
+    'stacking-context.js',
     'telemetry.js',
 )
 
